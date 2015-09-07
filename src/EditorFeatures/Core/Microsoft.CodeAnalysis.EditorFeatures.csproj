@@ -1,0 +1,265 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{AE28A655-C333-4857-A392-0AB902CFC33C}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Microsoft.CodeAnalysis.EditorFeatures</RootNamespace>
+    <AssemblyName>Microsoft.CodeAnalysis.CSharp.EditorFeatures</AssemblyName>
+    <TargetFrameworkVersion>v4.6</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup>
+    <SignAssembly>true</SignAssembly>
+  </PropertyGroup>
+  <PropertyGroup>
+    <AssemblyOriginatorKeyFile>35MSSharedLib1024.snk</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
+  <PropertyGroup>
+    <DelaySign>true</DelaySign>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Microsoft.CodeAnalysis, Version=1.1.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.CodeAnalysis.Common.1.1.0-beta1-20150812-01\lib\net45\Microsoft.CodeAnalysis.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.CodeAnalysis.CSharp, Version=1.1.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.CodeAnalysis.CSharp.1.1.0-beta1-20150812-01\lib\net45\Microsoft.CodeAnalysis.CSharp.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.CodeAnalysis.CSharp.Features, Version=1.1.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.CodeAnalysis.CSharp.Features.1.1.0-beta1-20150812-01\lib\net46\Microsoft.CodeAnalysis.CSharp.Features.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.CodeAnalysis.CSharp.Workspaces, Version=1.1.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.CodeAnalysis.CSharp.Workspaces.1.1.0-beta1-20150812-01\lib\net45\Microsoft.CodeAnalysis.CSharp.Workspaces.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.CodeAnalysis.Features, Version=1.1.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.CodeAnalysis.Features.1.1.0-beta1-20150812-01\lib\net46\Microsoft.CodeAnalysis.Features.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.CodeAnalysis.Workspaces, Version=1.1.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.CodeAnalysis.Workspaces.Common.1.1.0-beta1-20150812-01\lib\net45\Microsoft.CodeAnalysis.Workspaces.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.CodeAnalysis.Workspaces.Desktop, Version=1.1.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.CodeAnalysis.Workspaces.Common.1.1.0-beta1-20150812-01\lib\net45\Microsoft.CodeAnalysis.Workspaces.Desktop.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+    <Reference Include="System" />
+    <Reference Include="System.Collections.Immutable, Version=1.1.36.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>packages\System.Collections.Immutable.1.1.36\lib\portable-net45+win8+wp8+wpa81\System.Collections.Immutable.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.ComponentModel.Composition" />
+    <Reference Include="System.Composition.AttributedModel, Version=1.0.27.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.Composition.1.0.27\lib\portable-net45+win8+wp8+wpa81\System.Composition.AttributedModel.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Composition.Convention, Version=1.0.27.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.Composition.1.0.27\lib\portable-net45+win8+wp8+wpa81\System.Composition.Convention.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Composition.Hosting, Version=1.0.27.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.Composition.1.0.27\lib\portable-net45+win8+wp8+wpa81\System.Composition.Hosting.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Composition.Runtime, Version=1.0.27.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.Composition.1.0.27\lib\portable-net45+win8+wp8+wpa81\System.Composition.Runtime.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Composition.TypedParts, Version=1.0.27.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>packages\Microsoft.Composition.1.0.27\lib\portable-net45+win8+wp8+wpa81\System.Composition.TypedParts.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Core" />
+    <Reference Include="System.Reflection.Metadata, Version=1.1.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>packages\System.Reflection.Metadata.1.1.0-alpha-00009\lib\dotnet\System.Reflection.Metadata.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Xml" />
+    <Reference Include="WindowsBase" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="35MSSharedLib1024.snk" />
+    <None Include="app.config" />
+    <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Analyzer Include="packages\Microsoft.CodeAnalysis.Analyzers.1.1.0-beta1-20150812-01\analyzers\dotnet\cs\Microsoft.CodeAnalysis.Analyzers.dll" />
+    <Analyzer Include="packages\Microsoft.CodeAnalysis.Analyzers.1.1.0-beta1-20150812-01\analyzers\dotnet\cs\Microsoft.CodeAnalysis.CSharp.Analyzers.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Properties\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\CSharp\CSharpEditorResources.Designer.cs">
+      <Link>CSharp\CSharpEditorResources.Designer.cs</Link>
+    </Compile>
+    <Compile Include="..\CSharp\SignatureHelp\AbstractCSharpSignatureHelpProvider.cs">
+      <Link>CSharp\SignatureHelp\AbstractCSharpSignatureHelpProvider.cs</Link>
+    </Compile>
+    <Compile Include="..\CSharp\SignatureHelp\AttributeSignatureHelpProvider.cs">
+      <Link>CSharp\SignatureHelp\AttributeSignatureHelpProvider.cs</Link>
+    </Compile>
+    <Compile Include="..\CSharp\SignatureHelp\ConstructorInitializerSignatureHelpProvider.cs">
+      <Link>CSharp\SignatureHelp\ConstructorInitializerSignatureHelpProvider.cs</Link>
+    </Compile>
+    <Compile Include="..\CSharp\SignatureHelp\ElementAccessExpressionSignatureHelpProvider.cs">
+      <Link>CSharp\SignatureHelp\ElementAccessExpressionSignatureHelpProvider.cs</Link>
+    </Compile>
+    <Compile Include="..\CSharp\SignatureHelp\GenericNamePartiallyWrittenSignatureHelpProvider.cs">
+      <Link>CSharp\SignatureHelp\GenericNamePartiallyWrittenSignatureHelpProvider.cs</Link>
+    </Compile>
+    <Compile Include="..\CSharp\SignatureHelp\GenericNameSignatureHelpProvider.cs">
+      <Link>CSharp\SignatureHelp\GenericNameSignatureHelpProvider.cs</Link>
+    </Compile>
+    <Compile Include="..\CSharp\SignatureHelp\GenericNameSignatureHelpProvider_Method.cs">
+      <Link>CSharp\SignatureHelp\GenericNameSignatureHelpProvider_Method.cs</Link>
+    </Compile>
+    <Compile Include="..\CSharp\SignatureHelp\GenericNameSignatureHelpProvider_NamedType.cs">
+      <Link>CSharp\SignatureHelp\GenericNameSignatureHelpProvider_NamedType.cs</Link>
+    </Compile>
+    <Compile Include="..\CSharp\SignatureHelp\InvocationExpressionSignatureHelpProvider.cs">
+      <Link>CSharp\SignatureHelp\InvocationExpressionSignatureHelpProvider.cs</Link>
+    </Compile>
+    <Compile Include="..\CSharp\SignatureHelp\InvocationExpressionSignatureHelpProvider_DelegateInvoke.cs">
+      <Link>CSharp\SignatureHelp\InvocationExpressionSignatureHelpProvider_DelegateInvoke.cs</Link>
+    </Compile>
+    <Compile Include="..\CSharp\SignatureHelp\InvocationExpressionSignatureHelpProvider_MethodGroup.cs">
+      <Link>CSharp\SignatureHelp\InvocationExpressionSignatureHelpProvider_MethodGroup.cs</Link>
+    </Compile>
+    <Compile Include="..\CSharp\SignatureHelp\ObjectCreationExpressionSignatureHelpProvider.cs">
+      <Link>CSharp\SignatureHelp\ObjectCreationExpressionSignatureHelpProvider.cs</Link>
+    </Compile>
+    <Compile Include="..\CSharp\SignatureHelp\ObjectCreationExpressionSignatureHelpProvider_DelegateType.cs">
+      <Link>CSharp\SignatureHelp\ObjectCreationExpressionSignatureHelpProvider_DelegateType.cs</Link>
+    </Compile>
+    <Compile Include="..\CSharp\SignatureHelp\ObjectCreationExpressionSignatureHelpProvider_NormalType.cs">
+      <Link>CSharp\SignatureHelp\ObjectCreationExpressionSignatureHelpProvider_NormalType.cs</Link>
+    </Compile>
+    <Compile Include="..\CSharp\SignatureHelp\SignatureHelpUtilities.cs">
+      <Link>CSharp\SignatureHelp\SignatureHelpUtilities.cs</Link>
+    </Compile>
+    <Compile Include="CommandState.cs" />
+    <Compile Include="ContentTypeLanguageMetadata.cs" />
+    <Compile Include="ContentTypeNames.cs" />
+    <Compile Include="CSharpFeaturesResources.cs" />
+    <Compile Include="EditorFeaturesResources.Designer.cs" />
+    <Compile Include="Extensibility\BraceMatching\ExportBraceMatcherAttribute.cs" />
+    <Compile Include="Extensibility\BraceMatching\IBraceMatcher.cs" />
+    <Compile Include="Extensibility\Composition\ContentTypeMetadata.cs" />
+    <Compile Include="Extensibility\Composition\IContentTypeMetadata.cs" />
+    <Compile Include="Extensibility\Composition\OrderableContentTypeMetadata.cs" />
+    <Compile Include="Extensibility\Highlighting\ExportHighlighterAttribute.cs" />
+    <Compile Include="Extensibility\Highlighting\IHighlighter.cs" />
+    <Compile Include="Extensibility\QuickInfo\ExportQuickInfoProviderAttribute.cs" />
+    <Compile Include="Extensibility\QuickInfo\IDeferredQuickInfoContent.cs" />
+    <Compile Include="Extensibility\QuickInfo\IQuickInfoProvider.cs" />
+    <Compile Include="Extensibility\QuickInfo\PredefinedQuickInfoPresenterNames.cs" />
+    <Compile Include="Extensibility\QuickInfo\PredefinedQuickInfoProviderNames.cs" />
+    <Compile Include="Extensibility\QuickInfo\QuickInfoItem.cs" />
+    <Compile Include="Extensibility\SignatureHelp\ExportSignatureHelpProviderAttribute.cs" />
+    <Compile Include="Extensibility\SignatureHelp\ISignatureHelpProvider.cs" />
+    <Compile Include="Extensibility\SignatureHelp\PredefinedSignatureHelpPresenterNames.cs" />
+    <Compile Include="Extensibility\SignatureHelp\SignatureHelpItem.cs" />
+    <Compile Include="Extensibility\SignatureHelp\SignatureHelpItemEventArgs.cs" />
+    <Compile Include="Extensibility\SignatureHelp\SignatureHelpItems.cs" />
+    <Compile Include="Extensibility\SignatureHelp\SignatureHelpParameter.cs" />
+    <Compile Include="Extensibility\SignatureHelp\SignatureHelpState.cs" />
+    <Compile Include="Extensibility\SignatureHelp\SignatureHelpTriggerInfo.cs" />
+    <Compile Include="Extensibility\SignatureHelp\SignatureHelpTriggerReason.cs" />
+    <Compile Include="Host\IPreviewDialogService.cs" />
+    <Compile Include="Host\IPreviewPaneService.cs" />
+    <Compile Include="Host\IReferencedSymbolsPresenter.cs" />
+    <Compile Include="Host\IWaitContext.cs" />
+    <Compile Include="Host\IWaitIndicator.cs" />
+    <Compile Include="IBraceMatchingService.cs" />
+    <Compile Include="IForegroundNotificationService.cs" />
+    <Compile Include="IHighlightingService.cs" />
+    <Compile Include="IInlineRenameService.cs" />
+    <Compile Include="IInlineRenameSession.cs" />
+    <Compile Include="ILineSeparatorService.cs" />
+    <Compile Include="Implementation\IntelliSense\SignatureHelp\AbstractSignatureHelpProvider.cs" />
+    <Compile Include="Implementation\IntelliSense\SignatureHelp\AbstractSignatureHelpProvider.SymbolKeySignatureHelpItem.cs" />
+    <Compile Include="Implementation\IntelliSense\SignatureHelp\CommonSignatureHelpUtilities.cs" />
+    <Compile Include="Implementation\TodoComment\ITodoListProvider.cs" />
+    <Compile Include="Implementation\TodoComment\TodoItem.cs" />
+    <Compile Include="Implementation\TodoComment\TodoListEventArgs.cs" />
+    <Compile Include="IRefactorNotifyService.cs" />
+    <Compile Include="MetadataAsSourceFile.cs" />
+    <Compile Include="Options\BraceCompletionOptions.cs" />
+    <Compile Include="Options\CompletionOptions.cs" />
+    <Compile Include="Options\ExtensionManagerOptions.cs" />
+    <Compile Include="Options\NavigationBarOptions.cs" />
+    <Compile Include="Options\SignatureHelpOptions.cs" />
+    <Compile Include="Shared\Extensions\IBraceMatchingServiceExtensions.cs" />
+    <Compile Include="Shared\Extensions\IRefactorNotifyServiceExtensions.cs" />
+    <Compile Include="Shared\Extensions\IWaitIndicatorExtensions.cs" />
+    <Compile Include="Shared\Extensions\WorkspaceExtensions.cs" />
+    <Compile Include="Shared\Options\ComponentOnOffOptions.cs" />
+    <Compile Include="Shared\Options\FeatureOnOffOptions.cs" />
+    <Compile Include="Shared\Options\InternalFeatureOnOffOptions.cs" />
+    <Compile Include="Shared\Options\PerformanceFunctionIdOptionsProvider.cs" />
+    <Compile Include="Shared\Preview\PredefinedPreviewTaggerKeys.cs" />
+    <Compile Include="Shared\Preview\PreviewSolutionCrawlerRegistrationService.cs" />
+    <Compile Include="Shared\Preview\PreviewWorkspace.cs" />
+    <Compile Include="Shared\SuggestionSupport\DefaultDocumentSupportsSuggestionService.cs" />
+    <Compile Include="Shared\SuggestionSupport\IDocumentSupportsSuggestionService.cs" />
+    <Compile Include="Shared\Utilities\BrushToColorConverter.cs" />
+    <Compile Include="Shared\Utilities\CodeAnalysisColors.cs" />
+    <Compile Include="Shared\Utilities\HighContrastChecker.cs" />
+    <Compile Include="Shared\Utilities\ResettableDelay.cs" />
+    <Compile Include="Shared\Utilities\VirtualTreePoint.cs" />
+    <Compile Include="SymbolMapping\ISymbolMappingService.cs" />
+    <Compile Include="SymbolMapping\SymbolMappingResult.cs" />
+    <Compile Include="SymbolMapping\SymbolMappingServiceFactory.cs" />
+    <Compile Include="TextViewRoles.cs" />
+    <Compile Include="Undo\Extensions.cs" />
+    <Compile Include="Undo\IGlobalUndoService.cs" />
+    <Compile Include="Undo\IWorkspaceGlobalUndoTransaction.cs" />
+    <Compile Include="Undo\NoOpGlobalUndoServiceFactory.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="..\CSharp\CSharpEditorResources.resx">
+      <Link>CSharp\CSharpEditorResources.resx</Link>
+    </EmbeddedResource>
+    <EmbeddedResource Include="EditorFeaturesResources.resx" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>
