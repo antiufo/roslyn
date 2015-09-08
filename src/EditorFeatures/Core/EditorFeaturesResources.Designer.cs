@@ -10,6 +10,7 @@
 
 namespace Microsoft.CodeAnalysis.Editor {
     using System;
+    using System.Reflection;
     
     
     /// <summary>
@@ -39,7 +40,7 @@ namespace Microsoft.CodeAnalysis.Editor {
         internal static global::System.Resources.ResourceManager ResourceManager {
             get {
                 if (object.ReferenceEquals(resourceMan, null)) {
-                    global::System.Resources.ResourceManager temp = new global::System.Resources.ResourceManager("Microsoft.CodeAnalysis.Editor.EditorFeaturesResources", typeof(EditorFeaturesResources).Assembly);
+                    global::System.Resources.ResourceManager temp = new global::System.Resources.ResourceManager("Microsoft.CodeAnalysis.Editor.EditorFeaturesResources", typeof(EditorFeaturesResources).GetTypeInfo().Assembly);
                     resourceMan = temp;
                 }
                 return resourceMan;
