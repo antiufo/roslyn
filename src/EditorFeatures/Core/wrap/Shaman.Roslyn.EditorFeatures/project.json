@@ -1,5 +1,8 @@
 {
-  "version": "1.0.0-beta-4161",
+  "version": "1.0.0-beta-4162",
+  "scripts": {
+    "prepack": "../../../../../packages/FakeSign.0.9.2/tools/FakeSign.exe ../../Portable/obj/Release/Microsoft.CodeAnalysis.CSharp.EditorFeatures.dll"
+  },
   "frameworks": {
     "net45+win": {
       "wrappedProject": "../../Microsoft.CodeAnalysis.EditorFeatures.Portable.csproj",
