@@ -1,14 +1,18 @@
 ' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
+Imports Microsoft.CodeAnalysis.Editor.Implementation.Interactive
+Imports Microsoft.CodeAnalysis.Editor.UnitTests
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.ChangeSignature
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Extensions
+Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
+Imports Microsoft.CodeAnalysis.Editor.VisualBasic.ChangeSignature
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.ChangeSignature
     Partial Public Class ChangeSignatureTests
         Inherits AbstractChangeSignatureTests
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub RemoveParameters1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
+        Public Async Function TestRemoveParameters1() As Task
 
             Dim markup = <Text><![CDATA[
 Module Program
@@ -82,8 +86,51 @@ End Module
 
 ]]></Text>.NormalizedValue()
 
-            TestChangeSignatureViaCommand(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
+            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
 
-        End Sub
+        End Function
+
+        <WpfFact>
+        <Trait(Traits.Feature, Traits.Features.ChangeSignature)>
+        <Trait(Traits.Feature, Traits.Features.Interactive)>
+        Public Async Function TestChangeSignatureCommandDisabledInSubmission() As Task
+            Dim exportProvider = MinimalTestExportProvider.CreateExportProvider(
+                TestExportProvider.EntireAssemblyCatalogWithCSharpAndVisualBasic.WithParts(GetType(InteractiveDocumentSupportsFeatureService)))
+
+            Using workspace = Await TestWorkspace.CreateAsync(
+                <Workspace>
+                    <Submission Language="Visual Basic" CommonReferences="true">  
+                        Class C
+                            Sub M$$(x As Integer)
+                            End Sub
+                        End Class
+                    </Submission>
+                </Workspace>,
+                workspaceKind:=WorkspaceKind.Interactive,
+                exportProvider:=exportProvider)
+
+                ' Force initialization.
+                workspace.GetOpenDocumentIds().Select(Function(id) workspace.GetTestDocument(id).GetTextView()).ToList()
+
+                Dim textView = workspace.Documents.Single().GetTextView()
+
+                Dim handler = New ChangeSignatureCommandHandler()
+                Dim delegatedToNext = False
+                Dim nextHandler =
+                    Function()
+                        delegatedToNext = True
+                        Return CommandState.Unavailable
+                    End Function
+
+                Dim state = handler.GetCommandState(New Commands.ReorderParametersCommandArgs(textView, textView.TextBuffer), nextHandler)
+                Assert.True(delegatedToNext)
+                Assert.False(state.IsAvailable)
+
+                delegatedToNext = False
+                state = handler.GetCommandState(New Commands.RemoveParametersCommandArgs(textView, textView.TextBuffer), nextHandler)
+                Assert.True(delegatedToNext)
+                Assert.False(state.IsAvailable)
+            End Using
+        End Function
     End Class
 End Namespace

@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System;
 using System.Collections.Generic;
@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Completion.Providers;
+using Microsoft.CodeAnalysis.ErrorReporting;
 using Microsoft.CodeAnalysis.Options;
 using Microsoft.CodeAnalysis.Snippets;
 using Microsoft.CodeAnalysis.Text;
@@ -86,29 +87,31 @@ namespace Microsoft.CodeAnalysis.Completion
             Document document,
             int position,
             CompletionTriggerInfo triggerInfo,
-            IEnumerable<CompletionListProvider> completionProviders,
+            OptionSet options,
+            IEnumerable<CompletionListProvider> providers,
             CancellationToken cancellationToken)
         {
-            completionProviders = completionProviders ?? this.GetDefaultCompletionProviders();
-            var completionProviderToIndex = GetCompletionProviderToIndex(completionProviders);
+            options = options ?? document.Project.Solution.Workspace.Options;
+            providers = providers ?? GetDefaultCompletionProviders();
+
+            var completionProviderToIndex = GetCompletionProviderToIndex(providers);
             var completionRules = GetCompletionRules();
 
             var text = await document.GetTextAsync(cancellationToken).ConfigureAwait(false);
-            var options = document.Project.Solution.Workspace.Options;
 
             IEnumerable<CompletionListProvider> triggeredProviders;
             switch (triggerInfo.TriggerReason)
             {
                 case CompletionTriggerReason.TypeCharCommand:
-                    triggeredProviders = completionProviders.Where(p => p.IsTriggerCharacter(text, position - 1, options)).ToList();
+                    triggeredProviders = providers.Where(p => p.IsTriggerCharacter(text, position - 1, options)).ToList();
                     break;
                 case CompletionTriggerReason.BackspaceOrDeleteCommand:
                     triggeredProviders = this.TriggerOnBackspace(text, position, triggerInfo, options)
-                        ? completionProviders
+                        ? providers
                         : SpecializedCollections.EmptyEnumerable<CompletionListProvider>();
                     break;
                 default:
-                    triggeredProviders = completionProviders;
+                    triggeredProviders = providers;
                     break;
             }
 
@@ -116,7 +119,7 @@ namespace Microsoft.CodeAnalysis.Completion
             var providersAndLists = new List<ProviderList>();
             foreach (var provider in triggeredProviders)
             {
-                var completionList = await GetCompletionListAsync(provider, document, position, triggerInfo, cancellationToken).ConfigureAwait(false);
+                var completionList = await GetCompletionListAsync(provider, document, position, triggerInfo, options, cancellationToken).ConfigureAwait(false);
                 if (completionList != null)
                 {
                     providersAndLists.Add(new ProviderList { Provider = provider, List = completionList });
@@ -146,11 +149,11 @@ namespace Microsoft.CodeAnalysis.Completion
             // If we do have items, then ask all the other (non exclusive providers) if they
             // want to augment the items.
             var usedProviders = nonExclusiveLists.Select(g => g.Provider);
-            var nonUsedProviders = completionProviders.Except(usedProviders);
+            var nonUsedProviders = providers.Except(usedProviders);
             var nonUsedNonExclusiveProviders = new List<ProviderList>();
             foreach (var provider in nonUsedProviders)
             {
-                var completionList = await GetCompletionListAsync(provider, document, position, triggerInfo, cancellationToken).ConfigureAwait(false);
+                var completionList = await GetCompletionListAsync(provider, document, position, triggerInfo, options, cancellationToken).ConfigureAwait(false);
                 if (completionList != null && !completionList.IsExclusive)
                 {
                     nonUsedNonExclusiveProviders.Add(new ProviderList { Provider = provider, List = completionList });
@@ -236,7 +239,7 @@ namespace Microsoft.CodeAnalysis.Completion
             // the snippet item doesn't have its preselect bit set.
             // We'll special case this by not preferring later items
             // if they are snippets and the other candidate is preselected.
-            if (existingItem.Preselect && item.CompletionProvider is ISnippetCompletionProvider)
+            if (existingItem.MatchPriority != MatchPriority.Default && item.CompletionProvider is ISnippetCompletionProvider)
             {
                 return existingItem;
             }
@@ -271,13 +274,42 @@ namespace Microsoft.CodeAnalysis.Completion
             Document document,
             int position,
             CompletionTriggerInfo triggerInfo,
+            OptionSet options,
             CancellationToken cancellationToken)
         {
-            var context = new CompletionListContext(document, position, triggerInfo, cancellationToken);
-
-            await provider.ProduceCompletionListAsync(context).ConfigureAwait(false);
+            var context = new CompletionListContext(document, position, triggerInfo, options, cancellationToken);
+            if (document.SupportsSyntaxTree)
+            {
+                var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+                if (!root.FullSpan.IntersectsWith(position))
+                {
+                    try
+                    {
+                        // Trying to track down source of https://github.com/dotnet/roslyn/issues/9325
+                        var sourceText = await document.GetTextAsync(cancellationToken).ConfigureAwait(false);
+                        ReportException(position, root, sourceText);
+                    }
+                    catch (Exception e) when (FatalError.ReportWithoutCrash(e))
+                    {
+                    }
+                }
+                else
+                {
+                    await provider.ProduceCompletionListAsync(context).ConfigureAwait(false);
+                }
+            }
+            else
+            {
+                await provider.ProduceCompletionListAsync(context).ConfigureAwait(false);
+            }
 
             return new CompletionList(context.GetItems(), context.Builder, context.IsExclusive);
+        }
+
+        private static void ReportException(int position, SyntaxNode root, SourceText sourceText)
+        {
+            throw new InvalidOperationException(
+                $"Position '{position}' is not contained in SyntaxTree Span '{root.FullSpan}' source text length '{sourceText.Length}'");
         }
 
         public bool IsTriggerCharacter(SourceText text, int characterPosition, IEnumerable<CompletionListProvider> completionProviders, OptionSet options)
@@ -312,7 +344,7 @@ namespace Microsoft.CodeAnalysis.Completion
             var snippetInfoService = workspace.Services.GetLanguageServices(GetLanguageName()).GetService<ISnippetInfoService>();
             if (snippetInfoService != null && snippetInfoService.SnippetShortcutExists_NonBlocking(insertionText))
             {
-                return Task.FromResult(string.Format(FeaturesResources.NoteTabTwiceToInsertTheSnippet, insertionText));
+                return Task.FromResult(string.Format(FeaturesResources.Note_colon_Tab_twice_to_insert_the_0_snippet, insertionText));
             }
 
             return SpecializedTasks.Default<string>();

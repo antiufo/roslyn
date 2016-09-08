@@ -46,11 +46,12 @@ namespace Microsoft.CodeAnalysis
         // such value is currently not serializable by JSON serializer.
 
         /// <summary>
-        /// Specifies public key used to generate strong name for the compilation assembly, or empty of not specified.
+        /// Specifies public key used to generate strong name for the compilation assembly, or empty if not specified.
         /// </summary>
         /// <remarks>
-        /// If specified the values of <see cref="CryptoKeyFile"/> and <see cref="CryptoKeyContainer"/> must be null.
-        /// If <see cref="DelaySign"/> is false the assembly is marked as signed but not actually signed (aka "OSS signing").
+        /// If specified the values of <see cref="CryptoKeyFile"/> and <see cref="CryptoKeyContainer"/>
+        /// must be null. If <see cref="PublicSign"/> is true the assembly is marked as fully signed
+        /// but only signed with the public key (aka "OSS signing").
         /// </remarks>
         public ImmutableArray<byte> CryptoPublicKey { get; protected set; }
 
@@ -64,9 +65,8 @@ namespace Microsoft.CodeAnalysis
         /// but not both. If both are specified <see cref="CryptoKeyContainer"/> is ignored.
         /// </para>
         /// <para>
-        /// This setting is obsolete and only supported on Microsoft Windows platform.
-        /// Use <see cref="CryptoPublicKey"/> to generate assemblies with strong name and 
-        /// a signing tool (Microsoft .NET Framework Strong Name Utility (sn.exe) or equivalent) to sign them.
+        /// If <see cref="PublicSign" /> is also set, <see cref="CryptoKeyFile"/> must be the absolute
+        /// path to key file.
         /// </para>
         /// </remarks>
         public string CryptoKeyFile { get; protected set; }
@@ -88,7 +88,7 @@ namespace Microsoft.CodeAnalysis
         public string CryptoKeyContainer { get; protected set; }
 
         /// <summary>
-        /// Turn compilation assembly signing on or off.
+        /// Mark the compilation assembly as delay-signed.
         /// </summary>
         /// <remarks>
         /// If true the resulting assembly is marked as delay signed.
@@ -101,6 +101,20 @@ namespace Microsoft.CodeAnalysis
         /// applied to the compilation assembly in source. If the attribute is not present the value defaults to "false".
         /// </remarks>
         public bool? DelaySign { get; protected set; }
+
+        /// <summary>
+        /// Mark the compilation assembly as fully signed, but only sign with the public key.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// If true, the assembly is marked as signed, but is only signed with the public key.
+        /// </para>
+        /// <para>
+        /// The key must be provided through either an absolute path in <see cref="CryptoKeyFile"/>
+        /// or directly via <see cref="CryptoPublicKey" />.
+        /// </para>
+        /// </remarks>
+        public bool PublicSign { get; protected set; }
 
         /// <summary>
         /// Whether bounds checking on integer arithmetic is enforced by default or not.
@@ -134,6 +148,19 @@ namespace Microsoft.CodeAnalysis
         public bool ConcurrentBuild { get; protected set; }
 
         /// <summary>
+        /// Specifies whether the compilation should be deterministic.
+        /// </summary>
+        public bool Deterministic { get; protected set; }
+
+        /// <summary>
+        /// Used for time-based version generation when <see cref="System.Reflection.AssemblyVersionAttribute"/> contains a wildcard.
+        /// If equal to default(<see cref="DateTime"/>) the actual current local time will be used.
+        /// </summary>
+        internal DateTime CurrentLocalTime { get; private set; }
+
+        internal DateTime CurrentLocalTime_internal_protected_set { set { CurrentLocalTime = value; } }
+       
+        /// <summary>
         /// Emit extended custom debug information to the PDB file.
         /// </summary>
         internal bool ExtendedCustomDebugInformation { get; private set; }
@@ -142,12 +169,28 @@ namespace Microsoft.CodeAnalysis
         internal bool ExtendedCustomDebugInformation_internal_protected_set { set { ExtendedCustomDebugInformation = value; } }
 
         /// <summary>
+        /// Emit mode that favors debuggability. 
+        /// </summary>
+        internal bool DebugPlusMode { get; private set; }
+
+        // TODO: change visibility of the DebugPlusMode setter to internal & protected
+        internal bool DebugPlusMode_internal_protected_set { set { DebugPlusMode = value; } }
+
+        /// <summary>
         /// Import internal/private members from all references regardless of "internals-visible-to" relationship.
         /// </summary>
         internal MetadataImportOptions MetadataImportOptions { get; private set; }
 
         // TODO: change visibility of the MetadataImportOptions setter to internal & protected
         internal MetadataImportOptions MetadataImportOptions_internal_protected_set { set { MetadataImportOptions = value; } }
+
+        /// <summary>
+        /// Apply additional disambiguation rules during resolution of referenced assemblies.
+        /// </summary>
+        internal bool ReferencesSupersedeLowerVersions { get; private set; }
+
+        // TODO: change visibility of the ReferencesSupersedeLowerVersions setter to internal & protected
+        internal bool ReferencesSupersedeLowerVersions_internal_protected_set { set { ReferencesSupersedeLowerVersions = value; } }
 
         /// <summary>
         /// Modifies the incoming diagnostic, for example escalating its severity, or discarding it (returning null) based on the compilation options.
@@ -160,6 +203,11 @@ namespace Microsoft.CodeAnalysis
         /// Warning report option for each warning.
         /// </summary>
         public ImmutableDictionary<string, ReportDiagnostic> SpecificDiagnosticOptions { get; protected set; }
+
+        /// <summary>
+        /// Whether diagnostics suppressed in source, i.e. <see cref="Diagnostic.IsSuppressed"/> is true, should be reported.
+        /// </summary>
+        public bool ReportSuppressedDiagnostics { get; protected set; }
 
         /// <summary>
         /// Resolves paths to metadata references specified in source via #r directives.
@@ -212,6 +260,7 @@ namespace Microsoft.CodeAnalysis
         // Expects correct arguments.
         internal CompilationOptions(
             OutputKind outputKind,
+            bool reportSuppressedDiagnostics,
             string moduleName,
             string mainTypeName,
             string scriptClassName,
@@ -219,6 +268,7 @@ namespace Microsoft.CodeAnalysis
             string cryptoKeyFile,
             ImmutableArray<byte> cryptoPublicKey,
             bool? delaySign,
+            bool publicSign,
             OptimizationLevel optimizationLevel,
             bool checkOverflow,
             Platform platform,
@@ -226,13 +276,17 @@ namespace Microsoft.CodeAnalysis
             int warningLevel,
             ImmutableDictionary<string, ReportDiagnostic> specificDiagnosticOptions,
             bool concurrentBuild,
+            bool deterministic,
+            DateTime currentLocalTime,
             bool extendedCustomDebugInformation,
+            bool debugPlusMode,
             XmlReferenceResolver xmlReferenceResolver,
             SourceReferenceResolver sourceReferenceResolver,
             MetadataReferenceResolver metadataReferenceResolver,
             AssemblyIdentityComparer assemblyIdentityComparer,
             StrongNameProvider strongNameProvider,
-            MetadataImportOptions metadataImportOptions)
+            MetadataImportOptions metadataImportOptions,
+            bool referencesSupersedeLowerVersions)
         {
             this.OutputKind = outputKind;
             this.ModuleName = moduleName;
@@ -247,15 +301,21 @@ namespace Microsoft.CodeAnalysis
             this.GeneralDiagnosticOption = generalDiagnosticOption;
             this.WarningLevel = warningLevel;
             this.SpecificDiagnosticOptions = specificDiagnosticOptions;
+            this.ReportSuppressedDiagnostics = reportSuppressedDiagnostics;
             this.OptimizationLevel = optimizationLevel;
             this.ConcurrentBuild = concurrentBuild;
+            this.Deterministic = deterministic;
+            this.CurrentLocalTime = currentLocalTime;
             this.ExtendedCustomDebugInformation = extendedCustomDebugInformation;
+            this.DebugPlusMode = debugPlusMode;
             this.XmlReferenceResolver = xmlReferenceResolver;
             this.SourceReferenceResolver = sourceReferenceResolver;
             this.MetadataReferenceResolver = metadataReferenceResolver;
             this.StrongNameProvider = strongNameProvider;
             this.AssemblyIdentityComparer = assemblyIdentityComparer ?? AssemblyIdentityComparer.Default;
             this.MetadataImportOptions = metadataImportOptions;
+            this.ReferencesSupersedeLowerVersions = referencesSupersedeLowerVersions;
+            this.PublicSign = publicSign;
 
             _lazyErrors = new Lazy<ImmutableArray<Diagnostic>>(() =>
             {
@@ -272,6 +332,7 @@ namespace Microsoft.CodeAnalysis
             // Can't reuse when file resolver or identity comparers change.
             // Can reuse even if StrongNameProvider changes. When resolving a cyclic reference only the simple name is considered, not the strong name.
             return this.MetadataImportOptions == other.MetadataImportOptions
+                && this.ReferencesSupersedeLowerVersions == other.ReferencesSupersedeLowerVersions
                 && this.OutputKind.IsNetModule() == other.OutputKind.IsNetModule()
                 && object.Equals(this.XmlReferenceResolver, other.XmlReferenceResolver)
                 && object.Equals(this.MetadataReferenceResolver, other.MetadataReferenceResolver)
@@ -302,6 +363,8 @@ namespace Microsoft.CodeAnalysis
             }
         }
 
+        internal abstract ImmutableArray<string> GetImports();
+
         /// <summary>
         /// Creates a new options instance with the specified general diagnostic option.
         /// </summary>
@@ -327,6 +390,30 @@ namespace Microsoft.CodeAnalysis
         }
 
         /// <summary>
+        /// Creates a new options instance with the specified suppressed diagnostics reporting option.
+        /// </summary>
+        public CompilationOptions WithReportSuppressedDiagnostics(bool value)
+        {
+            return CommonWithReportSuppressedDiagnostics(value);
+        }
+
+        /// <summary>
+        /// Creates a new options instance with the concurrent build property set accordingly.
+        /// </summary>
+        public CompilationOptions WithConcurrentBuild(bool concurrent)
+        {
+            return CommonWithConcurrentBuild(concurrent);
+        }
+
+        /// <summary>
+        /// Creates a new options instance with the deterministic property set accordingly.
+        /// </summary>
+        public CompilationOptions WithDeterministic(bool deterministic)
+        {
+            return CommonWithDeterministic(deterministic);
+        }
+
+        /// <summary>
         /// Creates a new options instance with the specified output kind.
         /// </summary>
         public CompilationOptions WithOutputKind(OutputKind kind)
@@ -341,6 +428,11 @@ namespace Microsoft.CodeAnalysis
         {
             return CommonWithPlatform(platform);
         }
+
+        /// <summary>
+        /// Creates a new options instance with the specified public sign setting.
+        /// </summary>
+        public CompilationOptions WithPublicSign(bool publicSign) => CommonWithPublicSign(publicSign);
 
         /// <summary>
         /// Creates a new options instance with optimizations enabled or disabled.
@@ -375,8 +467,11 @@ namespace Microsoft.CodeAnalysis
             return CommonWithStrongNameProvider(provider);
         }
 
+        protected abstract CompilationOptions CommonWithConcurrentBuild(bool concurrent);
+        protected abstract CompilationOptions CommonWithDeterministic(bool deterministic);
         protected abstract CompilationOptions CommonWithOutputKind(OutputKind kind);
         protected abstract CompilationOptions CommonWithPlatform(Platform platform);
+        protected abstract CompilationOptions CommonWithPublicSign(bool publicSign);
         protected abstract CompilationOptions CommonWithOptimizationLevel(OptimizationLevel value);
         protected abstract CompilationOptions CommonWithXmlReferenceResolver(XmlReferenceResolver resolver);
         protected abstract CompilationOptions CommonWithSourceReferenceResolver(SourceReferenceResolver resolver);
@@ -386,6 +481,7 @@ namespace Microsoft.CodeAnalysis
         protected abstract CompilationOptions CommonWithGeneralDiagnosticOption(ReportDiagnostic generalDiagnosticOption);
         protected abstract CompilationOptions CommonWithSpecificDiagnosticOptions(ImmutableDictionary<string, ReportDiagnostic> specificDiagnosticOptions);
         protected abstract CompilationOptions CommonWithSpecificDiagnosticOptions(IEnumerable<KeyValuePair<string, ReportDiagnostic>> specificDiagnosticOptions);
+        protected abstract CompilationOptions CommonWithReportSuppressedDiagnostics(bool reportSuppressedDiagnostics);
         [Obsolete]
         protected abstract CompilationOptions CommonWithFeatures(ImmutableArray<string> features);
 
@@ -393,6 +489,45 @@ namespace Microsoft.CodeAnalysis
         /// Performs validation of options compatibilities and generates diagnostics if needed
         /// </summary>
         internal abstract void ValidateOptions(ArrayBuilder<Diagnostic> builder);
+
+        internal void ValidateOptions(ArrayBuilder<Diagnostic> builder, CommonMessageProvider messageProvider)
+        {
+            if (!CryptoPublicKey.IsEmpty)
+            {
+                if (CryptoKeyFile != null)
+                {
+                    builder.Add(messageProvider.CreateDiagnostic(messageProvider.ERR_MutuallyExclusiveOptions,
+                        Location.None, nameof(CryptoPublicKey), nameof(CryptoKeyFile)));
+                }
+
+                if (CryptoKeyContainer != null)
+                {
+                    builder.Add(messageProvider.CreateDiagnostic(messageProvider.ERR_MutuallyExclusiveOptions,
+                        Location.None, nameof(CryptoPublicKey), nameof(CryptoKeyContainer)));
+                }
+            }
+
+            if (PublicSign)
+            {
+                if (CryptoKeyFile != null && !PathUtilities.IsAbsolute(CryptoKeyFile))
+                {
+                    builder.Add(messageProvider.CreateDiagnostic(messageProvider.ERR_OptionMustBeAbsolutePath,
+                        Location.None, nameof(CryptoKeyFile)));
+                }
+
+                if (CryptoKeyContainer != null)
+                {
+                    builder.Add(messageProvider.CreateDiagnostic(messageProvider.ERR_MutuallyExclusiveOptions,
+                        Location.None, nameof(PublicSign), nameof(CryptoKeyContainer)));
+                }
+
+                if (DelaySign == true)
+                {
+                    builder.Add(messageProvider.CreateDiagnostic(messageProvider.ERR_MutuallyExclusiveOptions,
+                        Location.None, nameof(PublicSign), nameof(DelaySign)));
+                }
+            }
+        }
 
         /// <summary>
         /// Errors collection related to an incompatible set of compilation options
@@ -416,7 +551,10 @@ namespace Microsoft.CodeAnalysis
             bool equal =
                    this.CheckOverflow == other.CheckOverflow &&
                    this.ConcurrentBuild == other.ConcurrentBuild &&
+                   this.Deterministic == other.Deterministic &&
+                   this.CurrentLocalTime == other.CurrentLocalTime &&
                    this.ExtendedCustomDebugInformation == other.ExtendedCustomDebugInformation &&
+                   this.DebugPlusMode == other.DebugPlusMode &&
                    string.Equals(this.CryptoKeyContainer, other.CryptoKeyContainer, StringComparison.Ordinal) &&
                    string.Equals(this.CryptoKeyFile, other.CryptoKeyFile, StringComparison.Ordinal) &&
                    this.CryptoPublicKey.SequenceEqual(other.CryptoPublicKey) &&
@@ -424,10 +562,12 @@ namespace Microsoft.CodeAnalysis
                    this.GeneralDiagnosticOption == other.GeneralDiagnosticOption &&
                    string.Equals(this.MainTypeName, other.MainTypeName, StringComparison.Ordinal) &&
                    this.MetadataImportOptions == other.MetadataImportOptions &&
+                   this.ReferencesSupersedeLowerVersions == other.ReferencesSupersedeLowerVersions &&
                    string.Equals(this.ModuleName, other.ModuleName, StringComparison.Ordinal) &&
                    this.OptimizationLevel == other.OptimizationLevel &&
                    this.OutputKind == other.OutputKind &&
                    this.Platform == other.Platform &&
+                   this.ReportSuppressedDiagnostics == other.ReportSuppressedDiagnostics &&
                    string.Equals(this.ScriptClassName, other.ScriptClassName, StringComparison.Ordinal) &&
                    this.SpecificDiagnosticOptions.SequenceEqual(other.SpecificDiagnosticOptions, (left, right) => (left.Key == right.Key) && (left.Value == right.Value)) &&
                    this.WarningLevel == other.WarningLevel &&
@@ -435,7 +575,8 @@ namespace Microsoft.CodeAnalysis
                    object.Equals(this.XmlReferenceResolver, other.XmlReferenceResolver) &&
                    object.Equals(this.SourceReferenceResolver, other.SourceReferenceResolver) &&
                    object.Equals(this.StrongNameProvider, other.StrongNameProvider) &&
-                   object.Equals(this.AssemblyIdentityComparer, other.AssemblyIdentityComparer);
+                   object.Equals(this.AssemblyIdentityComparer, other.AssemblyIdentityComparer) &&
+                   this.PublicSign == other.PublicSign;
 
             return equal;
         }
@@ -446,17 +587,22 @@ namespace Microsoft.CodeAnalysis
         {
             return Hash.Combine(this.CheckOverflow,
                    Hash.Combine(this.ConcurrentBuild,
+                   Hash.Combine(this.Deterministic,
+                   Hash.Combine(this.CurrentLocalTime.GetHashCode(),
                    Hash.Combine(this.ExtendedCustomDebugInformation,
+                   Hash.Combine(this.DebugPlusMode,
                    Hash.Combine(this.CryptoKeyContainer != null ? StringComparer.Ordinal.GetHashCode(this.CryptoKeyContainer) : 0,
                    Hash.Combine(this.CryptoKeyFile != null ? StringComparer.Ordinal.GetHashCode(this.CryptoKeyFile) : 0,
                    Hash.Combine(Hash.CombineValues(this.CryptoPublicKey, 16),
                    Hash.Combine((int)this.GeneralDiagnosticOption,
                    Hash.Combine(this.MainTypeName != null ? StringComparer.Ordinal.GetHashCode(this.MainTypeName) : 0,
                    Hash.Combine((int)this.MetadataImportOptions,
+                   Hash.Combine(this.ReferencesSupersedeLowerVersions,
                    Hash.Combine(this.ModuleName != null ? StringComparer.Ordinal.GetHashCode(this.ModuleName) : 0,
                    Hash.Combine((int)this.OptimizationLevel,
                    Hash.Combine((int)this.OutputKind,
                    Hash.Combine((int)this.Platform,
+                   Hash.Combine(this.ReportSuppressedDiagnostics,
                    Hash.Combine(this.ScriptClassName != null ? StringComparer.Ordinal.GetHashCode(this.ScriptClassName) : 0,
                    Hash.Combine(Hash.CombineValues(this.SpecificDiagnosticOptions),
                    Hash.Combine(this.WarningLevel,
@@ -464,7 +610,8 @@ namespace Microsoft.CodeAnalysis
                    Hash.Combine(this.XmlReferenceResolver,
                    Hash.Combine(this.SourceReferenceResolver,
                    Hash.Combine(this.StrongNameProvider,
-                   Hash.Combine(this.AssemblyIdentityComparer, 0)))))))))))))))))))));
+                   Hash.Combine(this.AssemblyIdentityComparer,
+                   Hash.Combine(this.PublicSign, 0)))))))))))))))))))))))))));
         }
 
         public static bool operator ==(CompilationOptions left, CompilationOptions right)

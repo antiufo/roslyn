@@ -3,6 +3,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeGeneration;
 using Microsoft.CodeAnalysis.FindSymbols;
@@ -64,14 +65,14 @@ namespace Microsoft.CodeAnalysis.GenerateType
                 Compilation = compilation;
             }
 
-            public static State Generate(
+            public static async Task<State> GenerateAsync(
                 TService service,
                 SemanticDocument document,
                 SyntaxNode node,
                 CancellationToken cancellationToken)
             {
                 var state = new State(document.SemanticModel.Compilation);
-                if (!state.TryInitialize(service, document, node, cancellationToken))
+                if (!await state.TryInitializeAsync(service, document, node, cancellationToken).ConfigureAwait(false))
                 {
                     return null;
                 }
@@ -79,7 +80,7 @@ namespace Microsoft.CodeAnalysis.GenerateType
                 return state;
             }
 
-            private bool TryInitialize(
+            private async Task<bool> TryInitializeAsync(
                 TService service,
                 SemanticDocument document,
                 SyntaxNode node,
@@ -108,6 +109,16 @@ namespace Microsoft.CodeAnalysis.GenerateType
                 GenerateTypeServiceStateOptions generateTypeServiceStateOptions;
                 if (!service.TryInitializeState(document, this.SimpleName, cancellationToken, out generateTypeServiceStateOptions))
                 {
+                    return false;
+                }
+
+                if (char.IsLower(name[0]) && !document.SemanticModel.Compilation.IsCaseSensitive)
+                {
+                    // It's near universal in .Net that types start with a capital letter.  As such,
+                    // if this name starts with a lowercase letter, don't even bother to offer 
+                    // "generate type".  The user most likely wants to run 'Add Import' (which will
+                    // then fix up a case where they typed an existing type name in lowercase, 
+                    // intending the fix to case correct it).
                     return false;
                 }
 
@@ -158,7 +169,7 @@ namespace Microsoft.CodeAnalysis.GenerateType
                     }
                 }
 
-                DetermineNamespaceOrTypeToGenerateIn(service, document, cancellationToken);
+                await DetermineNamespaceOrTypeToGenerateInAsync(service, document, cancellationToken).ConfigureAwait(false);
 
                 // Now, try to infer a possible base type for this new class/interface.
                 this.InferBaseType(service, document, cancellationToken);
@@ -192,7 +203,7 @@ namespace Microsoft.CodeAnalysis.GenerateType
             {
                 // See if we can find a possible base type for the type being generated.
                 // NOTE(cyrusn): I currently limit this to when we have an object creation node.
-                // That's because that's when we would have an expression that could be coverted to
+                // That's because that's when we would have an expression that could be converted to
                 // something else.  i.e. if the user writes "IList<int> list = new Foo()" then we can
                 // infer a base interface for 'Foo'.  However, if they write "IList<int> list = Foo"
                 // then we don't really want to infer a base type for 'Foo'.
@@ -262,7 +273,7 @@ namespace Microsoft.CodeAnalysis.GenerateType
                 return service.IsInInterfaceList(this.NameOrMemberAccessExpression);
             }
 
-            private void DetermineNamespaceOrTypeToGenerateIn(
+            private async Task DetermineNamespaceOrTypeToGenerateInAsync(
                 TService service,
                 SemanticDocument document,
                 CancellationToken cancellationToken)
@@ -279,7 +290,7 @@ namespace Microsoft.CodeAnalysis.GenerateType
                     }
                     else
                     {
-                        var symbol = SymbolFinder.FindSourceDefinitionAsync(this.TypeToGenerateInOpt, document.Project.Solution, cancellationToken).WaitAndGetResult(cancellationToken);
+                        var symbol = await SymbolFinder.FindSourceDefinitionAsync(this.TypeToGenerateInOpt, document.Project.Solution, cancellationToken).ConfigureAwait(false);
                         if (symbol == null ||
                             !symbol.IsKind(SymbolKind.NamedType) ||
                             !symbol.Locations.Any(loc => loc.IsInSource))

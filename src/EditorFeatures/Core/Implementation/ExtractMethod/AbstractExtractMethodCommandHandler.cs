@@ -1,12 +1,12 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System;
 using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis.Editor.Commands;
 using Microsoft.CodeAnalysis.Editor.Host;
+using Microsoft.CodeAnalysis.Editor.Shared;
 using Microsoft.CodeAnalysis.Editor.Shared.Extensions;
-using Microsoft.CodeAnalysis.Editor.Shared.SuggestionSupport;
 using Microsoft.CodeAnalysis.ExtractMethod;
 using Microsoft.CodeAnalysis.Notification;
 using Microsoft.CodeAnalysis.Options;
@@ -62,8 +62,8 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.ExtractMethod
                 return nextHandler();
             }
 
-            var supportSuggestionService = document.Project.Solution.Workspace.Services.GetService<IDocumentSupportsSuggestionService>();
-            if (!supportSuggestionService.SupportsRefactorings(document))
+            var supportsFeatureService = document.Project.Solution.Workspace.Services.GetService<IDocumentSupportsFeatureService>();
+            if (!supportsFeatureService.SupportsRefactorings(document))
             {
                 return nextHandler();
             }
@@ -80,8 +80,8 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.ExtractMethod
                 return;
             }
 
-            var supportSuggestionService = document.Project.Solution.Workspace.Services.GetService<IDocumentSupportsSuggestionService>();
-            if (!supportSuggestionService.SupportsRefactorings(document))
+            var supportsFeatureService = document.Project.Solution.Workspace.Services.GetService<IDocumentSupportsFeatureService>();
+            if (!supportsFeatureService.SupportsRefactorings(document))
             {
                 nextHandler();
                 return;
@@ -96,8 +96,8 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.ExtractMethod
 
             var executed = false;
             _waitIndicator.Wait(
-                title: EditorFeaturesResources.ExtractMethod,
-                message: EditorFeaturesResources.ApplyingExtractMethodRefactoring,
+                title: EditorFeaturesResources.Extract_Method,
+                message: EditorFeaturesResources.Applying_Extract_Method_refactoring,
                 allowCancel: true,
                 action: waitContext =>
                 {
@@ -127,24 +127,25 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.ExtractMethod
                 return false;
             }
 
-            var options = document.Project.Solution.Workspace.Options;
             var result = ExtractMethodService.ExtractMethodAsync(
-                document, spans.Single().Span.ToTextSpan(), options, cancellationToken).WaitAndGetResult(cancellationToken);
+                document, spans.Single().Span.ToTextSpan(), cancellationToken: cancellationToken).WaitAndGetResult(cancellationToken);
             Contract.ThrowIfNull(result);
 
             if (!result.Succeeded && !result.SucceededWithSuggestion)
             {
                 // if it failed due to out/ref parameter in async method, try it with different option
-                var newResult = TryWithoutMakingValueTypesRef(document, spans, options, result, cancellationToken);
+                var newResult = TryWithoutMakingValueTypesRef(document, spans, result, cancellationToken);
                 if (newResult != null)
                 {
                     var notificationService = document.Project.Solution.Workspace.Services.GetService<INotificationService>();
                     if (notificationService != null)
                     {
                         if (!notificationService.ConfirmMessageBox(
+                                EditorFeaturesResources.Extract_method_failed_with_following_reasons_colon + Environment.NewLine + Environment.NewLine +
                                 string.Join(Environment.NewLine, result.Reasons) + Environment.NewLine + Environment.NewLine +
-                                EditorFeaturesResources.ExtractMethodAsyncErrorFix,
-                                EditorFeaturesResources.ExtractMethodFailedReasons, NotificationSeverity.Error))
+                                EditorFeaturesResources.We_can_fix_the_error_by_not_making_struct_out_ref_parameter_s_Do_you_want_to_proceed,
+                                title: EditorFeaturesResources.Extract_Method,
+                                severity: NotificationSeverity.Error))
                         {
                             // We handled the command, displayed a notification and did not produce code.
                             return true;
@@ -189,14 +190,16 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.ExtractMethod
             var notificationService = document.Project.Solution.Workspace.Services.GetService<INotificationService>();
 
             // see whether we will allow best effort extraction and if it is possible.
-            if (!document.Project.Solution.Workspace.Options.GetOption(ExtractMethodOptions.AllowBestEffort, document.Project.Language) ||
+            if (!document.Project.Solution.Options.GetOption(ExtractMethodOptions.AllowBestEffort, document.Project.Language) ||
                 !result.Status.HasBestEffort() || result.Document == null)
             {
                 if (notificationService != null)
                 {
                     notificationService.SendNotification(
+                        EditorFeaturesResources.Extract_method_failed_with_following_reasons_colon + Environment.NewLine + Environment.NewLine +
                         string.Join(Environment.NewLine, result.Reasons),
-                        EditorFeaturesResources.ExtractMethodFailedReasons, NotificationSeverity.Error);
+                        title: EditorFeaturesResources.Extract_Method,
+                        severity: NotificationSeverity.Error);
                 }
 
                 return true;
@@ -206,9 +209,11 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.ExtractMethod
             if (notificationService != null)
             {
                 if (!notificationService.ConfirmMessageBox(
+                        EditorFeaturesResources.Extract_method_failed_with_following_reasons_colon + Environment.NewLine + Environment.NewLine +
                         string.Join(Environment.NewLine, result.Reasons) + Environment.NewLine + Environment.NewLine +
-                        EditorFeaturesResources.ExtractMethodStillGenerateCode,
-                        EditorFeaturesResources.ExtractMethodFailedReasons, NotificationSeverity.Error))
+                        EditorFeaturesResources.Do_you_still_want_to_proceed_it_will_generate_broken_code,
+                        title: EditorFeaturesResources.Extract_Method,
+                        severity: NotificationSeverity.Error))
                 {
                     return true;
                 }
@@ -218,16 +223,18 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.ExtractMethod
         }
 
         private static ExtractMethodResult TryWithoutMakingValueTypesRef(
-            Document document, NormalizedSnapshotSpanCollection spans, OptionSet options, ExtractMethodResult result, CancellationToken cancellationToken)
+            Document document, NormalizedSnapshotSpanCollection spans, ExtractMethodResult result, CancellationToken cancellationToken)
         {
+            OptionSet options = document.Project.Solution.Options;
+
             if (options.GetOption(ExtractMethodOptions.DontPutOutOrRefOnStruct, document.Project.Language) || !result.Reasons.IsSingle())
             {
                 return null;
             }
 
             var reason = result.Reasons.FirstOrDefault();
-            var length = FeaturesResources.AsyncMethodWithRefOutParameters.IndexOf(':');
-            if (reason != null && length > 0 && reason.IndexOf(FeaturesResources.AsyncMethodWithRefOutParameters.Substring(0, length), 0, length, StringComparison.Ordinal) >= 0)
+            var length = FeaturesResources.Asynchronous_method_cannot_have_ref_out_parameters_colon_bracket_0_bracket.IndexOf(':');
+            if (reason != null && length > 0 && reason.IndexOf(FeaturesResources.Asynchronous_method_cannot_have_ref_out_parameters_colon_bracket_0_bracket.Substring(0, length), 0, length, StringComparison.Ordinal) >= 0)
             {
                 options = options.WithChangedOption(ExtractMethodOptions.DontPutOutOrRefOnStruct, document.Project.Language, true);
                 var newResult = ExtractMethodService.ExtractMethodAsync(

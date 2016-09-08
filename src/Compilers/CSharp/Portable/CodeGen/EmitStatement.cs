@@ -5,11 +5,10 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection.Metadata;
 using Microsoft.CodeAnalysis.CodeGen;
-using Microsoft.CodeAnalysis.Collections;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Symbols;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 
@@ -110,7 +109,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
             switch (statement.Flavor)
             {
                 case NoOpStatementFlavor.Default:
-                    if (_optimizations == OptimizationLevel.Debug)
+                    if (_ilEmitStyle == ILEmitStyle.Debug)
                     {
                         _builder.EmitOpCode(ILOpCode.Nop);
                     }
@@ -148,7 +147,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
 
                 var exprType = expr.Type;
                 // Expression type will be null for "throw null;".
-                if (((object)exprType != null) && (exprType.TypeKind == TypeKind.TypeParameter))
+                if (exprType?.TypeKind == TypeKind.TypeParameter)
                 {
                     this.EmitBox(exprType, expr.Syntax);
                 }
@@ -327,6 +326,41 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
 
         // generate a jump to dest if (condition == sense) is true
         private void EmitCondBranch(BoundExpression condition, ref object dest, bool sense)
+        {
+            _recursionDepth++;
+
+            if (_recursionDepth > 1)
+            {
+                StackGuard.EnsureSufficientExecutionStack(_recursionDepth);
+
+                EmitCondBranchCore(condition, ref dest, sense);
+            }
+            else
+            {
+                EmitCondBranchCoreWithStackGuard(condition, ref dest, sense);
+            }
+
+            _recursionDepth--;
+        }
+
+        private void EmitCondBranchCoreWithStackGuard(BoundExpression condition, ref object dest, bool sense)
+        {
+            Debug.Assert(_recursionDepth == 1);
+
+            try
+            {
+                EmitCondBranchCore(condition, ref dest, sense);
+                Debug.Assert(_recursionDepth == 1);
+            }
+            catch (Exception ex) when (StackGuard.IsInsufficientExecutionStackException(ex))
+            {
+                _diagnostics.Add(ErrorCode.ERR_InsufficientStack,
+                                 BoundTreeVisitor.CancelledByStackGuardException.GetTooLongOrComplexExpressionErrorLocation(condition));
+                throw new EmitCancelledException();
+            }
+        }
+
+        private void EmitCondBranchCore(BoundExpression condition, ref object dest, bool sense)
         {
         oneMoreTime:
 
@@ -623,7 +657,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
             //   ret
             //
             // Do not emit this pattern if the method doesn't include user code or doesn't have a block body.
-            return _optimizations == OptimizationLevel.Debug && _method.GenerateDebugInfo && _methodBodySyntaxOpt?.IsKind(SyntaxKind.Block) == true ||
+            return _ilEmitStyle == ILEmitStyle.Debug && _method.GenerateDebugInfo && _methodBodySyntaxOpt?.IsKind(SyntaxKind.Block) == true ||
                    _builder.InExceptionHandler;
         }
 
@@ -634,15 +668,21 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
         private bool CanHandleReturnLabel(BoundReturnStatement boundReturnStatement)
         {
             return boundReturnStatement.WasCompilerGenerated &&
-                    (boundReturnStatement.Syntax.Kind() == SyntaxKind.Block || (((object)_method != null) && _method.IsImplicitConstructor)) &&
+                    (boundReturnStatement.Syntax.IsKind(SyntaxKind.Block) || _method?.IsImplicitConstructor == true) &&
                     !_builder.InExceptionHandler;
         }
 
         private void EmitReturnStatement(BoundReturnStatement boundReturnStatement)
         {
             var expressionOpt = boundReturnStatement.ExpressionOpt;
-
-            this.EmitExpression(expressionOpt, used: true);
+            if (boundReturnStatement.RefKind == RefKind.None)
+            {
+                this.EmitExpression(expressionOpt, true);
+            }
+            else
+            {
+                this.EmitAddress(expressionOpt, AddressKind.Writeable);
+            }
 
             if (ShouldUseIndirectReturn())
             {
@@ -887,11 +927,11 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
                 _builder.MarkLabel(typeCheckPassedLabel);
             }
 
-            if ((object)catchBlock.LocalOpt != null)
+            foreach (var local in catchBlock.Locals)
             {
-                var declaringReferences = catchBlock.LocalOpt.DeclaringSyntaxReferences;
+                var declaringReferences = local.DeclaringSyntaxReferences;
                 var localSyntax = !declaringReferences.IsEmpty ? (CSharpSyntaxNode)declaringReferences[0].GetSyntax() : catchBlock.Syntax;
-                DefineLocal(catchBlock.LocalOpt, localSyntax);
+                DefineLocal(local, localSyntax);
             }
 
             var exceptionSourceOpt = catchBlock.ExceptionSourceOpt;
@@ -987,14 +1027,20 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
 
         private void EmitSwitchStatement(BoundSwitchStatement switchStatement)
         {
+            var preambleOpt = switchStatement.LoweredPreambleOpt;
+            if (preambleOpt != null)
+            {
+                EmitStatement(preambleOpt);
+            }
+
             // Switch expression must have a valid switch governing type
-            Debug.Assert((object)switchStatement.BoundExpression.Type != null);
-            Debug.Assert(switchStatement.BoundExpression.Type.IsValidSwitchGoverningType());
+            Debug.Assert((object)switchStatement.Expression.Type != null);
+            Debug.Assert(switchStatement.Expression.Type.IsValidV6SwitchGoverningType());
 
             // We must have rewritten nullable switch expression into non-nullable constructs.
-            Debug.Assert(!switchStatement.BoundExpression.Type.IsNullableType());
+            Debug.Assert(!switchStatement.Expression.Type.IsNullableType());
 
-            BoundExpression expression = switchStatement.BoundExpression;
+            BoundExpression expression = switchStatement.Expression;
             ImmutableArray<BoundSwitchSection> switchSections = switchStatement.SwitchSections;
             GeneratedLabelSymbol breakLabel = switchStatement.BreakLabel;
             LabelSymbol constantTargetOpt = switchStatement.ConstantTargetOpt;
@@ -1036,19 +1082,19 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
             var labelsBuilder = ArrayBuilder<KeyValuePair<ConstantValue, object>>.GetInstance();
             foreach (var section in sections)
             {
-                foreach (BoundSwitchLabel boundLabel in section.BoundSwitchLabels)
+                foreach (BoundSwitchLabel boundLabel in section.SwitchLabels)
                 {
-                    var label = (SourceLabelSymbol)boundLabel.Label;
-                    if (label.IdentifierNodeOrToken.Kind() == SyntaxKind.DefaultSwitchLabel)
+                    var label = boundLabel.Label;
+                    if (boundLabel.ConstantValueOpt == null)
                     {
                         fallThroughLabel = label;
                     }
                     else
                     {
-                        Debug.Assert(label.SwitchCaseLabelConstant != null
-                            && SwitchConstantValueHelper.IsValidSwitchCaseLabelConstant(label.SwitchCaseLabelConstant));
-
-                        labelsBuilder.Add(new KeyValuePair<ConstantValue, object>(label.SwitchCaseLabelConstant, label));
+                        var value = boundLabel.ConstantValueOpt;
+                        Debug.Assert(value != null
+                            && SwitchConstantValueHelper.IsValidSwitchCaseLabelConstant(value));
+                        labelsBuilder.Add(new KeyValuePair<ConstantValue, object>(value, label));
                     }
                 }
             }
@@ -1070,7 +1116,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
         {
             Debug.Assert(expression.ConstantValue == null);
             Debug.Assert((object)expression.Type != null &&
-                expression.Type.IsValidSwitchGoverningType());
+                expression.Type.IsValidV6SwitchGoverningType());
             Debug.Assert(switchCaseLabels.Length > 0);
 
             Debug.Assert(switchCaseLabels != null);
@@ -1148,7 +1194,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
             KeyValuePair<ConstantValue, object>[] switchCaseLabels,
             LabelSymbol fallThroughLabel,
             LocalOrParameter key,
-            CSharpSyntaxNode syntaxNode)
+            SyntaxNode syntaxNode)
         {
             LocalDefinition keyHash = null;
 
@@ -1283,7 +1329,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
             ImmutableArray<LocalSymbol> locals,
             ImmutableArray<BoundSwitchSection> switchSections,
             GeneratedLabelSymbol breakLabel,
-            CSharpSyntaxNode syntaxNode)
+            SyntaxNode syntaxNode)
         {
             var hasLocals = !locals.IsEmpty;
 
@@ -1312,7 +1358,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
 
         private void EmitSwitchSection(BoundSwitchSection switchSection)
         {
-            foreach (var boundSwitchLabel in switchSection.BoundSwitchLabels)
+            foreach (var boundSwitchLabel in switchSection.SwitchLabels)
             {
                 _builder.MarkLabel(boundSwitchLabel.Label);
             }
@@ -1337,7 +1383,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
             return _builder.LocalSlotManager.GetLocal(symbol);
         }
 
-        private LocalDefinition DefineLocal(LocalSymbol local, CSharpSyntaxNode syntaxNode)
+        private LocalDefinition DefineLocal(LocalSymbol local, SyntaxNode syntaxNode)
         {
             var transformFlags = default(ImmutableArray<TypedConstant>);
             bool hasDynamic = local.Type.ContainsDynamic();
@@ -1404,7 +1450,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
                 constraints: constraints,
                 isDynamic: isDynamicSourceLocal,
                 dynamicTransformFlags: transformFlags,
-                isSlotReusable: local.SynthesizedKind.IsSlotReusable(_optimizations));
+                isSlotReusable: local.SynthesizedKind.IsSlotReusable(_ilEmitStyle != ILEmitStyle.Release));
 
             // If named, add it to the local debug scope.
             if (localDef.Name != null)
@@ -1432,12 +1478,15 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
             // only user-defined locals should be named during lowering:
             Debug.Assert((local.Name == null) == (localKind != SynthesizedLocalKind.UserDefined));
 
-            if (!localKind.IsLongLived())
+            // Generating debug names for instrumentation payloads should be allowed, as described in https://github.com/dotnet/roslyn/issues/11024.
+            // For now, skip naming locals generated by instrumentation as they might not have a local syntax offset.
+            // Locals generated by instrumentation might exist in methods which do not contain a body (auto property initializers).
+            if (!localKind.IsLongLived() || localKind == SynthesizedLocalKind.InstrumentationPayload)
             {
                 return null;
             }
 
-            if (_optimizations == OptimizationLevel.Debug)
+            if (_ilEmitStyle == ILEmitStyle.Debug)
             {
                 var syntax = local.GetDeclaratorSyntax();
                 int syntaxOffset = _method.CalculateLocalSyntaxOffset(syntax.SpanStart, syntax.SyntaxTree);
@@ -1455,7 +1504,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
 
         private bool IsSlotReusable(LocalSymbol local)
         {
-            return local.SynthesizedKind.IsSlotReusable(_optimizations);
+            return local.SynthesizedKind.IsSlotReusable(_ilEmitStyle != ILEmitStyle.Release);
         }
 
         /// <summary>
@@ -1473,11 +1522,11 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
         /// <summary>
         /// Allocates a temp without identity.
         /// </summary>
-        private LocalDefinition AllocateTemp(TypeSymbol type, SyntaxNode syntaxNode)
+        private LocalDefinition AllocateTemp(TypeSymbol type, SyntaxNode syntaxNode, LocalSlotConstraints slotConstraints = LocalSlotConstraints.None)
         {
             return _builder.LocalSlotManager.AllocateSlot(
                 _module.Translate(type, syntaxNode, _diagnostics),
-                LocalSlotConstraints.None);
+                slotConstraints);
         }
 
         /// <summary>
@@ -1504,7 +1553,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
         /// This allows creating an emittable clone of finally.
         /// It is safe to do because no branches can go in or out of the finally handler.
         /// </summary>
-        private class FinallyCloner : BoundTreeRewriter
+        private class FinallyCloner : BoundTreeRewriterWithStackGuardWithoutRecursionOnTheLeftOfBinaryOperator
         {
             private Dictionary<LabelSymbol, GeneratedLabelSymbol> _labelClones;
 
@@ -1528,11 +1577,12 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
             public override BoundNode VisitSwitchStatement(BoundSwitchStatement node)
             {
                 var breakLabelClone = GetLabelClone(node.BreakLabel);
+                var preambleOpt = (BoundStatement)this.Visit(node.LoweredPreambleOpt);
 
                 // expressions do not contain labels or branches
-                BoundExpression boundExpression = node.BoundExpression;
+                BoundExpression boundExpression = node.Expression;
                 ImmutableArray<BoundSwitchSection> switchSections = (ImmutableArray<BoundSwitchSection>)this.VisitList(node.SwitchSections);
-                return node.Update(boundExpression, node.ConstantTargetOpt, node.InnerLocals, switchSections, breakLabelClone, node.StringEquality);
+                return node.Update(preambleOpt, boundExpression, node.ConstantTargetOpt, node.InnerLocals, node.InnerLocalFunctions, switchSections, breakLabelClone, node.StringEquality);
             }
 
             public override BoundNode VisitSwitchLabel(BoundSwitchLabel node)
@@ -1541,7 +1591,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
 
                 // expressions do not contain labels or branches
                 BoundExpression expressionOpt = node.ExpressionOpt;
-                return node.Update(labelClone, expressionOpt);
+                return node.Update(labelClone, expressionOpt, node.ConstantValueOpt);
             }
 
             public override BoundNode VisitGotoStatement(BoundGotoStatement node)

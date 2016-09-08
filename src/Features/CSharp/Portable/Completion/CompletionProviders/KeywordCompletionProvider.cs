@@ -1,6 +1,6 @@
 // Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
-using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Completion;
@@ -20,7 +20,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Completion.Providers
         {
         }
 
-        private static IEnumerable<IKeywordRecommender<CSharpSyntaxContext>> GetKeywordRecommenders()
+        private static ImmutableArray<IKeywordRecommender<CSharpSyntaxContext>> GetKeywordRecommenders()
         {
             return new IKeywordRecommender<CSharpSyntaxContext>[]
             {
@@ -88,6 +88,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Completion.Providers
                 new JoinKeywordRecommender(),
                 new LetKeywordRecommender(),
                 new LineKeywordRecommender(),
+                new LoadKeywordRecommender(),
                 new LockKeywordRecommender(),
                 new LongKeywordRecommender(),
                 new MethodKeywordRecommender(),
@@ -151,35 +152,34 @@ namespace Microsoft.CodeAnalysis.CSharp.Completion.Providers
                 new WhereKeywordRecommender(),
                 new WhileKeywordRecommender(),
                 new YieldKeywordRecommender(),
-            };
+            }.ToImmutableArray();
         }
 
-        protected override TextSpan GetTextChangeSpan(SourceText text, int position)
-        {
-            return CompletionUtilities.GetTextChangeSpan(text, position);
-        }
-
-        public override bool IsTriggerCharacter(SourceText text, int characterPosition, OptionSet options)
+        internal override bool IsInsertionTrigger(SourceText text, int characterPosition, OptionSet options)
         {
             return CompletionUtilities.IsTriggerCharacter(text, characterPosition, options);
         }
 
         protected override async Task<CSharpSyntaxContext> CreateContextAsync(Document document, int position, CancellationToken cancellationToken)
         {
-            var span = new TextSpan(position, 0);
+            var span = new TextSpan(position, length: 0);
             var semanticModel = await document.GetSemanticModelForSpanAsync(span, cancellationToken).ConfigureAwait(false);
             return CSharpSyntaxContext.CreateContext(document.Project.Solution.Workspace, semanticModel, position, cancellationToken);
         }
 
-        protected override CompletionItem CreateItem(TextSpan span, RecommendedKeyword keyword)
+        protected override CompletionItem CreateItem(RecommendedKeyword keyword)
         {
-            return new CompletionItem(
-                this,
+            return CommonCompletionItem.Create(
                 displayText: keyword.Keyword,
-                filterSpan: span,
-                descriptionFactory: (c) => Task.FromResult(keyword.DescriptionFactory(c)),
+                description: keyword.DescriptionFactory(CancellationToken.None),
                 glyph: Glyph.Keyword,
-                shouldFormatOnCommit: keyword.ShouldFormatOnCommit);
+                shouldFormatOnCommit: keyword.ShouldFormatOnCommit,
+                matchPriority: keyword.MatchPriority);
+        }
+
+        internal override TextSpan GetCurrentSpan(TextSpan span, SourceText text)
+        {
+            return CompletionUtilities.GetCompletionItemSpan(text, span.End);
         }
     }
 }

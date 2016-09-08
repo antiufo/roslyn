@@ -68,7 +68,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
                 var containingNamespaceOrType = GetNamespaceOrTypeNode();
 
                 return containingNamespaceOrType != null
-                    ? (object)FileCodeModel.CreateCodeElement<EnvDTE.CodeElement>(containingNamespaceOrType)
+                    ? (object)FileCodeModel.GetOrCreateCodeElement<EnvDTE.CodeElement>(containingNamespaceOrType)
                     : this.FileCodeModel;
             }
         }
@@ -133,7 +133,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
                 var namespaceNode = GetNamespaceNode();
 
                 return namespaceNode != null
-                    ? FileCodeModel.CreateCodeElement<EnvDTE.CodeNamespace>(namespaceNode)
+                    ? FileCodeModel.GetOrCreateCodeElement<EnvDTE.CodeNamespace>(namespaceNode)
                     : null;
             }
         }
@@ -165,19 +165,34 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
 
         public void RemoveMember(object element)
         {
-            var codeElement = ComAggregate.TryGetManagedObject<AbstractCodeElement>(element);
+            // Is this an EnvDTE.CodeElement that we created? If so, try to get the underlying code element object.
+            var abstractCodeElement = ComAggregate.TryGetManagedObject<AbstractCodeElement>(element);
 
-            if (codeElement == null)
+            if (abstractCodeElement == null)
             {
-                codeElement = ComAggregate.TryGetManagedObject<AbstractCodeElement>(this.Members.Item(element));
+                var codeElement = element as EnvDTE.CodeElement;
+                if (codeElement != null)
+                {
+                    // Is at least an EnvDTE.CodeElement? If so, try to retrieve it from the Members collection by name.
+                    // Note: This might throw an ArgumentException if the name isn't found in the collection.
+
+                    abstractCodeElement = ComAggregate.TryGetManagedObject<AbstractCodeElement>(this.Members.Item(codeElement.Name));
+                }
+                else if (element is string || element is int)
+                {
+                    // Is this a string or int? If so, try to retrieve it from the Members collection. Again, this will
+                    // throw an ArgumentException if the name or index isn't found in the collection.
+
+                    abstractCodeElement = ComAggregate.TryGetManagedObject<AbstractCodeElement>(this.Members.Item(element));
+                }
             }
 
-            if (codeElement == null)
+            if (abstractCodeElement == null)
             {
-                throw new ArgumentException(ServicesVSResources.ElementIsNotValid, "element");
+                throw new ArgumentException(ServicesVSResources.Element_is_not_valid, nameof(element));
             }
 
-            codeElement.Delete();
+            abstractCodeElement.Delete();
         }
 
         public EnvDTE.CodeElement AddBase(object @base, object position)

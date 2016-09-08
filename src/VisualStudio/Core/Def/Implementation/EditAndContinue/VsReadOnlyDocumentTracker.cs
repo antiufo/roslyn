@@ -87,9 +87,9 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.EditAndContinue
         {
             // Only set documents read-only if they're part of a project that supports Enc.
             var workspace = document.Project.Solution.Workspace as VisualStudioWorkspaceImpl;
-            var project = workspace?.ProjectTracker?.GetProject(document.Project.Id) as AbstractEncProject;
+            var project = workspace?.ProjectTracker?.GetProject(document.Project.Id);
 
-            if (project != null)
+            if (project?.EditAndContinueImplOpt != null)
             {
                 SessionReadOnlyReason sessionReason;
                 ProjectReadOnlyReason projectReason;
@@ -104,7 +104,8 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.EditAndContinue
             // while the code is running and get refreshed next time the web page is hit.
 
             // Note that Razor-like views are modelled as a ContainedDocument but normal code including code-behind are modelled as a StandardTextDocument.
-            var containedDocument = _vsProject.VisualStudioWorkspace.GetHostDocument(documentId) as ContainedDocument;
+            var visualStudioWorkspace = _vsProject.Workspace as VisualStudioWorkspaceImpl;
+            var containedDocument = visualStudioWorkspace?.GetHostDocument(documentId) as ContainedDocument;
             return containedDocument == null;
         }
 
@@ -116,17 +117,19 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.EditAndContinue
             var textBuffer = GetTextBuffer(_workspace, documentId);
             if (textBuffer != null)
             {
-                SetReadOnlyFlag(textBuffer, value);
+                var vsBuffer = _adapters.GetBufferAdapter(textBuffer);
+                if (vsBuffer != null)
+                {
+                    SetReadOnlyFlag(vsBuffer, value);
+                }
             }
         }
 
-        private void SetReadOnlyFlag(ITextBuffer buffer, bool value)
+        private void SetReadOnlyFlag(IVsTextBuffer buffer, bool value)
         {
-            var vsBuffer = _adapters.GetBufferAdapter(buffer);
-
             uint oldFlags;
             uint newFlags;
-            vsBuffer.GetStateFlags(out oldFlags);
+            buffer.GetStateFlags(out oldFlags);
             if (value)
             {
                 newFlags = oldFlags | (uint)BUFFERSTATEFLAGS.BSF_USER_READONLY;
@@ -138,7 +141,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.EditAndContinue
 
             if (oldFlags != newFlags)
             {
-                vsBuffer.SetStateFlags(newFlags);
+                buffer.SetStateFlags(newFlags);
             }
         }
 

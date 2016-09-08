@@ -10,7 +10,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Diagnostics.Implem
         <Fact>
         <Trait(Traits.Feature, Traits.Features.CodeActionsImplementAbstractClass)>
         <Trait(Traits.Feature, Traits.Features.CodeActionsFixAllOccurrences)>
-        Public Sub TestFixAllInDocument()
+        Public Async Function TestFixAllInDocument() As Task
             Dim fixAllActionId = ImplementAbstractClassCodeFixProvider.GetCodeActionId("Assembly1", "Global.A1")
 
             Dim input = <Workspace>
@@ -119,13 +119,13 @@ End Class]]>
                                </Project>
                            </Workspace>.ToString()
 
-            Test(input, expected, isLine:=False, compareTokens:=False, fixAllActionEquivalenceKey:=fixAllActionId)
-        End Sub
+            Await TestAsync(input, expected, compareTokens:=False, fixAllActionEquivalenceKey:=fixAllActionId)
+        End Function
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.CodeActionsImplementAbstractClass)>
         <Trait(Traits.Feature, Traits.Features.CodeActionsFixAllOccurrences)>
-        Public Sub TestFixAllInProject()
+        Public Async Function TestFixAllInProject() As Task
             Dim fixAllActionId = ImplementAbstractClassCodeFixProvider.GetCodeActionId("Assembly1", "Global.A1")
 
             Dim input = <Workspace>
@@ -242,13 +242,13 @@ End Class]]>
                                </Project>
                            </Workspace>.ToString()
 
-            Test(input, expected, isLine:=False, compareTokens:=False, fixAllActionEquivalenceKey:=fixAllActionId)
-        End Sub
+            Await TestAsync(input, expected, compareTokens:=False, fixAllActionEquivalenceKey:=fixAllActionId)
+        End Function
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.CodeActionsImplementAbstractClass)>
         <Trait(Traits.Feature, Traits.Features.CodeActionsFixAllOccurrences)>
-        Public Sub TestFixAllInSolution()
+        Public Async Function TestFixAllInSolution() As Task
             Dim fixAllActionId = ImplementAbstractClassCodeFixProvider.GetCodeActionId("Assembly1", "Global.A1")
 
             Dim input = <Workspace>
@@ -373,13 +373,13 @@ End Class]]>
                                </Project>
                            </Workspace>.ToString()
 
-            Test(input, expected, isLine:=False, compareTokens:=False, fixAllActionEquivalenceKey:=fixAllActionId)
-        End Sub
+            Await TestAsync(input, expected, compareTokens:=False, fixAllActionEquivalenceKey:=fixAllActionId)
+        End Function
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.CodeActionsImplementAbstractClass)>
         <Trait(Traits.Feature, Traits.Features.CodeActionsFixAllOccurrences)>
-        Public Sub TestFixAllInSolution_DifferentAssemblyWithSameTypeName()
+        Public Async Function TestFixAllInSolution_DifferentAssemblyWithSameTypeName() As Task
             Dim fixAllActionId = ImplementAbstractClassCodeFixProvider.GetCodeActionId("Assembly1", "Global.A1")
 
             Dim input = <Workspace>
@@ -510,7 +510,7 @@ End Class]]>
                                </Project>
                            </Workspace>.ToString()
 
-            Test(input, expected, isLine:=False, compareTokens:=False, fixAllActionEquivalenceKey:=fixAllActionId)
-        End Sub
+            Await TestAsync(input, expected, compareTokens:=False, fixAllActionEquivalenceKey:=fixAllActionId)
+        End Function
     End Class
 End Namespace

@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System;
 using System.Collections.Generic;
@@ -189,7 +189,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGeneration
                     options = CreateOptionsForMultipleMembers(options);
                 }
 
-                return AddMembers(destination, members, availableIndices, options);
+                return AddMembers(destination, members, availableIndices, options, CancellationToken.None);
             }
 
             if (destination is TypeDeclarationSyntax)
@@ -202,35 +202,35 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGeneration
             }
         }
 
-        protected override TDeclarationNode AddNamedType<TDeclarationNode>(TDeclarationNode destination, INamedTypeSymbol namedType, CodeGenerationOptions options, IList<bool> availableIndices)
+        protected override TDeclarationNode AddNamedType<TDeclarationNode>(TDeclarationNode destination, INamedTypeSymbol namedType, CodeGenerationOptions options, IList<bool> availableIndices, CancellationToken cancellationToken)
         {
             CheckDeclarationNode<TypeDeclarationSyntax, NamespaceDeclarationSyntax, CompilationUnitSyntax>(destination);
 
             if (destination is TypeDeclarationSyntax)
             {
-                return Cast<TDeclarationNode>(NamedTypeGenerator.AddNamedTypeTo(this, Cast<TypeDeclarationSyntax>(destination), namedType, options, availableIndices));
+                return Cast<TDeclarationNode>(NamedTypeGenerator.AddNamedTypeTo(this, Cast<TypeDeclarationSyntax>(destination), namedType, options, availableIndices, cancellationToken));
             }
             else if (destination is NamespaceDeclarationSyntax)
             {
-                return Cast<TDeclarationNode>(NamedTypeGenerator.AddNamedTypeTo(this, Cast<NamespaceDeclarationSyntax>(destination), namedType, options, availableIndices));
+                return Cast<TDeclarationNode>(NamedTypeGenerator.AddNamedTypeTo(this, Cast<NamespaceDeclarationSyntax>(destination), namedType, options, availableIndices, cancellationToken));
             }
             else
             {
-                return Cast<TDeclarationNode>(NamedTypeGenerator.AddNamedTypeTo(this, Cast<CompilationUnitSyntax>(destination), namedType, options, availableIndices));
+                return Cast<TDeclarationNode>(NamedTypeGenerator.AddNamedTypeTo(this, Cast<CompilationUnitSyntax>(destination), namedType, options, availableIndices, cancellationToken));
             }
         }
 
-        protected override TDeclarationNode AddNamespace<TDeclarationNode>(TDeclarationNode destination, INamespaceSymbol @namespace, CodeGenerationOptions options, IList<bool> availableIndices)
+        protected override TDeclarationNode AddNamespace<TDeclarationNode>(TDeclarationNode destination, INamespaceSymbol @namespace, CodeGenerationOptions options, IList<bool> availableIndices, CancellationToken cancellationToken)
         {
             CheckDeclarationNode<CompilationUnitSyntax, NamespaceDeclarationSyntax>(destination);
 
             if (destination is CompilationUnitSyntax)
             {
-                return Cast<TDeclarationNode>(NamespaceGenerator.AddNamespaceTo(this, Cast<CompilationUnitSyntax>(destination), @namespace, options, availableIndices));
+                return Cast<TDeclarationNode>(NamespaceGenerator.AddNamespaceTo(this, Cast<CompilationUnitSyntax>(destination), @namespace, options, availableIndices, cancellationToken));
             }
             else
             {
-                return Cast<TDeclarationNode>(NamespaceGenerator.AddNamespaceTo(this, Cast<NamespaceDeclarationSyntax>(destination), @namespace, options, availableIndices));
+                return Cast<TDeclarationNode>(NamespaceGenerator.AddNamespaceTo(this, Cast<NamespaceDeclarationSyntax>(destination), @namespace, options, availableIndices, cancellationToken));
             }
         }
 
@@ -522,7 +522,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGeneration
                 return destinationMember.ReplaceNode(block, newBlock);
             }
 
-            throw new ArgumentException(CSharpWorkspaceResources.NoAvailableLocationFoundTo);
+            throw new ArgumentException(CSharpWorkspaceResources.No_available_location_found_to_add_statements_to);
         }
 
         private static TDeclarationNode AddStatementsToMemberDeclaration<TDeclarationNode>(TDeclarationNode destinationMember, IEnumerable<SyntaxNode> statements, MemberDeclarationSyntax memberDeclaration) where TDeclarationNode : SyntaxNode
@@ -604,15 +604,15 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGeneration
         }
 
         public override SyntaxNode CreateNamedTypeDeclaration(
-            INamedTypeSymbol namedType, CodeGenerationDestination destination, CodeGenerationOptions options)
+            INamedTypeSymbol namedType, CodeGenerationDestination destination, CodeGenerationOptions options, CancellationToken cancellationToken)
         {
-            return NamedTypeGenerator.GenerateNamedTypeDeclaration(this, namedType, destination, options);
+            return NamedTypeGenerator.GenerateNamedTypeDeclaration(this, namedType, destination, options, cancellationToken);
         }
 
         public override SyntaxNode CreateNamespaceDeclaration(
-            INamespaceSymbol @namespace, CodeGenerationDestination destination, CodeGenerationOptions options)
+            INamespaceSymbol @namespace, CodeGenerationDestination destination, CodeGenerationOptions options, CancellationToken cancellationToken)
         {
-            return NamespaceGenerator.GenerateNamespaceDeclaration(this, @namespace, options);
+            return NamespaceGenerator.GenerateNamespaceDeclaration(this, @namespace, options, cancellationToken);
         }
 
         private static TDeclarationNode UpdateDeclarationModifiers<TDeclarationNode>(TDeclarationNode declaration, Func<SyntaxTokenList, SyntaxTokenList> computeNewModifiersList, CodeGenerationOptions options, CancellationToken cancellationToken)

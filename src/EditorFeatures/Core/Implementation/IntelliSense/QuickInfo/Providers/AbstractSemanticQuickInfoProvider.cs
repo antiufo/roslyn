@@ -6,7 +6,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.CodeAnalysis.DocumentationCommentFormatting;
+using Microsoft.CodeAnalysis.DocumentationComments;
 using Microsoft.CodeAnalysis.Editor.Shared.Utilities;
 using Microsoft.CodeAnalysis.LanguageServices;
 using Microsoft.CodeAnalysis.Shared.Extensions;
@@ -23,15 +23,13 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense.QuickInfo
     internal abstract partial class AbstractSemanticQuickInfoProvider : AbstractQuickInfoProvider
     {
         public AbstractSemanticQuickInfoProvider(
-            ITextBufferFactoryService textBufferFactoryService,
-            IContentTypeRegistryService contentTypeRegistryService,
             IProjectionBufferFactoryService projectionBufferFactoryService,
             IEditorOptionsFactoryService editorOptionsFactoryService,
             ITextEditorFactoryService textEditorFactoryService,
             IGlyphService glyphService,
             ClassificationTypeMap typeMap)
-            : base(textBufferFactoryService, contentTypeRegistryService, projectionBufferFactoryService,
-                   editorOptionsFactoryService, textEditorFactoryService, glyphService, typeMap)
+            : base(projectionBufferFactoryService, editorOptionsFactoryService,
+                   textEditorFactoryService, glyphService, typeMap)
         {
         }
 
@@ -150,13 +148,13 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense.QuickInfo
 
             var sections = await descriptionService.ToDescriptionGroupsAsync(workspace, semanticModel, token.SpanStart, symbols.AsImmutable(), cancellationToken).ConfigureAwait(false);
 
-            var mainDescriptionBuilder = new List<SymbolDisplayPart>();
+            var mainDescriptionBuilder = new List<TaggedText>();
             if (sections.ContainsKey(SymbolDescriptionGroups.MainDescription))
             {
                 mainDescriptionBuilder.AddRange(sections[SymbolDescriptionGroups.MainDescription]);
             }
 
-            var typeParameterMapBuilder = new List<SymbolDisplayPart>();
+            var typeParameterMapBuilder = new List<TaggedText>();
             if (sections.ContainsKey(SymbolDescriptionGroups.TypeParameterMap))
             {
                 var parts = sections[SymbolDescriptionGroups.TypeParameterMap];
@@ -167,7 +165,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense.QuickInfo
                 }
             }
 
-            var anonymousTypesBuilder = new List<SymbolDisplayPart>();
+            var anonymousTypesBuilder = new List<TaggedText>();
             if (sections.ContainsKey(SymbolDescriptionGroups.AnonymousTypes))
             {
                 var parts = sections[SymbolDescriptionGroups.AnonymousTypes];
@@ -178,7 +176,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense.QuickInfo
                 }
             }
 
-            var usageTextBuilder = new List<SymbolDisplayPart>();
+            var usageTextBuilder = new List<TaggedText>();
             if (sections.ContainsKey(SymbolDescriptionGroups.AwaitableUsageText))
             {
                 var parts = sections[SymbolDescriptionGroups.AwaitableUsageText];
@@ -190,10 +188,18 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense.QuickInfo
 
             if (supportedPlatforms != null)
             {
-                usageTextBuilder.AddRange(supportedPlatforms.ToDisplayParts());
+                usageTextBuilder.AddRange(supportedPlatforms.ToDisplayParts().ToTaggedText());
             }
 
-            // TODO: exceptions
+            var exceptionsTextBuilder = new List<TaggedText>();
+            if (sections.ContainsKey(SymbolDescriptionGroups.Exceptions))
+            {
+                var parts = sections[SymbolDescriptionGroups.Exceptions];
+                if (!parts.IsDefaultOrEmpty)
+                {
+                    exceptionsTextBuilder.AddRange(parts);
+                }
+            }
 
             var formatter = workspace.Services.GetLanguageServices(semanticModel.Language).GetService<IDocumentationCommentFormattingService>();
             var syntaxFactsService = workspace.Services.GetLanguageServices(semanticModel.Language).GetService<ISyntaxFactsService>();
@@ -216,12 +222,13 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense.QuickInfo
                 documentation: documentationContent,
                 typeParameterMap: typeParameterMapBuilder,
                 anonymousTypes: anonymousTypesBuilder,
-                usageText: usageTextBuilder);
+                usageText: usageTextBuilder,
+                exceptionText: exceptionsTextBuilder);
         }
 
         private IDeferredQuickInfoContent GetDocumentationContent(
             IEnumerable<ISymbol> symbols,
-            IDictionary<SymbolDescriptionGroups, ImmutableArray<SymbolDisplayPart>> sections,
+            IDictionary<SymbolDescriptionGroups, ImmutableArray<TaggedText>> sections,
             SemanticModel semanticModel,
             SyntaxToken token,
             IDocumentationCommentFormattingService formatter,
@@ -230,7 +237,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense.QuickInfo
         {
             if (sections.ContainsKey(SymbolDescriptionGroups.Documentation))
             {
-                var documentationBuilder = new List<SymbolDisplayPart>();
+                var documentationBuilder = new List<TaggedText>();
                 documentationBuilder.AddRange(sections[SymbolDescriptionGroups.Documentation]);
                 return CreateClassifiableDeferredContent(documentationBuilder);
             }

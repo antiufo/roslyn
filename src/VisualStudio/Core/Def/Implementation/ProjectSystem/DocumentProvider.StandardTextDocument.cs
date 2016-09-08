@@ -24,10 +24,8 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem
             /// The IDocumentProvider that created us.
             /// </summary>
             private readonly DocumentProvider _documentProvider;
-
-            private readonly ITextBufferFactoryService _textBufferFactoryService;
+            private readonly string _itemMoniker;
             private readonly ITextUndoHistoryRegistry _textUndoHistoryRegistry;
-
             private readonly FileChangeTracker _fileChangeTracker;
             private readonly ReiteratedVersionSnapshotTracker _snapshotTracker;
             private readonly TextLoader _doNotAccessDirectlyLoader;
@@ -36,7 +34,6 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem
             /// The text buffer that is open in the editor. When the file is closed, this is null.
             /// </summary>
             private ITextBuffer _openTextBuffer;
-            private readonly string _itemMoniker;
 
             public DocumentId Id { get; }
             public IReadOnlyList<string> Folders { get; }
@@ -52,27 +49,27 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem
                 DocumentProvider documentProvider,
                 IVisualStudioHostProject project,
                 DocumentKey documentKey,
-                uint itemId,
+                IReadOnlyList<string> folderNames,
                 SourceCodeKind sourceCodeKind,
-                ITextBufferFactoryService textBufferFactoryService,
                 ITextUndoHistoryRegistry textUndoHistoryRegistry,
                 IVsFileChangeEx fileChangeService,
                 ITextBuffer openTextBuffer,
-                DocumentId id)
+                DocumentId id,
+                EventHandler updatedOnDiskHandler,
+                EventHandler<bool> openedHandler,
+                EventHandler<bool> closingHandler)
             {
                 Contract.ThrowIfNull(documentProvider);
-                Contract.ThrowIfNull(textBufferFactoryService);
 
                 this.Project = project;
                 this.Id = id ?? DocumentId.CreateNewId(project.Id, documentKey.Moniker);
-                this.Folders = project.GetFolderNames(itemId);
+                this.Folders = folderNames;
 
                 _documentProvider = documentProvider;
 
                 this.Key = documentKey;
                 this.SourceCodeKind = sourceCodeKind;
                 _itemMoniker = documentKey.Moniker;
-                _textBufferFactoryService = textBufferFactoryService;
                 _textUndoHistoryRegistry = textUndoHistoryRegistry;
                 _fileChangeTracker = new FileChangeTracker(fileChangeService, this.FilePath);
                 _fileChangeTracker.UpdatedOnDisk += OnUpdatedOnDisk;
@@ -88,6 +85,21 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem
                 if (openTextBuffer == null)
                 {
                     _fileChangeTracker.StartFileChangeListeningAsync();
+                }
+
+                if (updatedOnDiskHandler != null)
+                {
+                    UpdatedOnDisk += updatedOnDiskHandler;
+                }
+
+                if (openedHandler != null)
+                {
+                    Opened += openedHandler;
+                }
+
+                if (closingHandler != null)
+                {
+                    Closing += closingHandler;
                 }
             }
 
@@ -144,11 +156,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem
                 _snapshotTracker.StartTracking(openedBuffer);
 
                 _openTextBuffer = openedBuffer;
-
-                if (Opened != null)
-                {
-                    Opened(this, isCurrentContext);
-                }
+                Opened?.Invoke(this, isCurrentContext);
             }
 
             internal void ProcessClose(bool updateActiveContext)
@@ -156,11 +164,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem
                 // Todo: it might already be closed...
                 // For now, continue asserting as it can be clicked through.
                 Debug.Assert(_openTextBuffer != null);
-
-                if (Closing != null)
-                {
-                    Closing(this, updateActiveContext);
-                }
+                Closing?.Invoke(this, updateActiveContext);
 
                 var buffer = _openTextBuffer;
                 _openTextBuffer = null;
@@ -181,11 +185,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem
 
             private void OnUpdatedOnDisk(object sender, EventArgs e)
             {
-                var handler = UpdatedOnDisk;
-                if (handler != null)
-                {
-                    handler(this, EventArgs.Empty);
-                }
+                UpdatedOnDisk?.Invoke(this, EventArgs.Empty);
             }
 
             public void Dispose()

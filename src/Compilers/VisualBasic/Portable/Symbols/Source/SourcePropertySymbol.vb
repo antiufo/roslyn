@@ -310,6 +310,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
+        Public Overrides ReadOnly Property ReturnsByRef As Boolean
+            Get
+                Return False
+            End Get
+        End Property
+
         Public Overrides ReadOnly Property Type As TypeSymbol
             Get
                 EnsureSignature()
@@ -729,11 +735,13 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                         MakeOverriddenMembers(New SignatureOnlyPropertySymbol(Me.Name, _containingType,
                                                                             Me.IsReadOnly, Me.IsWriteOnly,
                                                                             fakeParamsBuilder.ToImmutableAndFree(),
-                                                                            retType,
-                                                                            ImmutableArray(Of CustomModifier).Empty,
+                                                                            returnsByRef:=False,
+                                                                            [type]:=retType,
+                                                                            typeCustomModifiers:=ImmutableArray(Of CustomModifier).Empty,
                                                                             isOverrides:=True, isWithEvents:=Me.IsWithEvents))
                 End If
 
+                Debug.Assert(IsDefinition)
                 Dim overridden = overriddenMembers.OverriddenMember
 
                 If overridden IsNot Nothing Then

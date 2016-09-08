@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CSharp.Formatting;
 using Microsoft.CodeAnalysis.Editor.Implementation.AutomaticCompletion;
 using Microsoft.CodeAnalysis.Editor.Shared.Options;
@@ -15,208 +16,208 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
 {
     public class AutomaticBraceCompletionTests : AbstractAutomaticBraceCompletionTests
     {
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void Creation()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task Creation()
         {
-            using (var session = CreateSession("$$"))
+            using (var session = await CreateSessionAsync("$$"))
             {
                 Assert.NotNull(session);
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void InvalidLocation_String()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task InvalidLocation_String()
         {
             var code = @"class C
 {
     string s = ""$$
 }";
-            using (var session = CreateSession(code))
+            using (var session = await CreateSessionAsync(code))
             {
                 Assert.Null(session);
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void InvalidLocation_String2()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task InvalidLocation_String2()
         {
             var code = @"class C
 {
     string s = @""
 $$
 }";
-            using (var session = CreateSession(code))
+            using (var session = await CreateSessionAsync(code))
             {
                 Assert.Null(session);
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void ValidLocation_InterpolatedString1()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task ValidLocation_InterpolatedString1()
         {
             var code = @"class C
 {
     string s = $""$$
 }";
-            using (var session = CreateSession(code))
+            using (var session = await CreateSessionAsync(code))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session);
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void ValidLocation_InterpolatedString2()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task ValidLocation_InterpolatedString2()
         {
             var code = @"class C
 {
     string s = $@""$$
 }";
-            using (var session = CreateSession(code))
+            using (var session = await CreateSessionAsync(code))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session);
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void ValidLocation_InterpolatedString3()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task ValidLocation_InterpolatedString3()
         {
             var code = @"class C
 {
     string x = ""foo""
     string s = $""{x} $$
 }";
-            using (var session = CreateSession(code))
+            using (var session = await CreateSessionAsync(code))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session);
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void ValidLocation_InterpolatedString4()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task ValidLocation_InterpolatedString4()
         {
             var code = @"class C
 {
     string x = ""foo""
     string s = $@""{x} $$
 }";
-            using (var session = CreateSession(code))
+            using (var session = await CreateSessionAsync(code))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session);
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void ValidLocation_InterpolatedString5()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task ValidLocation_InterpolatedString5()
         {
             var code = @"class C
 {
     string s = $""{{$$
 }";
-            using (var session = CreateSession(code))
+            using (var session = await CreateSessionAsync(code))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session);
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void ValidLocation_InterpolatedString6()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task ValidLocation_InterpolatedString6()
         {
             var code = @"class C
 {
     string s = $""{}$$
 }";
-            using (var session = CreateSession(code))
+            using (var session = await CreateSessionAsync(code))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session);
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void InvalidLocation_InterpolatedString1()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task InvalidLocation_InterpolatedString1()
         {
             var code = @"class C
 {
     string s = @""$$
 }";
-            using (var session = CreateSession(code))
+            using (var session = await CreateSessionAsync(code))
             {
                 Assert.Null(session);
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void InvalidLocation_InterpolatedString2()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task InvalidLocation_InterpolatedString2()
         {
             var code = @"class C
 {
     string s = ""$$
 }";
-            using (var session = CreateSession(code))
+            using (var session = await CreateSessionAsync(code))
             {
                 Assert.Null(session);
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void InvalidLocation_Comment()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task InvalidLocation_Comment()
         {
             var code = @"class C
 {
     //$$
 }";
-            using (var session = CreateSession(code))
+            using (var session = await CreateSessionAsync(code))
             {
                 Assert.Null(session);
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void InvalidLocation_Comment2()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task InvalidLocation_Comment2()
         {
             var code = @"class C
 {
     /* $$
 }";
-            using (var session = CreateSession(code))
+            using (var session = await CreateSessionAsync(code))
             {
                 Assert.Null(session);
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void InvalidLocation_Comment3()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task InvalidLocation_Comment3()
         {
             var code = @"class C
 {
     /// $$
 }";
-            using (var session = CreateSession(code))
+            using (var session = await CreateSessionAsync(code))
             {
                 Assert.Null(session);
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void InvalidLocation_Comment4()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task InvalidLocation_Comment4()
         {
             var code = @"class C
 {
     /** $$
 }";
-            using (var session = CreateSession(code))
+            using (var session = await CreateSessionAsync(code))
             {
                 Assert.Null(session);
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void MultiLine_Comment()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task MultiLine_Comment()
         {
             var code = @"class C
 {
@@ -225,15 +226,15 @@ $$
         /* */$$
     }
 }";
-            using (var session = CreateSession(code))
+            using (var session = await CreateSessionAsync(code))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session);
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void MultiLine_DocComment()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task MultiLine_DocComment()
         {
             var code = @"class C
 {
@@ -242,7 +243,7 @@ $$
         /** */$$
     }
 }";
-            using (var session = CreateSession(code))
+            using (var session = await CreateSessionAsync(code))
             {
                 Assert.NotNull(session);
 
@@ -250,8 +251,8 @@ $$
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void String1()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task String1()
         {
             var code = @"class C
 {
@@ -260,7 +261,7 @@ $$
         var s = """"$$
     }
 }";
-            using (var session = CreateSession(code))
+            using (var session = await CreateSessionAsync(code))
             {
                 Assert.NotNull(session);
 
@@ -268,8 +269,8 @@ $$
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void String2()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task String2()
         {
             var code = @"class C
 {
@@ -278,7 +279,7 @@ $$
         var s = @""""$$
     }
 }";
-            using (var session = CreateSession(code))
+            using (var session = await CreateSessionAsync(code))
             {
                 Assert.NotNull(session);
 
@@ -286,12 +287,12 @@ $$
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void Class_OpenBrace()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task Class_OpenBrace()
         {
             var code = @"class C $$";
 
-            using (var session = CreateSession(code))
+            using (var session = await CreateSessionAsync(code))
             {
                 Assert.NotNull(session);
 
@@ -299,12 +300,12 @@ $$
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void Class_Delete()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task Class_Delete()
         {
             var code = @"class C $$";
 
-            using (var session = CreateSession(code))
+            using (var session = await CreateSessionAsync(code))
             {
                 Assert.NotNull(session);
 
@@ -313,12 +314,12 @@ $$
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void Class_Tab()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task Class_Tab()
         {
             var code = @"class C $$";
 
-            using (var session = CreateSession(code))
+            using (var session = await CreateSessionAsync(code))
             {
                 Assert.NotNull(session);
 
@@ -327,12 +328,12 @@ $$
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void Class_CloseBrace()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task Class_CloseBrace()
         {
             var code = @"class C $$";
 
-            using (var session = CreateSession(code))
+            using (var session = await CreateSessionAsync(code))
             {
                 Assert.NotNull(session);
 
@@ -341,14 +342,14 @@ $$
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void Method_OpenBrace_Multiple()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task Method_OpenBrace_Multiple()
         {
             var code = @"class C
 {
     void Method() { $$
 }";
-            using (var session = CreateSession(code))
+            using (var session = await CreateSessionAsync(code))
             {
                 Assert.NotNull(session);
 
@@ -356,12 +357,12 @@ $$
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void Class_OpenBrace_Enter()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task Class_OpenBrace_Enter()
         {
             var code = @"class C $$";
 
-            using (var session = CreateSession(code))
+            using (var session = await CreateSessionAsync(code))
             {
                 Assert.NotNull(session);
 
@@ -370,8 +371,8 @@ $$
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void Class_ObjectInitializer_OpenBrace_Enter()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task Class_ObjectInitializer_OpenBrace_Enter()
         {
             var code = @"using System.Collections.Generic;
  
@@ -395,7 +396,7 @@ class C
         }
     };
 }";
-            using (var session = CreateSession(code))
+            using (var session = await CreateSessionAsync(code))
             {
                 Assert.NotNull(session);
 
@@ -404,9 +405,9 @@ class C
             }
         }
 
-        [WorkItem(1070773)]
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void Collection_Initializer_OpenBraceOnSameLine_Enter()
+        [WorkItem(1070773, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1070773")]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task Collection_Initializer_OpenBraceOnSameLine_Enter()
         {
             var code = @"using System.Collections.Generic;
  
@@ -433,7 +434,7 @@ class C
                             {
                                 { CSharpFormattingOptions.NewLinesForBracesInObjectCollectionArrayInitializers, false }
                             };
-            using (var session = CreateSession(code, optionSet))
+            using (var session = await CreateSessionAsync(code, optionSet))
             {
                 Assert.NotNull(session);
 
@@ -442,9 +443,9 @@ class C
             }
         }
 
-        [WorkItem(1070773)]
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void Collection_Initializer_OpenBraceOnDifferentLine_Enter()
+        [WorkItem(1070773, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1070773")]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task Collection_Initializer_OpenBraceOnDifferentLine_Enter()
         {
             var code = @"using System.Collections.Generic;
  
@@ -468,7 +469,7 @@ class C
         }
     }
 }";
-            using (var session = CreateSession(code))
+            using (var session = await CreateSessionAsync(code))
             {
                 Assert.NotNull(session);
 
@@ -477,9 +478,9 @@ class C
             }
         }
 
-        [WorkItem(1070773)]
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void Object_Initializer_OpenBraceOnSameLine_Enter()
+        [WorkItem(1070773, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1070773")]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task Object_Initializer_OpenBraceOnSameLine_Enter()
         {
             var code = @"class C
 {
@@ -512,7 +513,7 @@ class Foo
                             {
                                 { CSharpFormattingOptions.NewLinesForBracesInObjectCollectionArrayInitializers, false }
                             };
-            using (var session = CreateSession(code, optionSet))
+            using (var session = await CreateSessionAsync(code, optionSet))
             {
                 Assert.NotNull(session);
 
@@ -521,9 +522,9 @@ class Foo
             }
         }
 
-        [WorkItem(1070773)]
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void Object_Initializer_OpenBraceOnDifferentLine_Enter()
+        [WorkItem(1070773, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1070773")]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task Object_Initializer_OpenBraceOnDifferentLine_Enter()
         {
             var code = @"class C
 {
@@ -553,7 +554,7 @@ class Foo
 {
     public int bar;
 }";
-            using (var session = CreateSession(code))
+            using (var session = await CreateSessionAsync(code))
             {
                 Assert.NotNull(session);
 
@@ -562,9 +563,9 @@ class Foo
             }
         }
 
-        [WorkItem(1070773)]
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void ArrayImplicit_Initializer_OpenBraceOnSameLine_Enter()
+        [WorkItem(1070773, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1070773")]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task ArrayImplicit_Initializer_OpenBraceOnSameLine_Enter()
         {
             var code = @"class C
 {
@@ -587,7 +588,7 @@ class Foo
                             {
                                 { CSharpFormattingOptions.NewLinesForBracesInObjectCollectionArrayInitializers, false }
                             };
-            using (var session = CreateSession(code, optionSet))
+            using (var session = await CreateSessionAsync(code, optionSet))
             {
                 Assert.NotNull(session);
 
@@ -596,9 +597,9 @@ class Foo
             }
         }
 
-        [WorkItem(1070773)]
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void ArrayImplicit_Initializer_OpenBraceOnDifferentLine_Enter()
+        [WorkItem(1070773, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1070773")]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task ArrayImplicit_Initializer_OpenBraceOnDifferentLine_Enter()
         {
             var code = @"class C
 {
@@ -618,7 +619,7 @@ class Foo
         }
     }
 }";
-            using (var session = CreateSession(code))
+            using (var session = await CreateSessionAsync(code))
             {
                 Assert.NotNull(session);
 
@@ -627,9 +628,9 @@ class Foo
             }
         }
 
-        [WorkItem(1070773)]
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void ArrayExplicit1_Initializer_OpenBraceOnSameLine_Enter()
+        [WorkItem(1070773, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1070773")]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task ArrayExplicit1_Initializer_OpenBraceOnSameLine_Enter()
         {
             var code = @"class C
 {
@@ -652,7 +653,7 @@ class Foo
                             {
                                 { CSharpFormattingOptions.NewLinesForBracesInObjectCollectionArrayInitializers, false }
                             };
-            using (var session = CreateSession(code, optionSet))
+            using (var session = await CreateSessionAsync(code, optionSet))
             {
                 Assert.NotNull(session);
 
@@ -661,9 +662,9 @@ class Foo
             }
         }
 
-        [WorkItem(1070773)]
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void ArrayExplicit1_Initializer_OpenBraceOnDifferentLine_Enter()
+        [WorkItem(1070773, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1070773")]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task ArrayExplicit1_Initializer_OpenBraceOnDifferentLine_Enter()
         {
             var code = @"class C
 {
@@ -683,7 +684,7 @@ class Foo
         }
     }
 }";
-            using (var session = CreateSession(code))
+            using (var session = await CreateSessionAsync(code))
             {
                 Assert.NotNull(session);
 
@@ -692,9 +693,9 @@ class Foo
             }
         }
 
-        [WorkItem(1070773)]
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void ArrayExplicit2_Initializer_OpenBraceOnSameLine_Enter()
+        [WorkItem(1070773, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1070773")]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task ArrayExplicit2_Initializer_OpenBraceOnSameLine_Enter()
         {
             var code = @"class C
 {
@@ -717,7 +718,7 @@ class Foo
                             {
                                 { CSharpFormattingOptions.NewLinesForBracesInObjectCollectionArrayInitializers, false }
                             };
-            using (var session = CreateSession(code, optionSet))
+            using (var session = await CreateSessionAsync(code, optionSet))
             {
                 Assert.NotNull(session);
 
@@ -726,9 +727,9 @@ class Foo
             }
         }
 
-        [WorkItem(1070773)]
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void ArrayExplicit2_Initializer_OpenBraceOnDifferentLine_Enter()
+        [WorkItem(1070773, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1070773")]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task ArrayExplicit2_Initializer_OpenBraceOnDifferentLine_Enter()
         {
             var code = @"class C
 {
@@ -748,7 +749,7 @@ class Foo
         }
     }
 }";
-            using (var session = CreateSession(code))
+            using (var session = await CreateSessionAsync(code))
             {
                 Assert.NotNull(session);
 
@@ -758,9 +759,9 @@ class Foo
         }
 
         [WorkItem(3447, "https://github.com/dotnet/roslyn/issues/3447")]
-        [WorkItem(850540)]
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void BlockIndentationWithAutomaticBraceFormattingDisabled()
+        [WorkItem(850540, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/850540")]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task BlockIndentationWithAutomaticBraceFormattingDisabled()
         {
             var code = @"class C
 {
@@ -787,7 +788,7 @@ class Foo
                                 { new OptionKey(FeatureOnOffOptions.AutoFormattingOnCloseBrace, LanguageNames.CSharp), false },
                                 { new OptionKey(FormattingOptions.SmartIndent, LanguageNames.CSharp), FormattingOptions.IndentStyle.Block }
                             };
-            using (var session = CreateSession(code, optionSet))
+            using (var session = await CreateSessionAsync(code, optionSet))
             {
                 Assert.NotNull(session);
 
@@ -799,8 +800,8 @@ class Foo
         }
 
         [WorkItem(2224, "https://github.com/dotnet/roslyn/issues/2224")]
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void NoSmartOrBlockIndentationWithAutomaticBraceFormattingDisabled()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task NoSmartOrBlockIndentationWithAutomaticBraceFormattingDisabled()
         {
             var code = @"namespace NS1
 {
@@ -818,7 +819,7 @@ $$
                             {
                                 { new OptionKey(FormattingOptions.SmartIndent, LanguageNames.CSharp), FormattingOptions.IndentStyle.None }
                             };
-            using (var session = CreateSession(code, optionSet))
+            using (var session = await CreateSessionAsync(code, optionSet))
             {
                 Assert.NotNull(session);
 
@@ -828,8 +829,8 @@ $$
         }
 
         [WorkItem(2330, "https://github.com/dotnet/roslyn/issues/2330")]
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void BlockIndentationWithAutomaticBraceFormatting()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task BlockIndentationWithAutomaticBraceFormatting()
         {
             var code = @"namespace NS1
 {
@@ -855,7 +856,7 @@ $$
                             {
                                 { new OptionKey(FormattingOptions.SmartIndent, LanguageNames.CSharp), FormattingOptions.IndentStyle.Block }
                             };
-            using (var session = CreateSession(code, optionSet))
+            using (var session = await CreateSessionAsync(code, optionSet))
             {
                 Assert.NotNull(session);
 
@@ -867,8 +868,8 @@ $$
         }
 
         [WorkItem(2330, "https://github.com/dotnet/roslyn/issues/2330")]
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void BlockIndentationWithAutomaticBraceFormattingSecondSet()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task BlockIndentationWithAutomaticBraceFormattingSecondSet()
         {
             var code = @"namespace NS1
 {
@@ -900,7 +901,7 @@ $$
                             {
                                 { new OptionKey(FormattingOptions.SmartIndent, LanguageNames.CSharp), FormattingOptions.IndentStyle.Block }
                             };
-            using (var session = CreateSession(code, optionSet))
+            using (var session = await CreateSessionAsync(code, optionSet))
             {
                 Assert.NotNull(session);
 
@@ -911,10 +912,10 @@ $$
             }
         }
 
-        internal Holder CreateSession(string code, Dictionary<OptionKey, object> optionSet = null)
+        internal async Task<Holder> CreateSessionAsync(string code, Dictionary<OptionKey, object> optionSet = null)
         {
             return CreateSession(
-                CSharpWorkspaceFactory.CreateWorkspaceFromFile(code),
+                await TestWorkspace.CreateCSharpAsync(code),
                 BraceCompletionSessionProvider.CurlyBrace.OpenCharacter, BraceCompletionSessionProvider.CurlyBrace.CloseCharacter, optionSet);
         }
     }

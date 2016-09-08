@@ -7,7 +7,6 @@ using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.LanguageServices;
 using Microsoft.CodeAnalysis.Notification;
 using Microsoft.CodeAnalysis.ProjectManagement;
-using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.GenerateType
 {
@@ -40,21 +39,21 @@ namespace Microsoft.CodeAnalysis.GenerateType
             private static string FormatDisplayText(
                 State state,
                 bool inNewFile,
-                string destination)
+                bool isNested)
             {
                 var finalName = GetTypeName(state);
 
                 if (inNewFile)
                 {
-                    return string.Format(FeaturesResources.GenerateForInNewFile,
+                    return string.Format(FeaturesResources.Generate_0_1_in_new_file,
                         state.IsStruct ? "struct" : state.IsInterface ? "interface" : "class",
-                        state.Name, destination);
+                        state.Name);
                 }
                 else
                 {
-                    return string.Format(FeaturesResources.GenerateForIn,
+                    return string.Format(isNested ? FeaturesResources.Generate_nested_0_1 : FeaturesResources.Generate_0_1,
                         state.IsStruct ? "struct" : state.IsInterface ? "interface" : "class",
-                        state.Name, destination);
+                        state.Name);
                 }
             }
 
@@ -73,12 +72,12 @@ namespace Microsoft.CodeAnalysis.GenerateType
                 {
                     if (_intoNamespace)
                     {
-                        var namespaceToGenerateIn = string.IsNullOrEmpty(_state.NamespaceToGenerateInOpt) ? FeaturesResources.GlobalNamespace : _state.NamespaceToGenerateInOpt;
-                        return FormatDisplayText(_state, _inNewFile, namespaceToGenerateIn);
+                        var namespaceToGenerateIn = string.IsNullOrEmpty(_state.NamespaceToGenerateInOpt) ? FeaturesResources.Global_Namespace : _state.NamespaceToGenerateInOpt;
+                        return FormatDisplayText(_state, _inNewFile, isNested: false);
                     }
                     else
                     {
-                        return FormatDisplayText(_state, inNewFile: false, destination: _state.TypeToGenerateInOpt.Name);
+                        return FormatDisplayText(_state, inNewFile: false, isNested: true);
                     }
                 }
             }
@@ -109,7 +108,7 @@ namespace Microsoft.CodeAnalysis.GenerateType
             {
                 get
                 {
-                    return FeaturesResources.GenerateNewType;
+                    return FeaturesResources.Generate_new_type;
                 }
             }
 
@@ -205,7 +204,7 @@ namespace Microsoft.CodeAnalysis.GenerateType
                 var generateTypeOptions = options as GenerateTypeOptionsResult;
                 if (generateTypeOptions != null && !generateTypeOptions.IsCancelled)
                 {
-                    var semanticDocument = SemanticDocument.CreateAsync(_document, cancellationToken).WaitAndGetResult(cancellationToken);
+                    var semanticDocument = await SemanticDocument.CreateAsync(_document, cancellationToken).ConfigureAwait(false);
                     var editor = new Editor(_service, semanticDocument, _state, true, generateTypeOptions, cancellationToken);
                     operations = await editor.GetOperationsAsync().ConfigureAwait(false);
                 }

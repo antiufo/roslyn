@@ -1,10 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <!-- Copyright (c)  Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information. -->
-<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003"
-         TreatAsLocalProperty="RestorePackages">
-  <ImportGroup Label="Settings">
-    <Import Project="..\..\..\..\build\Targets\VSL.Settings.targets" />
-  </ImportGroup>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="..\..\..\..\build\Targets\VSL.Settings.targets" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
@@ -16,13 +13,23 @@
     <LargeAddressAware>true</LargeAddressAware>
     <StartupObject>Microsoft.CodeAnalysis.CSharp.CommandLine.Program</StartupObject>
     <SolutionDir Condition="'$(SolutionDir)' == '' OR '$(SolutionDir)' == '*Undefined*'">..\..\..\..\</SolutionDir>
-    <OutDir>$(OutDir)core-clr\</OutDir>
+    <OutDir>$(OutDir)csccore\</OutDir>
     <RestorePackages>true</RestorePackages>
+    <ServiceablePackage>true</ServiceablePackage>
     <AutoGenerateBindingRedirects>True</AutoGenerateBindingRedirects>
-    <TargetCoreClr>true</TargetCoreClr>
     <ProjectTypeGuids>{786C830F-07A1-408B-BD7F-6EE04809D6DB};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
+    <TargetFrameworkIdentifier>.NETPortable</TargetFrameworkIdentifier>
+    <TargetFrameworkVersion>v5.0</TargetFrameworkVersion>
+    <!-- Misspelling, bug in NuGet targets -->
+    <RuntimeIndentifier>x64</RuntimeIndentifier>
+    <NuGetRuntimeIdentifier>$(BaseNuGetRuntimeIdentifier)-$(RuntimeIndentifier)</NuGetRuntimeIdentifier>
+    <NoStdLib>true</NoStdLib>
   </PropertyGroup>
   <ItemGroup Label="Project References">
+    <ProjectReference Include="..\..\..\Tools\CommonNetCoreReferences\CommonNetCoreReferences.csproj">
+      <Project>{b5a6057a-eb4c-49fb-987d-943137e72e47}</Project>
+      <Name>CommonNetCoreReferences</Name>
+    </ProjectReference>
     <ProjectReference Include="..\..\Core\Portable\CodeAnalysis.csproj">
       <Project>{1EE8CAD3-55F9-4D91-96B2-084641DA9A6C}</Project>
       <Name>CodeAnalysis</Name>
@@ -39,53 +46,29 @@
     <PlatformTarget>AnyCPU</PlatformTarget>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="System.Collections.Immutable">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\packages\System.Collections.Immutable.$(SystemCollectionsImmutableVersion)\lib\portable-net45+win8+wp8+wpa81\System.Collections.Immutable.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Reflection.Metadata">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\packages\System.Reflection.Metadata.$(SystemReflectionMetadataVersion)\lib\portable-net45+win8\System.Reflection.Metadata.dll</HintPath>
-    </Reference>
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="..\..\Core\MSBuildTask\BuildClient.cs">
-      <Link>BuildClient.cs</Link>
+    <Compile Include="..\..\Shared\CoreClrAnalyzerAssemblyLoader.cs">
+      <Link>CoreClrAnalyzerAssemblyLoader.cs</Link>
     </Compile>
-    <Compile Include="..\..\Core\MSBuildTask\NativeMethods.cs">
-      <Link>NativeMethods.cs</Link>
+    <Compile Include="..\..\Shared\CoreClrBuildClient.cs">
+      <Link>CoreClrBuildClient.cs</Link>
     </Compile>
-    <Compile Include="..\..\Core\VBCSCompiler\BuildProtocol.cs">
-      <Link>BuildProtocol.cs</Link>
+    <Compile Include="..\..\Shared\Csc.cs">
+      <Link>Csc.cs</Link>
     </Compile>
-    <Compile Include="..\..\Core\VBCSCompiler\CompilerServerLogger.cs">
-      <Link>CompilerServerLogger.cs</Link>
-    </Compile>
-    <Compile Include="..\..\Helpers\ConsoleUtil.cs">
-      <Link>ConsoleUtil.cs</Link>
-    </Compile>
-    <Compile Include="..\..\Helpers\NoOpAnalyzerAssemblyLoader.cs">
-      <Link>ConsoleUtil.cs</Link>
-    </Compile>
-    <Compile Include="Csc.cs" />
     <Compile Include="Program.cs" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleToTest Include="Roslyn.Compilers.CSharp.CommandLine.UnitTests" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="csc.exe.config">
+    <None Include="csc.cmd">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="csc.rsp">
+    <None Include="csc">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="project.json" />
   </ItemGroup>
-  <ImportGroup Label="Targets">
-    <Import Project="..\..\..\..\build\Targets\VSL.Imports.targets" />
-  </ImportGroup>
-  <Target Name="CopyExtraFiles" AfterTargets="Build">
-    <Copy SourceFiles="@(None)" DestinationFolder="$(OutDir)" Condition="'%(Extension)' == '.dll'" />
-  </Target>
+  <Import Project="..\..\Core\CommandLine\CommandLine.projitems" Label="Shared" />
+  <Import Project="..\..\..\..\build\Targets\VSL.Imports.targets" />
 </Project>

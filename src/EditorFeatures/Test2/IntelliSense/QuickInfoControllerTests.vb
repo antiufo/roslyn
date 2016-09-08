@@ -1,6 +1,5 @@
 ' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
-Imports System.ComponentModel.Composition.Hosting
 Imports System.Runtime.CompilerServices
 Imports System.Threading
 Imports System.Threading.Tasks
@@ -22,7 +21,7 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.IntelliSense
             TestWorkspace.ResetThreadAffinity()
         End Sub
 
-        <Fact>
+        <WpfFact>
         Public Sub InvokeQuickInfoWithoutDocumentShouldNotQueryProviders()
             Dim emptyProvider = New Mock(Of IDocumentProvider)
             emptyProvider.Setup(Function(p) p.GetDocumentAsync(It.IsAny(Of ITextSnapshot), It.IsAny(Of CancellationToken))).Returns(Task.FromResult(DirectCast(Nothing, Document)))
@@ -32,14 +31,14 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.IntelliSense
             GetMocks(controller).Provider.Verify(Function(p) p.GetItemAsync(It.IsAny(Of Document), It.IsAny(Of Integer), It.IsAny(Of CancellationToken)), Times.Never)
         End Sub
 
-        <Fact>
+        <WpfFact>
         Public Sub InvokeQuickInfoWithDocumentShouldStartNewSession()
             Dim controller = CreateController(triggerQuickInfo:=True)
 
             GetMocks(controller).Presenter.Verify(Function(p) p.CreateSession(It.IsAny(Of ITextView), It.IsAny(Of ITextBuffer), It.IsAny(Of IQuickInfoSession)), Times.Once)
         End Sub
 
-        <Fact>
+        <WpfFact>
         Public Sub InactiveQuickInfoShouldNotHandleEscape()
             Dim controller As Controller = CreateController()
 
@@ -48,7 +47,7 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.IntelliSense
             Assert.False(handled)
         End Sub
 
-        <Fact>
+        <WpfFact>
         Public Sub ActiveQuickInfoShouldHandleEscape()
             Dim presenter = New Mock(Of IIntelliSensePresenter(Of IQuickInfoPresenterSession, IQuickInfoSession))
             Dim presenterSession = New Mock(Of IQuickInfoPresenterSession)
@@ -63,7 +62,7 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.IntelliSense
             presenterSession.Verify(Sub(p) p.Dismiss(), Times.Once)
         End Sub
 
-        <Fact>
+        <WpfFact>
         Public Sub SlowQuickInfoShouldDismissSessionButNotHandleEscape()
             Dim checkpoint As New Checkpoint
             Dim presenter = New Mock(Of IIntelliSensePresenter(Of IQuickInfoPresenterSession, IQuickInfoSession))
@@ -84,7 +83,7 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.IntelliSense
             presenterSession.Verify(Sub(p) p.Dismiss(), Times.Once)
         End Sub
 
-        <Fact>
+        <WpfFact>
         Public Sub CaretPositionChangedShouldDismissSession()
             Dim presenter = New Mock(Of IIntelliSensePresenter(Of IQuickInfoPresenterSession, IQuickInfoSession))
             Dim presenterSession = New Mock(Of IQuickInfoPresenterSession)
@@ -96,7 +95,7 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.IntelliSense
             presenterSession.Verify(Sub(p) p.Dismiss(), Times.Once)
         End Sub
 
-        <Fact>
+        <WpfFact>
         Public Sub SubjectBufferPostChangedShouldDismissSession()
             Dim presenter = New Mock(Of IIntelliSensePresenter(Of IQuickInfoPresenterSession, IQuickInfoSession))
             Dim presenterSession = New Mock(Of IQuickInfoPresenterSession)
@@ -108,7 +107,7 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.IntelliSense
             presenterSession.Verify(Sub(p) p.Dismiss(), Times.Once)
         End Sub
 
-        <Fact(), WorkItem(1106729)>
+        <WpfFact(), WorkItem(1106729, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1106729")>
         Public Sub PresenterUpdatesExistingSessionIfNotDismissed()
             Dim broker = New Mock(Of IQuickInfoBroker)()
             Dim presenter As IIntelliSensePresenter(Of IQuickInfoPresenterSession, IQuickInfoSession) = New QuickInfoPresenter(broker.Object)
@@ -122,7 +121,7 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.IntelliSense
             mockEditorSession.Verify(Sub(m) m.Recalculate())
         End Sub
 
-        <Fact>
+        <WpfFact>
         Public Sub PresenterDoesNotRecalculateDismissedSession()
             Dim broker = New Mock(Of IQuickInfoBroker)()
             Dim brokerSession = New Mock(Of IQuickInfoSession)()
@@ -151,7 +150,7 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.IntelliSense
         ' Create an empty document to use as a non-null parameter when needed
         Private Shared ReadOnly s_document As Document =
             (Function()
-                 Dim workspace = TestWorkspaceFactory.CreateWorkspace(
+                 Dim workspace = TestWorkspace.CreateWorkspace(
                      <Workspace>
                          <Project Language="C#">
                              <Document>

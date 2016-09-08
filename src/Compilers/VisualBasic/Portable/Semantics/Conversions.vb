@@ -383,6 +383,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ' Interpolated string conversions
         InterpolatedString = [Widening] Or (1 << 25)
 
+        ' Tuple conversions
+        Tuple = (1 << 26)
+        WideningTuple = [Widening] Or Tuple
+        NarrowingTuple = [Narrowing] Or Tuple
+
         ' Bits 28 - 31 are reserved for failure flags.
     End Enum
 
@@ -916,13 +921,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             userDefinedConversionsMightStillBeApplicable = False
             Dim conv As ConversionKind
 
-            ' Using <symbol>.IsConstant() for field accesses can result in an infinite loop.
-            ' To detect such a loop pass the already visited constants from the binder.
+            ' Using source.IsConstant for field accesses can result in an infinite loop.
+            ' To resolve the cycle, first call GetConstantValue with the already visited constants from the binder.                  
+            ' The check for source.IsConstant is still necessary because the node might still 
+            ' be considered as a non-constant in some error conditions (a reference before declaration,
+            ' for example).
             Dim sourceIsConstant As Boolean = False
             If source.Kind = BoundKind.FieldAccess Then
-                sourceIsConstant = DirectCast(source, BoundFieldAccess).FieldSymbol.GetConstantValue(binder.ConstantFieldsInProgress) IsNot Nothing
+                sourceIsConstant = DirectCast(source, BoundFieldAccess).FieldSymbol.GetConstantValue(binder.ConstantFieldsInProgress) IsNot Nothing AndAlso source.IsConstant
             ElseIf source.Kind = BoundKind.Local Then
-                sourceIsConstant = DirectCast(source, BoundLocal).LocalSymbol.GetConstantValue(binder) IsNot Nothing
+                sourceIsConstant = DirectCast(source, BoundLocal).LocalSymbol.GetConstantValue(binder) IsNot Nothing AndAlso source.IsConstant
             Else
                 sourceIsConstant = source.IsConstant
             End If
@@ -952,11 +960,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Return Nothing 'ConversionKind.NoConversion
             End If
 
-            Dim sourceType As TypeSymbol = source.Type
+            Dim sourceType As TypeSymbol = If(source.Kind = BoundKind.TupleLiteral,
+                                                DirectCast(source, BoundTupleLiteral).InferredType,
+                                                source.Type)
 
             If sourceType Is Nothing Then
-
-                userDefinedConversionsMightStillBeApplicable = source.GetMostEnclosedParenthesizedExpression().Kind = BoundKind.ArrayLiteral
+                Dim mostEnclosing = source.GetMostEnclosedParenthesizedExpression().Kind
+                userDefinedConversionsMightStillBeApplicable = mostEnclosing = BoundKind.ArrayLiteral OrElse
+                                                               mostEnclosing = BoundKind.TupleLiteral
 
                 ' The node doesn't have a type yet and reclassification failed.
                 Return Nothing ' No conversion
@@ -1035,6 +1046,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Case BoundKind.InterpolatedStringExpression
                     Return ClassifyInterpolatedStringConversion(DirectCast(source, BoundInterpolatedStringExpression), destination, binder)
 
+                Case BoundKind.TupleLiteral
+                    Return ClassifyTupleConversion(DirectCast(source, BoundTupleLiteral), destination, binder, useSiteDiagnostics)
             End Select
 
             Return Nothing 'ConversionKind.NoConversion
@@ -1197,6 +1210,63 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             Return Nothing
 
+        End Function
+
+        Public Shared Function ClassifyTupleConversion(source As BoundTupleLiteral, destination As TypeSymbol, binder As Binder, <[In], Out> ByRef useSiteDiagnostics As HashSet(Of DiagnosticInfo)) As ConversionKind
+            If source.Type = destination Then
+                Return ConversionKind.Identity
+            End If
+
+            Dim arguments = source.Arguments
+
+            Dim wideningConversion = ConversionKind.WideningTuple
+            Dim narrowingConversion = ConversionKind.NarrowingTuple
+
+            If destination.IsNullableType Then
+                destination = destination.GetNullableUnderlyingType()
+
+                wideningConversion = ConversionKind.WideningNullable
+                narrowingConversion = ConversionKind.NarrowingNullable
+            End If
+
+            ' tuple literal converts to its inferred type 
+            If source.InferredType?.IsSameTypeIgnoringCustomModifiers(destination) Then
+                Return wideningConversion
+            End If
+
+            ' Now we can try element-wise conversion
+
+            ' check if the type is actually compatible type for a tuple of given cardinality
+            If Not destination.IsTupleOrCompatibleWithTupleOfCardinality(arguments.Length) Then
+                Return Nothing 'ConversionKind.NoConversion
+            End If
+
+            Dim targetElementTypes As ImmutableArray(Of TypeSymbol) = destination.GetElementTypesOfTupleOrCompatible()
+            Debug.Assert(arguments.Count = targetElementTypes.Length)
+
+            ' check arguments against flattened list of target element types 
+            Dim result As ConversionKind = wideningConversion
+
+            For i As Integer = 0 To arguments.Length - 1
+                Dim argument = arguments(i)
+                Dim targetElementType = targetElementTypes(i)
+
+                If argument.HasErrors OrElse targetElementType.IsErrorType Then
+                    Return Nothing 'ConversionKind.NoConversion
+                End If
+
+                Dim elementConversion = ClassifyConversion(argument, targetElementType, binder, useSiteDiagnostics).Key
+
+                If NoConversion(elementConversion) Then
+                    Return Nothing 'ConversionKind.NoConversion
+                End If
+
+                If IsNarrowingConversion(elementConversion) Then
+                    result = narrowingConversion
+                End If
+            Next
+
+            Return result
         End Function
 
         Private Shared Function ClassifyArrayInitialization(source As BoundArrayInitialization, targetElementType As TypeSymbol, binder As Binder, <[In], Out> ByRef useSiteDiagnostics As HashSet(Of DiagnosticInfo)) As ConversionKind
@@ -2007,7 +2077,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             If sourceType Is Nothing Then
                 source = source.GetMostEnclosedParenthesizedExpression()
-                sourceType = If(source.Kind <> BoundKind.ArrayLiteral, source.Type, New ArrayLiteralTypeSymbol(DirectCast(source, BoundArrayLiteral)))
+                If source.Kind = BoundKind.ArrayLiteral Then
+                    sourceType = New ArrayLiteralTypeSymbol(DirectCast(source, BoundArrayLiteral))
+                ElseIf source.Kind = BoundKind.TupleLiteral Then
+                    sourceType = DirectCast(source, BoundTupleLiteral).InferredType
+                    If sourceType Is Nothing Then
+                        Return Nothing
+                    End If
+                Else
+                    sourceType = source.Type
+                End If
             End If
 
             Debug.Assert(sourceType IsNot Nothing)
@@ -2114,6 +2193,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             'Array conversions
             result = ClassifyArrayConversion(source, destination, varianceCompatibilityClassificationDepth:=0, useSiteDiagnostics:=useSiteDiagnostics)
+            If ConversionExists(result) Then
+                Return result
+            End If
+
+            'Tuple conversions
+            result = ClassifyTupleConversion(source, destination, useSiteDiagnostics)
             If ConversionExists(result) Then
                 Return result
             End If
@@ -2339,7 +2424,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             'For one-dimensional arrays, if the target interface is IList(Of U) or ICollection(Of U) or IEnumerable(Of U),
             'look for any conversions that start with array covariance T()->U()
             'and then have a single array-generic conversion step U()->IList/ICollection/IEnumerable(Of U)
-            If array.Rank <> 1 Then
+            If Not array.IsSZArray Then
                 Return Nothing 'ConversionKind.NoConversion
             End If
 
@@ -2900,7 +2985,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim srcArray = DirectCast(source, ArrayTypeSymbol)
             Dim dstArray = DirectCast(destination, ArrayTypeSymbol)
 
-            If srcArray.Rank <> dstArray.Rank Then
+            If Not srcArray.HasSameShapeAs(dstArray) Then
                 Return Nothing 'ConversionKind.NoConversion
             End If
 
@@ -3144,7 +3229,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                         End If
 
                         If mightSucceedAtRuntime = Nothing Then
-                            ' CLR spec $8.7 says that integral()->integral() is possible so long as they have the same bitsize.
+                            ' CLR spec $8.7 says that integral()->integral() is possible so long as they have the same bit size.
                             ' It claims that bool is to be taken as the same size as int8/uint8, so allowing e.g. bool()->uint8().
                             ' That isn't allowed in practice by the current CLR runtime, but since it's in the spec,
                             ' we'll return "ConversionKind.MightSucceedAtRuntime" to mean that it might potentially possibly occur.
@@ -3436,6 +3521,47 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Return Nothing 'ConversionKind.NoConversion
         End Function
 
+        Private Shared Function ClassifyTupleConversion(source As TypeSymbol, destination As TypeSymbol, <[In], Out> ByRef useSiteDiagnostics As HashSet(Of DiagnosticInfo)) As ConversionKind
+
+            If Not source.IsTupleType Then
+                Return Nothing  'ConversionKind.NoConversion
+            End If
+
+            Dim sourceElementTypes = DirectCast(source, TupleTypeSymbol).TupleElementTypes
+
+            ' check if the type is actually compatible type for a tuple of given cardinality
+            If Not destination.IsTupleOrCompatibleWithTupleOfCardinality(sourceElementTypes.Length) Then
+                Return Nothing 'ConversionKind.NoConversion
+            End If
+
+            Dim targetElementTypes As ImmutableArray(Of TypeSymbol) = destination.GetElementTypesOfTupleOrCompatible()
+            Debug.Assert(sourceElementTypes.Count = targetElementTypes.Length)
+
+            ' check arguments against flattened list of target element types 
+            Dim result As ConversionKind = ConversionKind.WideningTuple
+
+            For i As Integer = 0 To sourceElementTypes.Length - 1
+                Dim argumentType = sourceElementTypes(i)
+                Dim targetType = targetElementTypes(i)
+
+                If argumentType.IsErrorType OrElse targetType.IsErrorType Then
+                    Return Nothing 'ConversionKind.NoConversion
+                End If
+
+                Dim elementConversion = ClassifyConversion(argumentType, targetType, useSiteDiagnostics).Key
+
+                If NoConversion(elementConversion) Then
+                    Return Nothing 'ConversionKind.NoConversion
+                End If
+
+                If IsNarrowingConversion(elementConversion) Then
+                    result = ConversionKind.NarrowingTuple
+                End If
+            Next
+
+            Return result
+        End Function
+
         Public Shared Function ClassifyStringConversion(source As TypeSymbol, destination As TypeSymbol) As ConversionKind
             '§8.8 Widening Conversions
             '•	From Char() to String.
@@ -3455,7 +3581,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             If shouldBeArray.Kind = SymbolKind.ArrayType Then
                 Dim array = DirectCast(shouldBeArray, ArrayTypeSymbol)
 
-                If array.Rank = 1 AndAlso array.ElementType.SpecialType = SpecialType.System_Char Then
+                If array.IsSZArray AndAlso array.ElementType.SpecialType = SpecialType.System_Char Then
                     If array Is source Then
                         Return ConversionKind.WideningString
                     Else
@@ -4317,8 +4443,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' Create a new ArrayTypeSymbol.
         ''' </summary>
         Friend Sub New(arrayLiteral As BoundArrayLiteral)
-            MyBase.New(arrayLiteral.InferredType.ElementType, arrayLiteral.InferredType.CustomModifiers, arrayLiteral.InferredType.Rank, arrayLiteral.Binder.Compilation.Assembly)
-
             Me._arrayLiteral = arrayLiteral
         End Sub
 
@@ -4328,5 +4452,50 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End Get
         End Property
 
+        Friend Overrides ReadOnly Property IsSZArray As Boolean
+            Get
+                Return _arrayLiteral.InferredType.IsSZArray
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property Rank As Integer
+            Get
+                Return _arrayLiteral.InferredType.Rank
+            End Get
+        End Property
+
+        Friend Overrides ReadOnly Property HasDefaultSizesAndLowerBounds As Boolean
+            Get
+                Return _arrayLiteral.InferredType.HasDefaultSizesAndLowerBounds
+            End Get
+        End Property
+
+        Friend Overrides ReadOnly Property InterfacesNoUseSiteDiagnostics As ImmutableArray(Of NamedTypeSymbol)
+            Get
+                Return _arrayLiteral.InferredType.InterfacesNoUseSiteDiagnostics
+            End Get
+        End Property
+
+        Friend Overrides ReadOnly Property BaseTypeNoUseSiteDiagnostics As NamedTypeSymbol
+            Get
+                Return _arrayLiteral.InferredType.BaseTypeNoUseSiteDiagnostics
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property CustomModifiers As ImmutableArray(Of CustomModifier)
+            Get
+                Return _arrayLiteral.InferredType.CustomModifiers
+            End Get
+        End Property
+
+        Public Overrides ReadOnly Property ElementType As TypeSymbol
+            Get
+                Return _arrayLiteral.InferredType.ElementType
+            End Get
+        End Property
+
+        Friend Overrides Function InternalSubstituteTypeParameters(substitution As TypeSubstitution) As TypeWithModifiers
+            Throw ExceptionUtilities.Unreachable
+        End Function
     End Class
 End Namespace

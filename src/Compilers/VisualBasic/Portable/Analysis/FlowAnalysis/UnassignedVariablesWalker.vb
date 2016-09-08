@@ -12,11 +12,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
     ''' before being assigned anywhere within a method.
     ''' </summary>
     ''' <remarks></remarks>
-    Friend Class UnassignedVariablesWalker
+    Friend NotInheritable Class UnassignedVariablesWalker
         Inherits DataFlowPass
 
         ' TODO: normalize the result by removing variables that are unassigned in an unmodified flow analysis.
-        Public Sub New(info As FlowAnalysisInfo)
+        Private Sub New(info As FlowAnalysisInfo)
             MyBase.New(info, suppressConstExpressionsSupport:=False, trackStructsWithIntrinsicTypedFields:=True)
         End Sub
 
@@ -32,7 +32,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Private ReadOnly _result As HashSet(Of Symbol) = New HashSet(Of Symbol)()
 
         Protected Overrides Sub ReportUnassigned(local As Symbol,
-                                                 node As VisualBasicSyntaxNode,
+                                                 node As SyntaxNode,
                                                  rwContext As ReadWriteContext,
                                                  Optional slot As Integer = SlotKind.NotTracked,
                                                  Optional boundFieldAccess As BoundFieldAccess = Nothing)

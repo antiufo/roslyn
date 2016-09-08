@@ -4,14 +4,11 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.LanguageServices;
 using Microsoft.CodeAnalysis.Shared.Utilities;
-using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Shared.Extensions
@@ -69,6 +66,11 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
         public static bool IsDelegateType(this ITypeSymbol symbol)
         {
             return symbol?.TypeKind == TypeKind.Delegate;
+        }
+
+        public static bool IsStructType(this ITypeSymbol symbol)
+        {
+            return symbol?.TypeKind == TypeKind.Struct;
         }
 
         public static bool IsAnonymousType(this INamedTypeSymbol symbol)
@@ -290,7 +292,20 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
             }
         }
 
-        // Determine if "type" inherits from "baseType", ignoring constructed types, and dealing
+        // Determine if "type" inherits from "baseType", ignoring constructed types, optionally including interfaces,
+        // dealing only with original types.
+        public static bool InheritsFromOrEquals(
+            this ITypeSymbol type, ITypeSymbol baseType, bool includeInterfaces)
+        {
+            if (!includeInterfaces)
+            {
+                return InheritsFromOrEquals(type, baseType);
+            }
+
+            return type.GetBaseTypesAndThis().Concat(type.AllInterfaces).Contains(t => SymbolEquivalenceComparer.Instance.Equals(t, baseType));
+        }
+
+        // Determine if "type" inherits from "baseType", ignoring constructed types and interfaces, dealing
         // only with original types.
         public static bool InheritsFromOrEquals(
             this ITypeSymbol type, ITypeSymbol baseType)
@@ -562,7 +577,7 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
 
         private static string GetParameterName(ITypeSymbol type)
         {
-            if (type == null || type.IsAnonymousType())
+            if (type == null || type.IsAnonymousType() || type.IsTupleType)
             {
                 return DefaultParameterName;
             }
@@ -607,11 +622,11 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
             return false;
         }
 
-        public static bool CanSupportCollectionInitializer(this ITypeSymbol typeSymbol)
+        public static bool CanSupportCollectionInitializer(this ITypeSymbol typeSymbol, ISymbol within)
         {
             return
                 typeSymbol.AllInterfaces.Any(i => i.SpecialType == SpecialType.System_Collections_IEnumerable) &&
-                typeSymbol.GetMembers(WellKnownMemberNames.CollectionInitializerAddMethodName)
+                typeSymbol.GetAccessibleMembersInThisAndBaseTypes<IMethodSymbol>(within ?? typeSymbol).Where(s => s.Name == WellKnownMemberNames.CollectionInitializerAddMethodName)
                     .OfType<IMethodSymbol>()
                     .Any(m => m.Parameters.Any());
         }

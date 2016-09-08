@@ -1,5 +1,6 @@
 ' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
+Imports System.Threading.Tasks
 Imports Microsoft.VisualStudio.GraphModel
 Imports Microsoft.VisualStudio.LanguageServices.Implementation.Progression
 Imports Roslyn.Test.Utilities
@@ -8,8 +9,8 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Progression
 
     Public Class OverriddenByGraphQueryTests
         <Fact, Trait(Traits.Feature, Traits.Features.Progression)>
-        Public Sub TestOverriddenByMethod1()
-            Using testState = New ProgressionTestState(
+        Public Async Function TestOverriddenByMethod1() As Task
+            Using testState = Await ProgressionTestState.CreateAsync(
                     <Workspace>
                         <Project Language="C#" CommonReferences="true" FilePath="Z:\Project.csproj">
                             <Document FilePath="Z:\Project.cs">
@@ -31,8 +32,8 @@ class Foo : Base, IComparable
                         </Project>
                     </Workspace>)
 
-                Dim inputGraph = testState.GetGraphWithMarkedSymbolNode()
-                Dim outputContext = testState.GetGraphContextAfterQuery(inputGraph, New OverriddenByGraphQuery(), GraphContextDirection.Target)
+                Dim inputGraph = await testState.GetGraphWithMarkedSymbolNodeAsync()
+                Dim outputContext = Await testState.GetGraphContextAfterQuery(inputGraph, New OverriddenByGraphQuery(), GraphContextDirection.Target)
 
                 AssertSimplifiedGraphIs(
                     outputContext.Graph,
@@ -47,11 +48,11 @@ class Foo : Base, IComparable
                         </IdentifierAliases>
                     </DirectedGraph>)
             End Using
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Progression)>
-        Public Sub TestOverriddenByMethod2()
-            Using testState = New ProgressionTestState(
+        Public Async Function TestOverriddenByMethod2() As Task
+            Using testState = Await ProgressionTestState.CreateAsync(
                     <Workspace>
                         <Project Language="C#" CommonReferences="true" FilePath="Z:\Project.csproj">
                             <Document FilePath="Z:\Project.cs">
@@ -73,8 +74,8 @@ class Foo : Base, IComparable
                         </Project>
                     </Workspace>)
 
-                Dim inputGraph = testState.GetGraphWithMarkedSymbolNode()
-                Dim outputContext = testState.GetGraphContextAfterQuery(inputGraph, New OverriddenByGraphQuery(), GraphContextDirection.Target)
+                Dim inputGraph = await testState.GetGraphWithMarkedSymbolNodeAsync()
+                Dim outputContext = Await testState.GetGraphContextAfterQuery(inputGraph, New OverriddenByGraphQuery(), GraphContextDirection.Target)
 
                 AssertSimplifiedGraphIs(
                     outputContext.Graph,
@@ -92,6 +93,6 @@ class Foo : Base, IComparable
                         </IdentifierAliases>
                     </DirectedGraph>)
             End Using
-        End Sub
+        End Function
     End Class
 End Namespace

@@ -36,7 +36,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.Venus
                                               pszObjectName As String,
                                               pszNameOfEvent As String) As Integer Implements IVsContainedLanguageStaticEventBinding.AddStaticEventBinding
             Me.ComponentModel.GetService(Of IWaitIndicator)().Wait(
-                BasicVSResources.Intellisense,
+                BasicVSResources.IntelliSense,
                 allowCancel:=False,
                 action:=Sub(c)
                             Dim visualStudioWorkspace = ComponentModel.GetService(Of visualStudioWorkspace)()
@@ -91,7 +91,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.Venus
                                                         ppbstrMemberIDs As IntPtr) As Integer Implements IVsContainedLanguageStaticEventBinding.GetStaticEventBindingsForObject
             Dim members As Integer
             Me.ComponentModel.GetService(Of IWaitIndicator)().Wait(
-                BasicVSResources.Intellisense,
+                BasicVSResources.IntelliSense,
                 allowCancel:=False,
                 action:=Sub(c)
                             Dim eventNamesAndMemberNamesAndIds = ContainedLanguageStaticEventBinding.GetStaticEventBindings(
@@ -112,7 +112,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.Venus
                                                  pszNameOfEvent As String) As Integer Implements IVsContainedLanguageStaticEventBinding.RemoveStaticEventBinding
 
             Me.ComponentModel.GetService(Of IWaitIndicator)().Wait(
-                BasicVSResources.Intellisense,
+                BasicVSResources.IntelliSense,
                 allowCancel:=False,
                 action:=Sub(c)
                             Dim visualStudioWorkspace = ComponentModel.GetService(Of visualStudioWorkspace)()
@@ -129,7 +129,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.VisualBasic.Venus
             Public Shared Shadows Instance As IFormattingRule = New VisualBasicHelperFormattingRule()
 
             Public Overrides Sub AddIndentBlockOperations(list As List(Of IndentBlockOperation), node As SyntaxNode, optionSet As OptionSet, nextOperation As NextAction(Of IndentBlockOperation))
-                ' we need special behavior for VB due to @Helper code generation wierd-ness.
+                ' we need special behavior for VB due to @Helper code generation weird-ness.
                 ' this will looking for code gen specific style to make it not so expansive
                 If IsEndHelperPattern(node) Then
                     Return

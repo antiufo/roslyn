@@ -3,13 +3,12 @@
 '-----------------------------------------------------------------------------
 ' Contains the definition of the Parser
 '-----------------------------------------------------------------------------
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
+Imports Microsoft.CodeAnalysis.Syntax.InternalSyntax
 Imports InternalSyntaxFactory = Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.SyntaxFactory
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
 
-    Friend Partial Class Parser
+    Partial Friend Class Parser
 
         '
         '============ Methods for parsing specific executable statements
@@ -491,7 +490,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
             Dim keyword As KeywordSyntax = DirectCast(CurrentToken, KeywordSyntax)
 
             ' Put the 'ENDIF'/'WEND'/'GOSUB' token in the unexpected.
-            Dim unexpected As SyntaxList(Of SyntaxToken) = ResyncAt()
+            Dim unexpected As CodeAnalysis.Syntax.InternalSyntax.SyntaxList(Of SyntaxToken) = ResyncAt()
 
             Dim missingEndKeyword As KeywordSyntax = InternalSyntaxFactory.MissingKeyword(SyntaxKind.EndKeyword)
             Dim statement As StatementSyntax = Nothing
@@ -1136,7 +1135,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
                     ' A non-parenthesized argument list cannot contain
                     ' a newline.
 
-                    Dim unexpected As VisualBasicSyntaxNode = Nothing
+                    Dim unexpected As GreenNode = Nothing
                     Dim arguments = ParseArguments(unexpected)
                     Dim closeParen = InternalSyntaxFactory.MissingPunctuation(SyntaxKind.CloseParenToken)
                     If unexpected IsNot Nothing Then
@@ -1577,7 +1576,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
                 Return ReportSyntaxError(SyntaxFactory.LabelStatement(labelName, InternalSyntaxFactory.MissingPunctuation(SyntaxKind.ColonToken)), ERRID.ERR_ObsoleteLineNumbersAreLabels)
             End If
 
-            Dim trivia = New SyntaxList(Of VisualBasicSyntaxNode)(labelName.GetTrailingTrivia())
+            Dim trivia = New CodeAnalysis.Syntax.InternalSyntax.SyntaxList(Of VisualBasicSyntaxNode)(labelName.GetTrailingTrivia())
             Debug.Assert(trivia.Count > 0)
             Dim index = -1
             For i = 0 To trivia.Count - 1
@@ -1640,7 +1639,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
                 argumentsBuilder.Add(ParseArgument(RedimOrNewParent:=False))
             End If
 
-            Dim arguments As SeparatedSyntaxList(Of ArgumentSyntax) = argumentsBuilder.ToList
+            Dim arguments As CodeAnalysis.Syntax.InternalSyntax.SeparatedSyntaxList(Of ArgumentSyntax) = argumentsBuilder.ToList
             _pool.Free(argumentsBuilder)
 
             Dim closeParen As PunctuationSyntax = Nothing
@@ -1790,7 +1789,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
             GetNextToken()
 
             Dim optionalExpression As ExpressionSyntax = Nothing
-            Dim variables As SeparatedSyntaxList(Of VariableDeclaratorSyntax) = Nothing
+            Dim variables As CodeAnalysis.Syntax.InternalSyntax.SeparatedSyntaxList(Of VariableDeclaratorSyntax) = Nothing
 
             Dim nextToken As SyntaxToken = PeekToken(1)
 
@@ -1805,7 +1804,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
                 optionalExpression = ParseExpressionCore()
             End If
 
-            'TODO - not resynching here may cause errors to differ from Dev10.
+            'TODO - not resyncing here may cause errors to differ from Dev10.
 
             'No need to resync on error.  This will be handled by GetStatementTerminator
 
@@ -1864,7 +1863,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
             ' skip possible statement terminator
             Dim lookahead = PeekToken(1)
 
-            If lookahead.Kind <> SyntaxKind.EndOfFileToken OrElse _scanner.Options.Kind <> SourceCodeKind.Interactive Then
+            If lookahead.Kind <> SyntaxKind.EndOfFileToken OrElse _scanner.Options.Kind = SourceCodeKind.Regular Then
                 result = result.AddError(ERRID.ERR_UnexpectedExpressionStatement)
             End If
 

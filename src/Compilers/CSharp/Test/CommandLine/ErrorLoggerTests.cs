@@ -1,9 +1,11 @@
 ﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System;
+using System.Collections.Immutable;
 using System.Globalization;
 using System.IO;
 using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
+using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Test.Utilities;
 using Xunit;
 
@@ -46,7 +48,9 @@ class C
 
             var expectedHeader = GetExpectedErrorLogHeader(actualOutput, cmd);
             var expectedIssues = @"
-  ""issues"": [
+      ""results"": [
+      ]
+    }
   ]
 }";
             var expectedText = expectedHeader + expectedIssues;
@@ -83,50 +87,165 @@ public class C
 
             var expectedHeader = GetExpectedErrorLogHeader(actualOutput, cmd);
             var expectedIssues = string.Format(@"
-  ""issues"": [
-    {{
-      ""ruleId"": ""CS0169"",
-      ""locations"": [
+      ""results"": [
         {{
-          ""analysisTarget"": [
+          ""ruleId"": ""CS0169"",
+          ""level"": ""warning"",
+          ""message"": ""The field 'C.x' is never used"",
+          ""locations"": [
             {{
-              ""uri"": ""{0}"",
-              ""region"": {{
-                ""startLine"": 3,
-                ""startColumn"": 16,
-                ""endLine"": 3,
-                ""endColumn"": 17
+              ""resultFile"": {{
+                ""uri"": ""{0}"",
+                ""region"": {{
+                  ""startLine"": 4,
+                  ""startColumn"": 17,
+                  ""endLine"": 4,
+                  ""endColumn"": 18
+                }}
               }}
             }}
-          ]
+          ],
+          ""properties"": {{
+            ""warningLevel"": 3
+          }}
+        }},
+        {{
+          ""ruleId"": ""CS5001"",
+          ""level"": ""error"",
+          ""message"": ""Program does not contain a static 'Main' method suitable for an entry point""
         }}
       ],
-      ""fullMessage"": ""The field 'C.x' is never used"",
-      ""properties"": {{
-        ""severity"": ""Warning"",
-        ""warningLevel"": ""3"",
-        ""defaultSeverity"": ""Warning"",
-        ""title"": ""Field is never used"",
-        ""category"": ""Compiler"",
-        ""isEnabledByDefault"": ""True"",
-        ""customTags"": ""Compiler;Telemetry""
-      }}
-    }},
-    {{
-      ""ruleId"": ""CS5001"",
-      ""locations"": [
-      ],
-      ""fullMessage"": ""Program does not contain a static 'Main' method suitable for an entry point"",
-      ""properties"": {{
-        ""severity"": ""Error"",
-        ""defaultSeverity"": ""Error"",
-        ""category"": ""Compiler"",
-        ""isEnabledByDefault"": ""True"",
-        ""customTags"": ""Compiler;Telemetry;NotConfigurable""
+      ""rules"": {{
+        ""CS0169"": {{
+          ""id"": ""CS0169"",
+          ""shortDescription"": ""Field is never used"",
+          ""defaultLevel"": ""warning"",
+          ""properties"": {{
+            ""category"": ""Compiler"",
+            ""isEnabledByDefault"": true,
+            ""tags"": [
+              ""Compiler"",
+              ""Telemetry""
+            ]
+          }}
+        }},
+        ""CS5001"": {{
+          ""id"": ""CS5001"",
+          ""defaultLevel"": ""error"",
+          ""properties"": {{
+            ""category"": ""Compiler"",
+            ""isEnabledByDefault"": true,
+            ""tags"": [
+              ""Compiler"",
+              ""Telemetry"",
+              ""NotConfigurable""
+            ]
+          }}
+        }}
       }}
     }}
   ]
-}}", AnalyzerForErrorLogTest.EscapeDirectorySeparatorChar(sourceFile));
+}}", AnalyzerForErrorLogTest.GetUriForPath(sourceFile));
+
+            var expectedText = expectedHeader + expectedIssues;
+            Assert.Equal(expectedText, actualOutput);
+
+            CleanupAllGeneratedFiles(sourceFile);
+            CleanupAllGeneratedFiles(errorLogFile);
+        }
+
+        [Fact]
+        public void SimpleCompilerDiagnostics_Suppressed()
+        {
+            var source = @"
+public class C
+{
+#pragma warning disable CS0169
+    private int x;
+#pragma warning restore CS0169
+}";
+            var sourceFile = Temp.CreateFile().WriteAllText(source).Path;
+            var errorLogDir = Temp.CreateDirectory();
+            var errorLogFile = Path.Combine(errorLogDir.Path, "ErrorLog.txt");
+
+            var cmd = new MockCSharpCompiler(null, _baseDirectory, new[] {
+                "/nologo", sourceFile, "/preferreduilang:en", $"/errorlog:{errorLogFile}" });
+            var outWriter = new StringWriter(CultureInfo.InvariantCulture);
+
+            var exitCode = cmd.Run(outWriter);
+            var actualConsoleOutput = outWriter.ToString().Trim();
+
+            // Suppressed diagnostics are only report in the error log, not the console output.
+            Assert.DoesNotContain("CS0169", actualConsoleOutput);
+            Assert.Contains("CS5001", actualConsoleOutput);
+            Assert.NotEqual(0, exitCode);
+
+            var actualOutput = File.ReadAllText(errorLogFile).Trim();
+
+            var expectedHeader = GetExpectedErrorLogHeader(actualOutput, cmd);
+            var expectedIssues = string.Format(@"
+      ""results"": [
+        {{
+          ""ruleId"": ""CS0169"",
+          ""level"": ""warning"",
+          ""message"": ""The field 'C.x' is never used"",
+          ""suppressionStates"": [
+            ""suppressedInSource""
+          ],
+          ""locations"": [
+            {{
+              ""resultFile"": {{
+                ""uri"": ""{0}"",
+                ""region"": {{
+                  ""startLine"": 5,
+                  ""startColumn"": 17,
+                  ""endLine"": 5,
+                  ""endColumn"": 18
+                }}
+              }}
+            }}
+          ],
+          ""properties"": {{
+            ""warningLevel"": 3
+          }}
+        }},
+        {{
+          ""ruleId"": ""CS5001"",
+          ""level"": ""error"",
+          ""message"": ""Program does not contain a static 'Main' method suitable for an entry point""
+        }}
+      ],
+      ""rules"": {{
+        ""CS0169"": {{
+          ""id"": ""CS0169"",
+          ""shortDescription"": ""Field is never used"",
+          ""defaultLevel"": ""warning"",
+          ""properties"": {{
+            ""category"": ""Compiler"",
+            ""isEnabledByDefault"": true,
+            ""tags"": [
+              ""Compiler"",
+              ""Telemetry""
+            ]
+          }}
+        }},
+        ""CS5001"": {{
+          ""id"": ""CS5001"",
+          ""defaultLevel"": ""error"",
+          ""properties"": {{
+            ""category"": ""Compiler"",
+            ""isEnabledByDefault"": true,
+            ""tags"": [
+              ""Compiler"",
+              ""Telemetry"",
+              ""NotConfigurable""
+            ]
+          }}
+        }}
+      }}
+    }}
+  ]
+}}", AnalyzerForErrorLogTest.GetUriForPath(sourceFile));
 
             var expectedText = expectedHeader + expectedIssues;
             Assert.Equal(expectedText, actualOutput);
@@ -149,7 +268,7 @@ public class C
 
             var cmd = new MockCSharpCompiler(null, _baseDirectory, new[] {
                 "/nologo", "/t:library", $"/out:{outputFilePath}", sourceFile, "/preferreduilang:en", $"/errorlog:{errorLogFile}" },
-               analyzer: new AnalyzerForErrorLogTest());
+               analyzers: ImmutableArray.Create<DiagnosticAnalyzer>(new AnalyzerForErrorLogTest()));
 
             var outWriter = new StringWriter(CultureInfo.InvariantCulture);
 
@@ -163,7 +282,7 @@ public class C
             var actualOutput = File.ReadAllText(errorLogFile).Trim();
 
             var expectedHeader = GetExpectedErrorLogHeader(actualOutput, cmd);
-            var expectedIssues = AnalyzerForErrorLogTest.GetExpectedErrorLogIssuesText(cmd.Compilation);
+            var expectedIssues = AnalyzerForErrorLogTest.GetExpectedErrorLogResultsText(cmd.Compilation);
             var expectedText = expectedHeader + expectedIssues;
             Assert.Equal(expectedText, actualOutput);
 

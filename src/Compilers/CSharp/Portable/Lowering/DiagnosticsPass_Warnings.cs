@@ -1,5 +1,6 @@
 ﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
+using System;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
@@ -10,7 +11,7 @@ namespace Microsoft.CodeAnalysis.CSharp
     /// This pass detects and reports diagnostics that do not affect lambda convertibility.
     /// This part of the partial class focuses on expression and operator warnings.
     /// </summary>
-    internal sealed partial class DiagnosticsPass : BoundTreeWalker
+    internal sealed partial class DiagnosticsPass : BoundTreeWalkerWithStackGuard
     {
         private void CheckArguments(ImmutableArray<RefKind> argumentRefKindsOpt, ImmutableArray<BoundExpression> arguments, Symbol method)
         {
@@ -19,9 +20,22 @@ namespace Microsoft.CodeAnalysis.CSharp
                 Debug.Assert(arguments.Length == argumentRefKindsOpt.Length);
                 for (int i = 0; i < arguments.Length; i++)
                 {
-                    if (argumentRefKindsOpt[i] != RefKind.None && arguments[i].Kind == BoundKind.FieldAccess)
+                    if (argumentRefKindsOpt[i] != RefKind.None)
                     {
-                        CheckFieldAddress((BoundFieldAccess)arguments[i], method);
+                        var argument = arguments[i];
+                        switch (argument.Kind)
+                        {
+                            case BoundKind.FieldAccess:
+                                CheckFieldAddress((BoundFieldAccess)argument, method);
+                                break;
+                            case BoundKind.Local:
+                                var local = (BoundLocal)argument;
+                                if (local.Syntax.Kind() == SyntaxKind.DeclarationExpression)
+                                {
+                                    CheckOutDeclaration(local, method);
+                                }
+                                break;
+                        }
                     }
                 }
             }
@@ -212,7 +226,11 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         private static bool IsComCallWithRefOmitted(MethodSymbol method, ImmutableArray<BoundExpression> arguments, ImmutableArray<RefKind> argumentRefKindsOpt)
         {
-            if ((object)method.ContainingType == null || !method.ContainingType.IsComImport) return false;
+            if (method.ParameterCount != arguments.Length ||
+                (object)method.ContainingType == null ||
+                !method.ContainingType.IsComImport)
+                return false;
+
             for (int i = 0; i < arguments.Length; i++)
             {
                 if (method.Parameters[i].RefKind != RefKind.None && (argumentRefKindsOpt.IsDefault || argumentRefKindsOpt[i] == RefKind.None)) return true;
@@ -842,12 +860,6 @@ namespace Microsoft.CodeAnalysis.CSharp
         {
             CheckReceiverIfField(node.ReceiverOpt);
             return base.VisitFieldAccess(node);
-        }
-
-        public override BoundNode VisitPropertyAccess(BoundPropertyAccess node)
-        {
-            CheckReceiverIfField(node.ReceiverOpt);
-            return base.VisitPropertyAccess(node);
         }
 
         public override BoundNode VisitPropertyGroup(BoundPropertyGroup node)

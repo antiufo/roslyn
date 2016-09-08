@@ -320,7 +320,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         Private Class LambdaRelaxationVisitor
-            Inherits BoundTreeWalker
+            Inherits StatementWalker
 
             Private ReadOnly _lambdaSymbol As LambdaSymbol
             Private ReadOnly _isIterator As Boolean
@@ -426,7 +426,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 #End If
             Dim lambdaSyntax = lambdaSymbol.Syntax
             Dim bodyBinder = lambdaBinder.GetBinder(lambdaSyntax)
-            Dim endSyntax As VisualBasicSyntaxNode = lambdaSyntax
+            Dim endSyntax As SyntaxNode = lambdaSyntax
 
             Dim block As BoundBlock
 
@@ -584,7 +584,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         Private Class CheckAwaitWalker
-            Inherits BoundTreeWalker
+            Inherits BoundTreeWalkerWithStackGuardWithoutRecursionOnTheLeftOfBinaryOperator
 
             Private ReadOnly _binder As Binder
             Private ReadOnly _diagnostics As DiagnosticBag
@@ -603,11 +603,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             ) As Boolean
                 Debug.Assert(binder.IsInAsyncContext())
 
-                Dim walker As New CheckAwaitWalker(binder, diagnostics)
-                walker.Visit(block)
-                Debug.Assert(Not walker._isInCatchFinallyOrSyncLock)
+                Try
+                    Dim walker As New CheckAwaitWalker(binder, diagnostics)
+                    walker.Visit(block)
+                    Debug.Assert(Not walker._isInCatchFinallyOrSyncLock)
 
-                Return walker._containsAwait
+                    Return walker._containsAwait
+                Catch ex As CancelledByStackGuardException
+                    ex.AddAnError(diagnostics)
+                    Return True
+                End Try
             End Function
 
             Public Overrides Function VisitTryStatement(node As BoundTryStatement) As BoundNode
@@ -965,7 +970,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     If lambdaReturnType Is Nothing Then
                         ' "Cannot infer a return type. Specifying the return type might correct this error."
                         ReportDiagnostic(diagnostics, LambdaHeaderErrorNode(source), ERRID.ERR_LambdaNoType)
-                        lambdaReturnType = lambdaSymbol.ReturnTypeIsUnknown
+                        lambdaReturnType = LambdaSymbol.ReturnTypeIsUnknown
 
                     ElseIf lambdaReturnType.IsRestrictedTypeOrArrayType(restrictedType) Then
                         ReportDiagnostic(diagnostics, LambdaHeaderErrorNode(source), ERRID.ERR_RestrictedType1, restrictedType)
@@ -1011,7 +1016,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Return New KeyValuePair(Of TypeSymbol, ImmutableArray(Of Diagnostic))(lambdaReturnType, diagnostics.ToReadOnlyAndFree())
         End Function
 
-        Private Shared Function LambdaHeaderErrorNode(source As UnboundLambda) As VisualBasicSyntaxNode
+        Private Shared Function LambdaHeaderErrorNode(source As UnboundLambda) As SyntaxNode
             Dim lambdaSyntax = TryCast(source.Syntax, LambdaExpressionSyntax)
 
             If lambdaSyntax IsNot Nothing Then
@@ -1022,7 +1027,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         Private Class LambdaReturnStatementsVisitor
-            Inherits BoundTreeWalker
+            Inherits StatementWalker
 
             Private ReadOnly _builder As ArrayBuilder(Of BoundExpression)
             Private ReadOnly _isIterator As Boolean
@@ -1098,7 +1103,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             _functionValue = CreateFunctionValueLocal(lambdaSymbol)
         End Sub
 
-        Private Function CreateFunctionValueLocal(lambdaSymbol As LambdaSymbol) As LocalSymbol
+        Private Shared Function CreateFunctionValueLocal(lambdaSymbol As LambdaSymbol) As LocalSymbol
             ' synthesized lambdas may not result from a LambdaExpressionSyntax (e.g. an AddressOf expression that 
             ' needs relaxation). In this case there will be no need to create a local here, this is done when generating the 
             ' lambda body.

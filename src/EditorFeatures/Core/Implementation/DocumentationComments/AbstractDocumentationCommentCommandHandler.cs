@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System;
 using System.Collections.Generic;
@@ -9,6 +9,7 @@ using Microsoft.CodeAnalysis.Editor.Host;
 using Microsoft.CodeAnalysis.Editor.Shared.Extensions;
 using Microsoft.CodeAnalysis.Editor.Shared.Options;
 using Microsoft.CodeAnalysis.Formatting;
+using Microsoft.CodeAnalysis.Options;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.CodeAnalysis.Text.Shared.Extensions;
@@ -141,9 +142,10 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.DocumentationComments
             int originalPosition,
             ITextBuffer subjectBuffer,
             ITextView textView,
+            DocumentOptionSet options,
             CancellationToken cancellationToken)
         {
-            if (!subjectBuffer.GetOption(FeatureOnOffOptions.AutoXmlDocCommentGeneration))
+            if (!subjectBuffer.GetFeatureOnOffOption(FeatureOnOffOptions.AutoXmlDocCommentGeneration))
             {
                 return false;
             }
@@ -190,8 +192,8 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.DocumentationComments
             lines[0] = lines[0].Substring(3);
 
             // Add indents
-            var lineOffset = line.GetColumnOfFirstNonWhitespaceCharacterOrEndOfLine(subjectBuffer.GetOption(FormattingOptions.TabSize));
-            var indentText = lineOffset.CreateIndentationString(subjectBuffer.GetOption(FormattingOptions.UseTabs), subjectBuffer.GetOption(FormattingOptions.TabSize));
+            var lineOffset = line.GetColumnOfFirstNonWhitespaceCharacterOrEndOfLine(options.GetOption(FormattingOptions.TabSize));
+            var indentText = lineOffset.CreateIndentationString(options.GetOption(FormattingOptions.UseTabs), options.GetOption(FormattingOptions.TabSize));
             for (int i = 1; i < lines.Count - 1; i++)
             {
                 lines[i] = indentText + lines[i];
@@ -217,19 +219,22 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.DocumentationComments
             int originalPosition,
             ITextBuffer subjectBuffer,
             ITextView textView,
+            DocumentOptionSet options,
             CancellationToken cancellationToken)
         {
-            if (!subjectBuffer.GetOption(FeatureOnOffOptions.AutoXmlDocCommentGeneration))
+            // Don't attempt to generate a new XML doc comment on ENTER if the option to auto-generate
+            // them isn't set. Regardless of the option, we should generate exterior trivia (i.e. /// or ''')
+            // on ENTER inside an existing XML doc comment.
+
+            if (subjectBuffer.GetFeatureOnOffOption(FeatureOnOffOptions.AutoXmlDocCommentGeneration))
             {
-                return false;
+                if (TryGenerateDocumentationCommentAfterEnter(syntaxTree, text, position, originalPosition, subjectBuffer, textView, options, cancellationToken))
+                {
+                    return true;
+                }
             }
 
-            if (TryGenerateDocumentationCommentAfterEnter(syntaxTree, text, position, originalPosition, subjectBuffer, textView, cancellationToken))
-            {
-                return true;
-            }
-
-            if (TryGenerateExteriorTriviaAfterEnter(syntaxTree, text, position, originalPosition, subjectBuffer, textView, cancellationToken))
+            if (TryGenerateExteriorTriviaAfterEnter(syntaxTree, text, position, originalPosition, subjectBuffer, textView, options, cancellationToken))
             {
                 return true;
             }
@@ -244,6 +249,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.DocumentationComments
             int originalPosition,
             ITextBuffer subjectBuffer,
             ITextView textView,
+            DocumentOptionSet options,
             CancellationToken cancellationToken)
         {
             // Find the documentation comment before the new line that was just pressed
@@ -286,8 +292,8 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.DocumentationComments
             lines[0] = lines[0].Substring(3);
 
             // Add indents
-            var lineOffset = line.GetColumnOfFirstNonWhitespaceCharacterOrEndOfLine(subjectBuffer.GetOption(FormattingOptions.TabSize));
-            var indentText = lineOffset.CreateIndentationString(subjectBuffer.GetOption(FormattingOptions.UseTabs), subjectBuffer.GetOption(FormattingOptions.TabSize));
+            var lineOffset = line.GetColumnOfFirstNonWhitespaceCharacterOrEndOfLine(options.GetOption(FormattingOptions.TabSize));
+            var indentText = lineOffset.CreateIndentationString(options.GetOption(FormattingOptions.UseTabs), options.GetOption(FormattingOptions.TabSize));
             for (int i = 1; i < lines.Count; i++)
             {
                 lines[i] = indentText + lines[i];
@@ -328,6 +334,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.DocumentationComments
             int originalPosition,
             ITextBuffer subjectBuffer,
             ITextView textView,
+            DocumentOptionSet options,
             CancellationToken cancellationToken)
         {
             // Find the documentation comment before the new line that was just pressed
@@ -374,7 +381,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.DocumentationComments
                 return false;
             }
 
-            InsertExteriorTrivia(textView, subjectBuffer, currentLine, previousLine);
+            InsertExteriorTrivia(textView, subjectBuffer, options, currentLine, previousLine);
 
             return true;
         }
@@ -386,6 +393,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.DocumentationComments
             int originalPosition,
             ITextBuffer subjectBuffer,
             ITextView textView,
+            DocumentOptionSet options,
             CancellationToken cancellationToken)
         {
             var targetMember = GetTargetMember(syntaxTree, text, position, cancellationToken);
@@ -405,10 +413,10 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.DocumentationComments
             AddLineBreaks(text, lines);
 
             // Add indents
-            var lineOffset = line.GetColumnOfFirstNonWhitespaceCharacterOrEndOfLine(subjectBuffer.GetOption(FormattingOptions.TabSize));
+            var lineOffset = line.GetColumnOfFirstNonWhitespaceCharacterOrEndOfLine(options.GetOption(FormattingOptions.TabSize));
             Contract.Assume(line.Start + lineOffset == startPosition);
 
-            var indentText = lineOffset.CreateIndentationString(subjectBuffer.GetOption(FormattingOptions.UseTabs), subjectBuffer.GetOption(FormattingOptions.TabSize));
+            var indentText = lineOffset.CreateIndentationString(options.GetOption(FormattingOptions.UseTabs), options.GetOption(FormattingOptions.TabSize));
             for (int i = 1; i < lines.Count; i++)
             {
                 lines[i] = indentText + lines[i];
@@ -430,7 +438,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.DocumentationComments
             ITextBuffer subjectBuffer,
             ITextView textView,
             int originalCaretPosition,
-            Func<SyntaxTree, SourceText, int, int, ITextBuffer, ITextView, CancellationToken, bool> insertAction,
+            Func<SyntaxTree, SourceText, int, int, ITextBuffer, ITextView, DocumentOptionSet, CancellationToken, bool> insertAction,
             CancellationToken cancellationToken)
         {
             var caretPosition = textView.GetCaretPoint(subjectBuffer) ?? -1;
@@ -445,9 +453,10 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.DocumentationComments
                 return false;
             }
 
-            var text = document.GetTextAsync(cancellationToken).WaitAndGetResult(cancellationToken);
-            var syntaxTree = document.GetSyntaxTreeAsync(cancellationToken).WaitAndGetResult(cancellationToken);
-            return insertAction(syntaxTree, text, caretPosition, originalCaretPosition, subjectBuffer, textView, cancellationToken);
+            var syntaxTree = document.GetSyntaxTreeSynchronously(cancellationToken);
+            var text = syntaxTree.GetText(cancellationToken);
+            var documentOptions = document.GetOptionsAsync(cancellationToken).WaitAndGetResult(cancellationToken);
+            return insertAction(syntaxTree, text, caretPosition, originalCaretPosition, subjectBuffer, textView, documentOptions, cancellationToken);
         }
 
         public CommandState GetCommandState(TypeCharCommandArgs args, Func<CommandState> nextHandler)
@@ -480,14 +489,30 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.DocumentationComments
             // Check to see if the current line starts with exterior trivia. If so, we'll take over.
             // If not, let the nextHandler run.
 
-            var caretPosition = args.TextView.GetCaretPoint(args.SubjectBuffer) ?? -1;
-            if (caretPosition < 0)
+            int originalPosition = -1;
+
+            // The original position should be a position that is consistent with the syntax tree, even
+            // after Enter is pressed. Thus, we use the start of the first selection if there is one.
+            // Otherwise, getting the tokens to the right or the left might return unexpected results.
+
+            if (args.TextView.Selection.SelectedSpans.Count > 0)
+            {
+                var selectedSpan = args.TextView.Selection
+                    .GetSnapshotSpansOnBuffer(args.SubjectBuffer)
+                    .FirstOrNullable();
+
+                originalPosition = selectedSpan != null
+                    ? selectedSpan.Value.Start
+                    : args.TextView.GetCaretPoint(args.SubjectBuffer) ?? -1;
+            }
+
+            if (originalPosition < 0)
             {
                 nextHandler();
                 return;
             }
 
-            if (!CurrentLineStartsWithExteriorTrivia(args.SubjectBuffer, caretPosition))
+            if (!CurrentLineStartsWithExteriorTrivia(args.SubjectBuffer, originalPosition))
             {
                 nextHandler();
                 return;
@@ -504,12 +529,12 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.DocumentationComments
             // According to JasonMal, the text undo history is associated with the surface buffer
             // in projection buffer scenarios, so the following line's usage of the surface buffer
             // is correct.
-            using (var transaction = _undoHistoryRegistry.GetHistory(args.TextView.TextBuffer).CreateTransaction(EditorFeaturesResources.InsertNewLine))
+            using (var transaction = _undoHistoryRegistry.GetHistory(args.TextView.TextBuffer).CreateTransaction(EditorFeaturesResources.Insert_new_line))
             {
                 var editorOperations = _editorOperationsFactoryService.GetEditorOperations(args.TextView);
                 editorOperations.InsertNewLine();
 
-                CompleteComment(args.SubjectBuffer, args.TextView, caretPosition, InsertOnEnterTyped, CancellationToken.None);
+                CompleteComment(args.SubjectBuffer, args.TextView, originalPosition, InsertOnEnterTyped, CancellationToken.None);
 
                 // Since we're wrapping the ENTER key undo transaction, we always complete
                 // the transaction -- even if we didn't generate anything.
@@ -534,8 +559,8 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.DocumentationComments
             TMemberNode targetMember = null;
             _waitIndicator.Wait("IntelliSense", allowCancel: true, action: c =>
             {
-                var text = document.GetTextAsync(c.CancellationToken).WaitAndGetResult(c.CancellationToken);
-                var syntaxTree = document.GetSyntaxTreeAsync(c.CancellationToken).WaitAndGetResult(c.CancellationToken);
+                var syntaxTree = document.GetSyntaxTreeSynchronously(c.CancellationToken);
+                var text = syntaxTree.GetText(c.CancellationToken);
                 targetMember = GetTargetMember(syntaxTree, text, caretPosition, c.CancellationToken);
             });
 
@@ -549,8 +574,8 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.DocumentationComments
             var originalCaretPosition = args.TextView.GetCaretPoint(args.SubjectBuffer) ?? -1;
 
             _waitIndicator.Wait(
-                title: EditorFeaturesResources.DocumentationComment,
-                message: EditorFeaturesResources.InsertingDocumentationComment,
+                title: EditorFeaturesResources.Documentation_Comment,
+                message: EditorFeaturesResources.Inserting_documentation_comment,
                 allowCancel: true,
                 action: w =>
                 {
@@ -653,12 +678,14 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.DocumentationComments
                 return;
             }
 
-            InsertExteriorTrivia(view, subjectBuffer, currentLine, previousLine);
+            var documentOptions = document.GetOptionsAsync(CancellationToken.None).WaitAndGetResult(CancellationToken.None);
+
+            InsertExteriorTrivia(view, subjectBuffer, documentOptions, currentLine, previousLine);
         }
 
-        private void InsertExteriorTrivia(ITextView view, ITextBuffer subjectBuffer, TextLine currentLine, TextLine previousLine)
+        private void InsertExteriorTrivia(ITextView view, ITextBuffer subjectBuffer, DocumentOptionSet options, TextLine currentLine, TextLine previousLine)
         {
-            var insertionText = CreateInsertionTextFromPreviousLine(previousLine, subjectBuffer);
+            var insertionText = CreateInsertionTextFromPreviousLine(previousLine, options);
 
             var firstNonWhitespaceOffset = currentLine.GetFirstNonWhitespaceOffset();
             var replaceSpan = firstNonWhitespaceOffset != null
@@ -670,10 +697,10 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.DocumentationComments
             view.TryMoveCaretToAndEnsureVisible(subjectBuffer.CurrentSnapshot.GetPoint(replaceSpan.Start + insertionText.Length));
         }
 
-        private string CreateInsertionTextFromPreviousLine(TextLine previousLine, ITextBuffer subjectBuffer)
+        private string CreateInsertionTextFromPreviousLine(TextLine previousLine, DocumentOptionSet options)
         {
-            var useTabs = subjectBuffer.GetOption(FormattingOptions.UseTabs);
-            var tabSize = subjectBuffer.GetOption(FormattingOptions.TabSize);
+            var useTabs = options.GetOption(FormattingOptions.UseTabs);
+            var tabSize = options.GetOption(FormattingOptions.TabSize);
 
             var previousLineText = previousLine.ToString();
             var firstNonWhitespaceColumn = previousLineText.GetColumnOfFirstNonWhitespaceCharacterOrEndOfLine(tabSize);

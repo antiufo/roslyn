@@ -1,8 +1,11 @@
 // Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System.Collections.Generic;
-using Microsoft.CodeAnalysis.Editor.CSharp.SignatureHelp;
+using System.Threading.Tasks;
+using Microsoft.CodeAnalysis.CSharp.SignatureHelp;
 using Microsoft.CodeAnalysis.Editor.UnitTests.SignatureHelp;
+using Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces;
+using Microsoft.CodeAnalysis.SignatureHelp;
 using Roslyn.Test.Utilities;
 using Xunit;
 
@@ -10,6 +13,10 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.SignatureHelp
 {
     public class ConstructorInitializerSignatureHelpProviderTests : AbstractCSharpSignatureHelpProviderTests
     {
+        public ConstructorInitializerSignatureHelpProviderTests(CSharpTestWorkspaceFixture workspaceFixture) : base(workspaceFixture)
+        {
+        }
+
         internal override ISignatureHelpProvider CreateSignatureHelpProvider()
         {
             return new ConstructorInitializerSignatureHelpProvider();
@@ -18,7 +25,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.SignatureHelp
         #region "Regular tests"
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void TestInvocationWithoutParameters()
+        public async Task TestInvocationWithoutParameters()
         {
             var markup = @"
 class BaseClass
@@ -35,11 +42,11 @@ class Derived : BaseClass
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("BaseClass()", string.Empty, null, currentParameterIndex: 0));
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void TestInvocationWithoutParametersMethodXmlComments()
+        public async Task TestInvocationWithoutParametersMethodXmlComments()
         {
             var markup = @"
 class BaseClass
@@ -57,11 +64,11 @@ class Derived : BaseClass
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("BaseClass()", "Summary for BaseClass", null, currentParameterIndex: 0));
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void TestInvocationWithParametersOn1()
+        public async Task TestInvocationWithParametersOn1()
         {
             var markup = @"
 class BaseClass
@@ -78,11 +85,11 @@ class Derived : BaseClass
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("BaseClass(int a, int b)", string.Empty, string.Empty, currentParameterIndex: 0));
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void TestInvocationWithParametersXmlCommentsOn1()
+        public async Task TestInvocationWithParametersXmlCommentsOn1()
         {
             var markup = @"
 class BaseClass
@@ -102,11 +109,11 @@ class Derived : BaseClass
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("BaseClass(int a, int b)", "Summary for BaseClass", "Param a", currentParameterIndex: 0));
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void TestInvocationWithParametersOn2()
+        public async Task TestInvocationWithParametersOn2()
         {
             var markup = @"
 class BaseClass
@@ -126,11 +133,11 @@ class Derived : BaseClass
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("BaseClass(int a, int b)", "Summary for BaseClass", "Param b", currentParameterIndex: 1));
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void TestInvocationWithParametersXmlComentsOn2()
+        public async Task TestInvocationWithParametersXmlComentsOn2()
         {
             var markup = @"
 class BaseClass
@@ -150,11 +157,11 @@ class Derived : BaseClass
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("BaseClass(int a, int b)", "Summary for BaseClass", "Param b", currentParameterIndex: 1));
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void TestThisInvocation()
+        public async Task TestThisInvocation()
         {
             var markup = @"
 class Foo
@@ -169,11 +176,11 @@ class Foo
                 new SignatureHelpTestItem("Foo(int a, int b)", string.Empty, string.Empty, currentParameterIndex: 1),
             };
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void TestInvocationWithoutClosingParen()
+        public async Task TestInvocationWithoutClosingParen()
         {
             var markup = @"
 class Foo
@@ -188,7 +195,7 @@ class Foo
                 new SignatureHelpTestItem("Foo(int a, int b)", string.Empty, string.Empty, currentParameterIndex: 1),
             };
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
         #endregion
@@ -196,7 +203,7 @@ class Foo
         #region "Current Parameter Name"
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void TestCurrentParameterName()
+        public async Task TestCurrentParameterName()
         {
             var markup = @"
 class Foo
@@ -205,7 +212,7 @@ class Foo
     public Foo() : this(b: 2, a: $$
 }";
 
-            VerifyCurrentParameterName(markup, "a");
+            await VerifyCurrentParameterNameAsync(markup, "a");
         }
 
         #endregion
@@ -213,7 +220,7 @@ class Foo
         #region "Trigger tests"
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void TestInvocationOnTriggerParens()
+        public async Task TestInvocationOnTriggerParens()
         {
             var markup = @"
 class Foo
@@ -228,11 +235,11 @@ class Foo
                 new SignatureHelpTestItem("Foo(int a)", string.Empty, string.Empty, currentParameterIndex: 0),
             };
 
-            Test(markup, expectedOrderedItems, usePreviousCharAsTrigger: true);
+            await TestAsync(markup, expectedOrderedItems, usePreviousCharAsTrigger: true);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void TestInvocationOnTriggerComma()
+        public async Task TestInvocationOnTriggerComma()
         {
             var markup = @"
 class Foo
@@ -247,11 +254,11 @@ class Foo
                 new SignatureHelpTestItem("Foo(int a, int b)", string.Empty, string.Empty, currentParameterIndex: 1),
             };
 
-            Test(markup, expectedOrderedItems, usePreviousCharAsTrigger: true);
+            await TestAsync(markup, expectedOrderedItems, usePreviousCharAsTrigger: true);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void TestNoInvocationOnSpace()
+        public async Task TestNoInvocationOnSpace()
         {
             var markup = @"
 class Foo
@@ -261,7 +268,7 @@ class Foo
 }";
 
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
-            Test(markup, expectedOrderedItems, usePreviousCharAsTrigger: true);
+            await TestAsync(markup, expectedOrderedItems, usePreviousCharAsTrigger: true);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
@@ -278,7 +285,7 @@ class Foo
         #region "EditorBrowsable tests"
         [WorkItem(7336, "DevDiv_Projects/Roslyn")]
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void EditorBrowsable_ConstructorInitializer_BrowsableStateAlways()
+        public async Task EditorBrowsable_ConstructorInitializer_BrowsableStateAlways()
         {
             var markup = @"
 class DerivedClass : BaseClass
@@ -296,7 +303,7 @@ public class BaseClass
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("BaseClass(int x)", string.Empty, string.Empty, currentParameterIndex: 0));
 
-            TestSignatureHelpInEditorBrowsableContexts(markup: markup,
+            await TestSignatureHelpInEditorBrowsableContextsAsync(markup: markup,
                                                 referencedCode: referencedCode,
                                                 expectedOrderedItemsMetadataReference: expectedOrderedItems,
                                                 expectedOrderedItemsSameSolution: expectedOrderedItems,
@@ -306,7 +313,7 @@ public class BaseClass
 
         [WorkItem(7336, "DevDiv_Projects/Roslyn")]
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void EditorBrowsable_ConstructorInitializer_BrowsableStateNever()
+        public async Task EditorBrowsable_ConstructorInitializer_BrowsableStateNever()
         {
             var markup = @"
 class DerivedClass : BaseClass
@@ -324,7 +331,7 @@ public class BaseClass
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("BaseClass(int x)", string.Empty, string.Empty, currentParameterIndex: 0));
 
-            TestSignatureHelpInEditorBrowsableContexts(markup: markup,
+            await TestSignatureHelpInEditorBrowsableContextsAsync(markup: markup,
                                                 referencedCode: referencedCode,
                                                 expectedOrderedItemsMetadataReference: new List<SignatureHelpTestItem>(),
                                                 expectedOrderedItemsSameSolution: expectedOrderedItems,
@@ -334,7 +341,7 @@ public class BaseClass
 
         [WorkItem(7336, "DevDiv_Projects/Roslyn")]
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void EditorBrowsable_ConstructorInitializer_BrowsableStateAdvanced()
+        public async Task EditorBrowsable_ConstructorInitializer_BrowsableStateAdvanced()
         {
             var markup = @"
 class DerivedClass : BaseClass
@@ -352,7 +359,7 @@ public class BaseClass
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("BaseClass(int x)", string.Empty, string.Empty, currentParameterIndex: 0));
 
-            TestSignatureHelpInEditorBrowsableContexts(markup: markup,
+            await TestSignatureHelpInEditorBrowsableContextsAsync(markup: markup,
                                                 referencedCode: referencedCode,
                                                 expectedOrderedItemsMetadataReference: new List<SignatureHelpTestItem>(),
                                                 expectedOrderedItemsSameSolution: expectedOrderedItems,
@@ -360,7 +367,7 @@ public class BaseClass
                                                 referencedLanguage: LanguageNames.CSharp,
                                                 hideAdvancedMembers: true);
 
-            TestSignatureHelpInEditorBrowsableContexts(markup: markup,
+            await TestSignatureHelpInEditorBrowsableContextsAsync(markup: markup,
                                                 referencedCode: referencedCode,
                                                 expectedOrderedItemsMetadataReference: expectedOrderedItems,
                                                 expectedOrderedItemsSameSolution: expectedOrderedItems,
@@ -371,7 +378,7 @@ public class BaseClass
 
         [WorkItem(7336, "DevDiv_Projects/Roslyn")]
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void EditorBrowsable_ConstructorInitializer_BrowsableStateMixed()
+        public async Task EditorBrowsable_ConstructorInitializer_BrowsableStateMixed()
         {
             var markup = @"
 class DerivedClass : BaseClass
@@ -397,7 +404,7 @@ public class BaseClass
             expectedOrderedItemsSameSolution.Add(new SignatureHelpTestItem("BaseClass(int x)", string.Empty, string.Empty, currentParameterIndex: 0));
             expectedOrderedItemsSameSolution.Add(new SignatureHelpTestItem("BaseClass(int x, int y)", string.Empty, string.Empty, currentParameterIndex: 0));
 
-            TestSignatureHelpInEditorBrowsableContexts(markup: markup,
+            await TestSignatureHelpInEditorBrowsableContextsAsync(markup: markup,
                                                 referencedCode: referencedCode,
                                                 expectedOrderedItemsMetadataReference: expectedOrderedItemsMetadataReference,
                                                 expectedOrderedItemsSameSolution: expectedOrderedItemsSameSolution,
@@ -408,7 +415,7 @@ public class BaseClass
         #endregion
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void FieldUnavailableInOneLinkedFile()
+        public async Task FieldUnavailableInOneLinkedFile()
         {
             var markup = @"<Workspace>
     <Project Language=""C#"" CommonReferences=""true"" AssemblyName=""Proj1"" PreprocessorSymbols=""FOO"">
@@ -435,12 +442,12 @@ class C
         <Document IsLinkFile=""true"" LinkAssemblyName=""Proj1"" LinkFilePath=""SourceDocument""/>
     </Project>
 </Workspace>";
-            var expectedDescription = new SignatureHelpTestItem($"Secret(int secret)\r\n\r\n{string.Format(FeaturesResources.ProjectAvailability, "Proj1", FeaturesResources.Available)}\r\n{string.Format(FeaturesResources.ProjectAvailability, "Proj2", FeaturesResources.NotAvailable)}\r\n\r\n{FeaturesResources.UseTheNavigationBarToSwitchContext}", currentParameterIndex: 0);
-            VerifyItemWithReferenceWorker(markup, new[] { expectedDescription }, false);
+            var expectedDescription = new SignatureHelpTestItem($"Secret(int secret)\r\n\r\n{string.Format(FeaturesResources._0_1, "Proj1", FeaturesResources.Available)}\r\n{string.Format(FeaturesResources._0_1, "Proj2", FeaturesResources.Not_Available)}\r\n\r\n{FeaturesResources.You_can_use_the_navigation_bar_to_switch_context}", currentParameterIndex: 0);
+            await VerifyItemWithReferenceWorkerAsync(markup, new[] { expectedDescription }, false);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void ExcludeFilesWithInactiveRegions()
+        public async Task ExcludeFilesWithInactiveRegions()
         {
             var markup = @"<Workspace>
     <Project Language=""C#"" CommonReferences=""true"" AssemblyName=""Proj1"" PreprocessorSymbols=""FOO,BAR"">
@@ -474,23 +481,23 @@ class C
     </Project>
 </Workspace>";
 
-            var expectedDescription = new SignatureHelpTestItem($"Secret(int secret)\r\n\r\n{string.Format(FeaturesResources.ProjectAvailability, "Proj1", FeaturesResources.Available)}\r\n{string.Format(FeaturesResources.ProjectAvailability, "Proj3", FeaturesResources.NotAvailable)}\r\n\r\n{FeaturesResources.UseTheNavigationBarToSwitchContext}", currentParameterIndex: 0);
-            VerifyItemWithReferenceWorker(markup, new[] { expectedDescription }, false);
+            var expectedDescription = new SignatureHelpTestItem($"Secret(int secret)\r\n\r\n{string.Format(FeaturesResources._0_1, "Proj1", FeaturesResources.Available)}\r\n{string.Format(FeaturesResources._0_1, "Proj3", FeaturesResources.Not_Available)}\r\n\r\n{FeaturesResources.You_can_use_the_navigation_bar_to_switch_context}", currentParameterIndex: 0);
+            await VerifyItemWithReferenceWorkerAsync(markup, new[] { expectedDescription }, false);
         }
 
-        [WorkItem(1067933)]
+        [WorkItem(1067933, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1067933")]
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void InvokedWithNoToken()
+        public async Task InvokedWithNoToken()
         {
             var markup = @"
 // foo($$";
 
-            Test(markup);
+            await TestAsync(markup);
         }
 
-        [WorkItem(1082601)]
+        [WorkItem(1082601, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1082601")]
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void TestInvocationWithBadParameterList()
+        public async Task TestInvocationWithBadParameterList()
         {
             var markup = @"
 class BaseClass
@@ -505,7 +512,7 @@ class Derived : BaseClass
 }";
 
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
     }
 }

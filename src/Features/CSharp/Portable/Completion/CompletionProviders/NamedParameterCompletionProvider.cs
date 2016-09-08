@@ -7,7 +7,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Completion;
-using Microsoft.CodeAnalysis.Completion.Providers;
 using Microsoft.CodeAnalysis.CSharp.Extensions;
 using Microsoft.CodeAnalysis.CSharp.Extensions.ContextQuery;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
@@ -16,57 +15,56 @@ using Microsoft.CodeAnalysis.Options;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
+using Microsoft.CodeAnalysis.Completion.Providers;
 
 namespace Microsoft.CodeAnalysis.CSharp.Completion.Providers
 {
-    internal partial class NamedParameterCompletionProvider : AbstractCompletionProvider, IEqualityComparer<IParameterSymbol>
+    internal partial class NamedParameterCompletionProvider : CommonCompletionProvider, IEqualityComparer<IParameterSymbol>
     {
         private const string ColonString = ":";
 
-        public override bool IsTriggerCharacter(SourceText text, int characterPosition, OptionSet options)
+        // Explicitly remove ":" from the set of filter characters because (by default)
+        // any character that appears in DisplayText gets treated as a filter char.
+        private static readonly CompletionItemRules s_rules = CompletionItemRules.Default
+            .WithFilterCharacterRule(CharacterSetModificationRule.Create(CharacterSetModificationKind.Remove, ':'));
+
+        internal override bool IsInsertionTrigger(SourceText text, int characterPosition, OptionSet options)
         {
             return CompletionUtilities.IsTriggerCharacter(text, characterPosition, options);
         }
 
-        protected override async Task<bool> IsExclusiveAsync(Document document, int caretPosition, CompletionTriggerInfo triggerInfo, CancellationToken cancellationToken)
+        public override async Task ProvideCompletionsAsync(CompletionContext context)
         {
-            var syntaxTree = await document.GetSyntaxTreeAsync(cancellationToken).ConfigureAwait(false);
-            var token = syntaxTree.FindTokenOnLeftOfPosition(caretPosition, cancellationToken)
-                                  .GetPreviousTokenIfTouchingWord(caretPosition);
+            var document = context.Document;
+            var position = context.Position;
+            var cancellationToken = context.CancellationToken;
 
-            return token.IsMandatoryNamedParameterPosition();
-        }
-
-        protected override async Task<IEnumerable<CompletionItem>> GetItemsWorkerAsync(
-            Document document, int position, CompletionTriggerInfo triggerInfo, CancellationToken cancellationToken)
-        {
             var syntaxTree = await document.GetSyntaxTreeAsync(cancellationToken).ConfigureAwait(false);
             if (syntaxTree.IsInNonUserCode(position, cancellationToken))
             {
-                return null;
+                return;
             }
 
-            var token = syntaxTree.FindTokenOnLeftOfPosition(position, cancellationToken);
-            token = token.GetPreviousTokenIfTouchingWord(position);
+            var token = syntaxTree
+                .FindTokenOnLeftOfPosition(position, cancellationToken)
+                .GetPreviousTokenIfTouchingWord(position);
 
-            if (token.Kind() != SyntaxKind.OpenParenToken &&
-                token.Kind() != SyntaxKind.OpenBracketToken &&
-                token.Kind() != SyntaxKind.CommaToken)
+            if (!token.IsKind(SyntaxKind.OpenParenToken, SyntaxKind.OpenBracketToken, SyntaxKind.CommaToken))
             {
-                return null;
+                return;
             }
 
             var argumentList = token.Parent as BaseArgumentListSyntax;
             if (argumentList == null)
             {
-                return null;
+                return;
             }
 
             var semanticModel = await document.GetSemanticModelForNodeAsync(argumentList, cancellationToken).ConfigureAwait(false);
             var parameterLists = GetParameterLists(semanticModel, position, argumentList.Parent, cancellationToken);
             if (parameterLists == null)
             {
-                return null;
+                return;
             }
 
             var existingNamedParameters = GetExistingNamedParameters(argumentList, position);
@@ -76,26 +74,41 @@ namespace Microsoft.CodeAnalysis.CSharp.Completion.Providers
                                                       .Where(p => !existingNamedParameters.Contains(p.Name))
                                                       .Distinct(this);
 
+            if (!unspecifiedParameters.Any())
+            {
+                return;
+            }
+
+            if (token.IsMandatoryNamedParameterPosition())
+            {
+                context.IsExclusive = true;
+            }
+
             var text = await document.GetTextAsync(cancellationToken).ConfigureAwait(false);
 
-            return unspecifiedParameters.Select(
-                p =>
-                {
-                    // Note: the filter text does not include the ':'.  We want to ensure that if 
-                    // the user types the name exactly (up to the colon) that it is selected as an
-                    // exact match.
-                    var workspace = document.Project.Solution.Workspace;
-                    var escaped = p.Name.ToIdentifierToken().ToString();
-                    return new CompletionItem(
-                        this,
-                        escaped + ColonString,
-                        CompletionUtilities.GetTextChangeSpan(text, position),
-                        CommonCompletionUtilities.CreateDescriptionFactory(workspace, semanticModel, token.SpanStart, p),
-                        p.GetGlyph(),
-                        sortText: p.Name,
-                        filterText: escaped,
-                        rules: ItemRules.Instance);
-                });
+            var workspace = document.Project.Solution.Workspace;
+
+            foreach (var parameter in unspecifiedParameters)
+            {
+                // Note: the filter text does not include the ':'.  We want to ensure that if 
+                // the user types the name exactly (up to the colon) that it is selected as an
+                // exact match.
+                var escapedName = parameter.Name.ToIdentifierToken().ToString();
+
+                context.AddItem(SymbolCompletionItem.Create(
+                    displayText: escapedName + ColonString,
+                    insertionText: null,
+                    symbol: parameter,
+                    contextPosition: token.SpanStart,
+                    filterText: escapedName,
+                    rules: s_rules,
+                    matchPriority: SymbolMatchPriority.PreferNamedArgument));
+            }
+        }
+
+        public override Task<CompletionDescription> GetDescriptionAsync(Document document, CompletionItem item, CancellationToken cancellationToken)
+        {
+            return SymbolCompletionItem.GetDescriptionAsync(item, document, cancellationToken);
         }
 
         private bool IsValid(ImmutableArray<IParameterSymbol> parameterList, ISet<string> existingNamedParameters)
@@ -225,6 +238,13 @@ namespace Microsoft.CodeAnalysis.CSharp.Completion.Providers
         int IEqualityComparer<IParameterSymbol>.GetHashCode(IParameterSymbol obj)
         {
             return obj.Name.GetHashCode();
+        }
+
+        protected override Task<TextChange?> GetTextChangeAsync(CompletionItem selectedItem, char? ch, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<TextChange?>(new TextChange(
+                selectedItem.Span,
+                selectedItem.DisplayText.Substring(0, selectedItem.DisplayText.Length - ColonString.Length)));
         }
     }
 }

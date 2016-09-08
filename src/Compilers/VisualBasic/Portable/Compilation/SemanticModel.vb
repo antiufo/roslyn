@@ -3,6 +3,7 @@
 Imports System.Collections.Immutable
 Imports System.Runtime.InteropServices
 Imports System.Threading
+Imports Microsoft.CodeAnalysis.Semantics
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
@@ -41,7 +42,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <summary> 
         ''' The root node of the syntax tree that this binding is based on.
         ''' </summary> 
-        Friend MustOverride ReadOnly Property Root As VisualBasicSyntaxNode
+        Friend MustOverride ReadOnly Property Root As SyntaxNode
 
         ''' <summary>
         ''' Gets symbol information about an expression syntax node. This is the worker
@@ -130,6 +131,22 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                  TypeOf (node) Is OrderingSyntax)
         End Function
 
+        Friend Enum GetOperationOptions
+            Lowest
+            Highest
+            Parent
+        End Enum
+
+        Protected Overrides Function GetOperationCore(node As SyntaxNode, cancellationToken As CancellationToken) As IOperation
+            Dim vbnode = DirectCast(node, VisualBasicSyntaxNode)
+            CheckSyntaxNode(vbnode)
+            Return GetOperationWorker(vbnode, GetOperationOptions.Highest, cancellationToken)
+        End Function
+
+        Friend Overridable Function GetOperationWorker(node As VisualBasicSyntaxNode, options As GetOperationOptions, cancellationToken As CancellationToken) As IOperation
+            Return Nothing
+        End Function
+
         ''' <summary>
         ''' Returns what symbol(s), if any, the given expression syntax bound to in the program.
         ''' 
@@ -164,10 +181,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             CheckSyntaxNode(expression)
 
             If expression.Parent IsNot Nothing AndAlso expression.Parent.Kind = SyntaxKind.CollectionInitializer AndAlso
-                   expression.Parent.Parent IsNot Nothing AndAlso expression.Parent.Parent.Kind = SyntaxKind.ObjectCollectionInitializer AndAlso
-                   DirectCast(expression.Parent.Parent, ObjectCollectionInitializerSyntax).Initializer Is expression.Parent AndAlso
-                   expression.Parent.Parent.Parent IsNot Nothing AndAlso expression.Parent.Parent.Parent.Kind = SyntaxKind.ObjectCreationExpression AndAlso
-                   CanGetSemanticInfo(expression.Parent.Parent.Parent, allowNamedArgumentName:=False) Then
+               expression.Parent.Parent IsNot Nothing AndAlso expression.Parent.Parent.Kind = SyntaxKind.ObjectCollectionInitializer AndAlso
+               DirectCast(expression.Parent.Parent, ObjectCollectionInitializerSyntax).Initializer Is expression.Parent AndAlso
+               expression.Parent.Parent.Parent IsNot Nothing AndAlso expression.Parent.Parent.Parent.Kind = SyntaxKind.ObjectCreationExpression AndAlso
+               CanGetSemanticInfo(expression.Parent.Parent.Parent, allowNamedArgumentName:=False) Then
 
                 Dim collectionInitializer = DirectCast(expression.Parent.Parent.Parent, ObjectCreationExpressionSyntax)
                 If collectionInitializer.Initializer Is expression.Parent.Parent Then
@@ -588,7 +605,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ' a position. Just using FindToken doesn't give quite the right results, especially in situations where
         ' end constructs haven't been typed yet. If we are in the trivia between two tokens, we move backward to the previous
         ' token. There are also some special cases around beginning and end of the whole tree.
-        Friend Function FindInitialNodeFromPosition(position As Integer) As VisualBasicSyntaxNode
+        Friend Function FindInitialNodeFromPosition(position As Integer) As SyntaxNode
             Dim fullStart As Integer = Root.Position
             Dim fullEnd As Integer = Root.EndPosition
 
@@ -927,14 +944,16 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             ' Let's account for that.
             If lowestExpr.Kind = BoundKind.ArrayCreation AndAlso DirectCast(lowestExpr, BoundArrayCreation).ArrayLiteralOpt IsNot Nothing Then
                 type = Nothing
-                conversion = New conversion(New KeyValuePair(Of ConversionKind, MethodSymbol)(DirectCast(lowestExpr, BoundArrayCreation).ArrayLiteralConversion, Nothing))
+                conversion = New Conversion(New KeyValuePair(Of ConversionKind, MethodSymbol)(DirectCast(lowestExpr, BoundArrayCreation).ArrayLiteralConversion, Nothing))
+            ElseIf lowestExpr.Kind = BoundKind.ConvertedTupleLiteral Then
+                type = DirectCast(lowestExpr, BoundConvertedTupleLiteral).NaturalTypeOpt
             Else
                 type = lowestExpr.Type
             End If
 
             Dim useOfLocalBeforeDeclaration As Boolean = False
 
-            ' Use of local befor declaration requires some additional fixup.
+            ' Use of local before declaration requires some additional fixup.
             ' Due complications around implicit locals and type inference, we do not
             ' try to obtain a type of a local when it is used before declaration, we use
             ' a special error type symbol. However, semantic model should return the same
@@ -977,7 +996,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 ' Special case: overload failure on X in New X(...), where overload resolution failed. 
                 ' Binds to method group which can't have a type.
 
-                Dim parentSyntax As VisualBasicSyntaxNode = boundNodes.LowestBoundNodeOfSyntacticParent.Syntax
+                Dim parentSyntax As SyntaxNode = boundNodes.LowestBoundNodeOfSyntacticParent.Syntax
                 If parentSyntax IsNot Nothing AndAlso
                    parentSyntax Is boundNodes.LowestBoundNode.Syntax.Parent AndAlso
                    ((parentSyntax.Kind = SyntaxKind.ObjectCreationExpression AndAlso (DirectCast(parentSyntax, ObjectCreationExpressionSyntax).Type Is boundNodes.LowestBoundNode.Syntax))) Then
@@ -1202,7 +1221,7 @@ _Default:
 
                     Else
                         If referenceType = ErrorTypeSymbol.UnknownResultType Then
-                            ' in an instance member, but binder considered Me/MyBase/MyClass unreferencable
+                            ' in an instance member, but binder considered Me/MyBase/MyClass unreferenceable
                             meParam = New MeParameterSymbol(containingMember, containingType)
                             resultKind = LookupResultKind.NotReferencable
                         Else
@@ -1413,7 +1432,7 @@ _Default:
             Debug.Assert(boundNodeOfSyntacticParent IsNot Nothing)
 
             ' Check if boundNode.Syntax is the type-name child of an ObjectCreationExpression or Attribute.
-            Dim parentSyntax As VisualBasicSyntaxNode = boundNodeOfSyntacticParent.Syntax
+            Dim parentSyntax As SyntaxNode = boundNodeOfSyntacticParent.Syntax
             If parentSyntax IsNot Nothing AndAlso
                lowestBoundNode IsNot Nothing AndAlso
                parentSyntax Is lowestBoundNode.Syntax.Parent AndAlso
@@ -1549,7 +1568,7 @@ _Default:
         End Function
 
         ' This is used by other binding API's to invoke the right binder API
-        Friend Overridable Function Bind(binder As Binder, node As VisualBasicSyntaxNode, diagnostics As DiagnosticBag) As BoundNode
+        Friend Overridable Function Bind(binder As Binder, node As SyntaxNode, diagnostics As DiagnosticBag) As BoundNode
             Dim expr = TryCast(node, ExpressionSyntax)
             If expr IsNot Nothing Then
                 Return binder.BindNamespaceOrTypeOrExpressionSyntaxForSemanticModel(expr, diagnostics)
@@ -1854,7 +1873,7 @@ _Default:
                 For Each result In sealedResults
                     ' Special case: we want to see constructors, even though they can't be referenced by name.
                     If result.CanBeReferencedByName OrElse
-                            (result.Kind = SymbolKind.Method AndAlso DirectCast(result, MethodSymbol).MethodKind = MethodKind.Constructor) Then
+                        (result.Kind = SymbolKind.Method AndAlso DirectCast(result, MethodSymbol).MethodKind = MethodKind.Constructor) Then
                         If builder IsNot Nothing Then
                             builder.Add(result)
                         End If
@@ -3381,13 +3400,13 @@ _Default:
             Return False
         End Function
 
-        Friend Overrides Function GetDeclarationsInSpan(span As TextSpan, getSymbol As Boolean, cancellationToken As CancellationToken) As ImmutableArray(Of DeclarationInfo)
-            Return VisualBasicDeclarationComputer.GetDeclarationsInSpan(Me, span, getSymbol, cancellationToken)
-        End Function
+        Friend Overrides Sub ComputeDeclarationsInSpan(span As TextSpan, getSymbol As Boolean, builder As List(Of DeclarationInfo), cancellationToken As CancellationToken)
+            VisualBasicDeclarationComputer.ComputeDeclarationsInSpan(Me, span, getSymbol, builder, cancellationToken)
+        End Sub
 
-        Friend Overrides Function GetDeclarationsInNode(node As SyntaxNode, getSymbol As Boolean, cancellationToken As CancellationToken, Optional levelsToCompute As Integer? = Nothing) As ImmutableArray(Of DeclarationInfo)
-            Return VisualBasicDeclarationComputer.GetDeclarationsInNode(Me, node, getSymbol, cancellationToken)
-        End Function
+        Friend Overrides Sub ComputeDeclarationsInNode(node As SyntaxNode, getSymbol As Boolean, builder As List(Of DeclarationInfo), cancellationToken As CancellationToken, Optional levelsToCompute As Integer? = Nothing)
+            VisualBasicDeclarationComputer.ComputeDeclarationsInNode(Me, node, getSymbol, builder, cancellationToken)
+        End Sub
 
         Protected Overrides Function GetTopmostNodeForDiagnosticAnalysis(symbol As ISymbol, declaringSyntax As SyntaxNode) As SyntaxNode
             Select Case symbol.Kind

@@ -8,7 +8,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
     Public Class CodeGenClosureLambdaTests
         Inherits BasicTestBase
 
-        <WorkItem(546416, "DevDiv")>
+        <WorkItem(546416, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546416")>
         <Fact>
         Public Sub TestAnonymousTypeInsideGroupBy_Enumerable()
             CompileAndVerify(
@@ -43,8 +43,8 @@ End Class
 </compilation>, expectedOutput:="")
         End Sub
 
-        <WorkItem(546538, "DevDiv")>
-        <WorkItem(546416, "DevDiv")>
+        <WorkItem(546538, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546538")>
+        <WorkItem(546416, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546416")>
         <Fact()>
         Public Sub TestAnonymousTypeInsideGroupBy_Queryable_1()
             Dim compilation =
@@ -89,7 +89,7 @@ BC36675: Statement lambdas cannot be converted to expression trees.
 </errors>)
         End Sub
 
-        <WorkItem(546538, "DevDiv")>
+        <WorkItem(546538, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546538")>
         <Fact()>
         Public Sub TestAnonymousTypeInsideGroupBy_Queryable_2()
             CompileAndVerify(
@@ -211,7 +211,7 @@ End Module
   IL_0019:  dup
   IL_001a:  callvirt   "Sub System.Action.Invoke()"
   IL_001f:  ldloc.0
-  IL_0020:  dup
+  IL_0020:  ldloc.0
   IL_0021:  ldfld      "M1._Closure$__0-0.$VB$Local_X As Integer"
   IL_0026:  ldloc.0
   IL_0027:  ldfld      "M1._Closure$__0-0.$VB$Local_X As Integer"
@@ -268,7 +268,7 @@ End Module
   IL_0019:  dup
   IL_001a:  callvirt   "Sub System.Action.Invoke()"
   IL_001f:  ldloc.0
-  IL_0020:  dup
+  IL_0020:  ldloc.0
   IL_0021:  ldfld      "M1.C1._Closure$__1-0.$VB$Local_X As Integer"
   IL_0026:  ldloc.0
   IL_0027:  ldfld      "M1.C1._Closure$__1-0.$VB$Local_X As Integer"
@@ -338,7 +338,7 @@ End Module
   IL_0020:  dup
   IL_0021:  callvirt   "Sub System.Action.Invoke()"
   IL_0026:  ldloc.0
-  IL_0027:  dup
+  IL_0027:  ldloc.0
   IL_0028:  ldfld      "M1.C1._Closure$__1-0.$VB$Local_X As Integer"
   IL_002d:  ldloc.0
   IL_002e:  ldfld      "M1.C1._Closure$__1-0.$VB$Local_X As Integer"
@@ -411,7 +411,7 @@ End Module
   IL_0028:  add.ovf
   IL_0029:  callvirt   "Sub System.Action(Of Integer).Invoke(Integer)"
   IL_002e:  ldloc.0
-  IL_002f:  dup
+  IL_002f:  ldloc.0
   IL_0030:  ldfld      "M1.C1._Closure$__1-0.$VB$Local_x As Integer"
   IL_0035:  ldloc.0
   IL_0036:  ldfld      "M1.C1._Closure$__1-0.$VB$Local_x As Integer"
@@ -1152,21 +1152,21 @@ End Module
             <![CDATA[
 {
   // Code size       44 (0x2c)
-  .maxstack  4
-  .locals init (M1.C1._Closure$__1-0(Of T) V_0) //$VB$Closure_0
+  .maxstack  3
+  .locals init (System.Action V_0) //d1
   IL_0000:  newobj     "Sub M1.C1._Closure$__1-0(Of T)..ctor()"
-  IL_0005:  stloc.0
-  IL_0006:  ldloc.0
-  IL_0007:  ldftn      "Sub M1.C1._Closure$__1-0(Of T)._Lambda$__0()"
-  IL_000d:  newobj     "Sub System.Action..ctor(Object, System.IntPtr)"
-  IL_0012:  dup
+  IL_0005:  dup
+  IL_0006:  ldftn      "Sub M1.C1._Closure$__1-0(Of T)._Lambda$__0()"
+  IL_000c:  newobj     "Sub System.Action..ctor(Object, System.IntPtr)"
+  IL_0011:  stloc.0
+  IL_0012:  ldloc.0
   IL_0013:  callvirt   "Sub System.Action.Invoke()"
-  IL_0018:  ldloc.0
-  IL_0019:  dup
-  IL_001a:  ldfld      "M1.C1._Closure$__1-0(Of T).$VB$Local_X As Integer"
-  IL_001f:  ldc.i4.5
-  IL_0020:  add.ovf
-  IL_0021:  stfld      "M1.C1._Closure$__1-0(Of T).$VB$Local_X As Integer"
+  IL_0018:  dup
+  IL_0019:  ldfld      "M1.C1._Closure$__1-0(Of T).$VB$Local_X As Integer"
+  IL_001e:  ldc.i4.5
+  IL_001f:  add.ovf
+  IL_0020:  stfld      "M1.C1._Closure$__1-0(Of T).$VB$Local_X As Integer"
+  IL_0025:  ldloc.0
   IL_0026:  callvirt   "Sub System.Action.Invoke()"
   IL_002b:  ret
 }
@@ -1986,7 +1986,7 @@ End Module
   IL_0019:  newobj     "Sub System.Action..ctor(Object, System.IntPtr)"
   IL_001e:  stelem.ref
   IL_001f:  ldloc.2
-  IL_0020:  dup
+  IL_0020:  ldloc.2
   IL_0021:  ldfld      "Module1._Closure$__0-0.$VB$Local_x As Integer"
   IL_0026:  ldc.i4.1
   IL_0027:  add.ovf
@@ -2060,7 +2060,7 @@ End Module
 ]]>)
             c.VerifyIL("Module1.Main", <![CDATA[
 {
-  // Code size      126 (0x7e)
+  // Code size      127 (0x7f)
   .maxstack  4
   .locals init (System.Action() V_0, //a
                 Integer V_1, //S
@@ -2080,7 +2080,7 @@ End Module
   IL_0012:  stloc.3
   IL_0013:  ldc.i4.0
   IL_0014:  stfld      "Module1._Closure$__0-0.$VB$Local_i As Integer"
-  IL_0019:  br.s       IL_0064
+  IL_0019:  br.s       IL_0065
   IL_001b:  ldloc.s    V_4
   IL_001d:  newobj     "Sub Module1._Closure$__0-1..ctor(Module1._Closure$__0-1)"
   IL_0022:  stloc.s    V_4
@@ -2096,32 +2096,32 @@ End Module
   IL_0041:  newobj     "Sub System.Action..ctor(Object, System.IntPtr)"
   IL_0046:  stelem.ref
   IL_0047:  ldloc.s    V_4
-  IL_0049:  dup
-  IL_004a:  ldfld      "Module1._Closure$__0-1.$VB$Local_x As Integer"
-  IL_004f:  ldc.i4.1
-  IL_0050:  add.ovf
-  IL_0051:  stfld      "Module1._Closure$__0-1.$VB$Local_x As Integer"
-  IL_0056:  ldloc.2
-  IL_0057:  dup
-  IL_0058:  ldfld      "Module1._Closure$__0-0.$VB$Local_i As Integer"
-  IL_005d:  ldloc.3
-  IL_005e:  add.ovf
-  IL_005f:  stfld      "Module1._Closure$__0-0.$VB$Local_i As Integer"
-  IL_0064:  ldloc.3
-  IL_0065:  ldc.i4.s   31
-  IL_0067:  shr
-  IL_0068:  ldloc.2
-  IL_0069:  ldfld      "Module1._Closure$__0-0.$VB$Local_i As Integer"
-  IL_006e:  xor
-  IL_006f:  ldloc.3
-  IL_0070:  ldc.i4.s   31
-  IL_0072:  shr
-  IL_0073:  ldc.i4.5
-  IL_0074:  xor
-  IL_0075:  ble.s      IL_001b
-  IL_0077:  ldloc.0
-  IL_0078:  call       "Sub Module1.Dump(System.Action())"
-  IL_007d:  ret
+  IL_0049:  ldloc.s    V_4
+  IL_004b:  ldfld      "Module1._Closure$__0-1.$VB$Local_x As Integer"
+  IL_0050:  ldc.i4.1
+  IL_0051:  add.ovf
+  IL_0052:  stfld      "Module1._Closure$__0-1.$VB$Local_x As Integer"
+  IL_0057:  ldloc.2
+  IL_0058:  ldloc.2
+  IL_0059:  ldfld      "Module1._Closure$__0-0.$VB$Local_i As Integer"
+  IL_005e:  ldloc.3
+  IL_005f:  add.ovf
+  IL_0060:  stfld      "Module1._Closure$__0-0.$VB$Local_i As Integer"
+  IL_0065:  ldloc.3
+  IL_0066:  ldc.i4.s   31
+  IL_0068:  shr
+  IL_0069:  ldloc.2
+  IL_006a:  ldfld      "Module1._Closure$__0-0.$VB$Local_i As Integer"
+  IL_006f:  xor
+  IL_0070:  ldloc.3
+  IL_0071:  ldc.i4.s   31
+  IL_0073:  shr
+  IL_0074:  ldc.i4.5
+  IL_0075:  xor
+  IL_0076:  ble.s      IL_001b
+  IL_0078:  ldloc.0
+  IL_0079:  call       "Sub Module1.Dump(System.Action())"
+  IL_007e:  ret
 }
 ]]>)
         End Sub
@@ -2852,7 +2852,7 @@ End Class
 ]]>)
         End Sub
 
-        <WorkItem(542070, "DevDiv")>
+        <WorkItem(542070, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542070")>
         <Fact>
         Public Sub DeeplyNestedLambda()
             CompileAndVerify(
@@ -2953,7 +2953,7 @@ End Class
 "Level5" & vbCrLf)
         End Sub
 
-        <WorkItem(542121, "DevDiv")>
+        <WorkItem(542121, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542121")>
         <Fact>
         Public Sub TestLambdaNoClosureClass()
 
@@ -2995,7 +2995,7 @@ End Class
 ]]>)
         End Sub
 
-        <WorkItem(545390, "DevDiv")>
+        <WorkItem(545390, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545390")>
         <Fact>
         Public Sub Regress13769()
             CompileAndVerify(
@@ -3028,7 +3028,7 @@ End Module
 </compilation>, expectedOutput:="======== Generic-26 ===========")
         End Sub
 
-        <WorkItem(545391, "DevDiv")>
+        <WorkItem(545391, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545391")>
         <Fact>
         Public Sub Regress13770()
             CompileAndVerify(
@@ -3081,7 +3081,7 @@ End Module
 </compilation>, expectedOutput:="======== Generic-12 ===========")
         End Sub
 
-        <WorkItem(545392, "DevDiv")>
+        <WorkItem(545392, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545392")>
         <Fact>
         Public Sub Regress13771()
             CompileAndVerify(
@@ -3134,7 +3134,7 @@ End Module
 </compilation>, expectedOutput:="======== Generic-14 ===========")
         End Sub
 
-        <WorkItem(545393, "DevDiv")>
+        <WorkItem(545393, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545393")>
         <Fact>
         Public Sub Regress13772()
             CompileAndVerify(
@@ -3186,7 +3186,7 @@ End Module
 </compilation>, expectedOutput:="======== Generic-4 ===========")
         End Sub
 
-        <WorkItem(545394, "DevDiv")>
+        <WorkItem(545394, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545394")>
         <Fact>
         Public Sub Regress13773()
             CompileAndVerify(
@@ -3247,7 +3247,7 @@ End Module
 </compilation>, expectedOutput:="======== Generic-5 ===========")
         End Sub
 
-        <WorkItem(545395, "DevDiv")>
+        <WorkItem(545395, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545395")>
         <Fact>
         Public Sub Regress13774()
             CompileAndVerify(
@@ -3302,7 +3302,7 @@ End Module
 </compilation>, expectedOutput:="======== Generic-5 ===========")
         End Sub
 
-        <WorkItem(545389, "DevDiv")>
+        <WorkItem(545389, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545389")>
         <Fact>
         Public Sub Regress13768()
             CompileAndVerify(
@@ -3338,7 +3338,7 @@ End Module
 </compilation>, expectedOutput:="correct")
         End Sub
 
-        <WorkItem(531533, "DevDiv")>
+        <WorkItem(531533, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/531533")>
         <Fact>
         Public Sub Regress531533()
 
@@ -3437,7 +3437,7 @@ End Module
 </compilation>, expectedOutput:="True")
         End Sub
 
-        <WorkItem(836488, "DevDiv")>
+        <WorkItem(836488, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/836488")>
         <Fact>
         Public Sub RelaxedInitializer()
             CompileAndVerify(
@@ -3886,6 +3886,73 @@ End Class
     </file>
 </compilation>
             CompileAndVerify(source)
+        End Sub
+
+        <Fact>
+        Public Sub ClosureInSwitchStatementWithNullableExpression()
+            Dim verifier = CompileAndVerify(
+<compilation>
+    <file name="a.vb">
+Imports System
+Class C
+    Shared Sub Main()
+        Dim i As Integer? = Nothing
+        Select Case i
+        Case 0
+        Case Else
+            Dim o As Object = Nothing
+            Dim f = Function() o
+            Console.Write("{0}", f() Is Nothing)
+        End Select
+    End Sub
+End Class
+    </file>
+</compilation>, expectedOutput:="True")
+            verifier.VerifyIL("C.Main",
+            <![CDATA[
+{
+  // Code size      104 (0x68)
+  .maxstack  3
+  .locals init (Integer? V_0,
+                Boolean? V_1,
+                VB$AnonymousDelegate_0(Of Object) V_2) //f
+  IL_0000:  ldloca.s   V_0
+  IL_0002:  initobj    "Integer?"
+  IL_0008:  ldloc.0
+  IL_0009:  stloc.0
+  IL_000a:  ldloca.s   V_0
+  IL_000c:  call       "Function Integer?.get_HasValue() As Boolean"
+  IL_0011:  brtrue.s   IL_001e
+  IL_0013:  ldloca.s   V_1
+  IL_0015:  initobj    "Boolean?"
+  IL_001b:  ldloc.1
+  IL_001c:  br.s       IL_002d
+  IL_001e:  ldloca.s   V_0
+  IL_0020:  call       "Function Integer?.GetValueOrDefault() As Integer"
+  IL_0025:  ldc.i4.0
+  IL_0026:  ceq
+  IL_0028:  newobj     "Sub Boolean?..ctor(Boolean)"
+  IL_002d:  stloc.1
+  IL_002e:  ldloca.s   V_1
+  IL_0030:  call       "Function Boolean?.GetValueOrDefault() As Boolean"
+  IL_0035:  brtrue.s   IL_0067
+  IL_0037:  newobj     "Sub C._Closure$__1-0..ctor()"
+  IL_003c:  dup
+  IL_003d:  ldnull
+  IL_003e:  stfld      "C._Closure$__1-0.$VB$Local_o As Object"
+  IL_0043:  ldftn      "Function C._Closure$__1-0._Lambda$__0() As Object"
+  IL_0049:  newobj     "Sub VB$AnonymousDelegate_0(Of Object)..ctor(Object, System.IntPtr)"
+  IL_004e:  stloc.2
+  IL_004f:  ldstr      "{0}"
+  IL_0054:  ldloc.2
+  IL_0055:  callvirt   "Function VB$AnonymousDelegate_0(Of Object).Invoke() As Object"
+  IL_005a:  ldnull
+  IL_005b:  ceq
+  IL_005d:  box        "Boolean"
+  IL_0062:  call       "Sub System.Console.Write(String, Object)"
+  IL_0067:  ret
+}
+]]>)
         End Sub
     End Class
 End Namespace

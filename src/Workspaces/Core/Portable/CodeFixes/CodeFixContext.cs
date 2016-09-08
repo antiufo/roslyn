@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System;
 using System.Collections.Generic;
@@ -7,7 +7,6 @@ using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.Text;
-using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CodeFixes
 {
@@ -17,6 +16,7 @@ namespace Microsoft.CodeAnalysis.CodeFixes
     public struct CodeFixContext
     {
         private readonly Document _document;
+        private readonly Project _project;
         private readonly TextSpan _span;
         private readonly ImmutableArray<Diagnostic> _diagnostics;
         private readonly CancellationToken _cancellationToken;
@@ -26,6 +26,11 @@ namespace Microsoft.CodeAnalysis.CodeFixes
         /// Document corresponding to the <see cref="CodeFixContext.Span"/> to fix.
         /// </summary>
         public Document Document { get { return _document; } }
+
+        /// <summary>
+        /// Project corresponding to the diagnostics to fix.
+        /// </summary>
+        internal Project Project { get { return _project; } }
 
         /// <summary>
         /// Text span within the <see cref="CodeFixContext.Document"/> to fix.
@@ -97,6 +102,27 @@ namespace Microsoft.CodeAnalysis.CodeFixes
             Action<CodeAction, ImmutableArray<Diagnostic>> registerCodeFix,
             bool verifyArguments,
             CancellationToken cancellationToken)
+            : this(document, document.Project, span, diagnostics, registerCodeFix, verifyArguments, cancellationToken)
+        {
+        }
+
+        internal CodeFixContext(
+            Project project,
+            ImmutableArray<Diagnostic> diagnostics,
+            Action<CodeAction, ImmutableArray<Diagnostic>> registerCodeFix,
+            CancellationToken cancellationToken)
+            : this(document: null, project: project, span: default(TextSpan), diagnostics: diagnostics, registerCodeFix: registerCodeFix, verifyArguments: false, cancellationToken: cancellationToken)
+        {
+        }
+
+        private CodeFixContext(
+            Document document,
+            Project project,
+            TextSpan span,
+            ImmutableArray<Diagnostic> diagnostics,
+            Action<CodeAction, ImmutableArray<Diagnostic>> registerCodeFix,
+            bool verifyArguments,
+            CancellationToken cancellationToken)
         {
             if (verifyArguments)
             {
@@ -114,6 +140,7 @@ namespace Microsoft.CodeAnalysis.CodeFixes
             }
 
             _document = document;
+            _project = project;
             _span = span;
             _diagnostics = diagnostics;
             _registerCodeFix = registerCodeFix;
@@ -196,17 +223,17 @@ namespace Microsoft.CodeAnalysis.CodeFixes
 
             if (diagnostics.Length == 0)
             {
-                throw new ArgumentException(WorkspacesResources.DiagnosticsCannotBeEmpty, nameof(diagnostics));
+                throw new ArgumentException(WorkspacesResources.At_least_one_diagnostic_must_be_supplied, nameof(diagnostics));
             }
 
             if (diagnostics.Any(d => d == null))
             {
-                throw new ArgumentException(WorkspacesResources.DiagnosticCannotBeNull, nameof(diagnostics));
+                throw new ArgumentException(WorkspacesResources.Supplied_diagnostic_cannot_be_null, nameof(diagnostics));
             }
 
             if (diagnostics.Any(d => d.Location.SourceSpan != span))
             {
-                throw new ArgumentException(string.Format(WorkspacesResources.DiagnosticMustHaveMatchingSpan, span.ToString()), nameof(diagnostics));
+                throw new ArgumentException(string.Format(WorkspacesResources.Diagnostic_must_have_span_0, span.ToString()), nameof(diagnostics));
             }
         }
     }

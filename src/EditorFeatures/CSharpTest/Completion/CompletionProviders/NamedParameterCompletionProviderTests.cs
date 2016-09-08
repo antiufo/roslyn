@@ -1,8 +1,10 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Completion;
 using Microsoft.CodeAnalysis.CSharp.Completion.Providers;
 using Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Completion.CompletionProviders;
+using Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces;
 using Roslyn.Test.Utilities;
 using Xunit;
 
@@ -10,13 +12,17 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Completion.CompletionSe
 {
     public class NamedParameterCompletionProviderTests : AbstractCSharpCompletionProviderTests
     {
-        internal override CompletionListProvider CreateCompletionProvider()
+        public NamedParameterCompletionProviderTests(CSharpTestWorkspaceFixture workspaceFixture) : base(workspaceFixture)
+        {
+        }
+
+        internal override CompletionProvider CreateCompletionProvider()
         {
             return new NamedParameterCompletionProvider();
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void SendEnterThroughToEditorTest()
+        public async Task SendEnterThroughToEditorTest()
         {
             const string markup = @"
 class Foo
@@ -30,12 +36,13 @@ class Foo
     }
 }";
 
-            VerifySendEnterThroughToEnter(markup, "a:", sendThroughEnterEnabled: false, expected: false);
-            VerifySendEnterThroughToEnter(markup, "a:", sendThroughEnterEnabled: true, expected: true);
+            await VerifySendEnterThroughToEnterAsync(markup, "a:", sendThroughEnterOption: EnterKeyRule.Never, expected: false);
+            await VerifySendEnterThroughToEnterAsync(markup, "a:", sendThroughEnterOption: EnterKeyRule.AfterFullyTypedWord, expected: true);
+            await VerifySendEnterThroughToEnterAsync(markup, "a:", sendThroughEnterOption: EnterKeyRule.Always, expected: true);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void CommitCharacterTest()
+        public async Task CommitCharacterTest()
         {
             const string markup = @"
 class Foo
@@ -49,11 +56,11 @@ class Foo
     }
 }";
 
-            VerifyCommonCommitCharacters(markup, textTypedSoFar: "");
+            await VerifyCommonCommitCharactersAsync(markup, textTypedSoFar: "");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void InObjectCreation()
+        public async Task InObjectCreation()
         {
             var markup = @"
 class Foo
@@ -67,11 +74,11 @@ class Foo
     }
 }";
 
-            VerifyItemExists(markup, "a:");
+            await VerifyItemExistsAsync(markup, "a:");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void InBaseConstructor()
+        public async Task InBaseConstructor()
         {
             var markup = @"
 class Foo
@@ -86,11 +93,11 @@ class DogBed : Foo
 }
 ";
 
-            VerifyItemExists(markup, "a:");
+            await VerifyItemExistsAsync(markup, "a:");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void InvocationExpression()
+        public async Task InvocationExpression()
         {
             var markup = @"
 class Foo
@@ -102,11 +109,11 @@ class Foo
 }
 ";
 
-            VerifyItemExists(markup, "a:");
+            await VerifyItemExistsAsync(markup, "a:");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void InvocationExpressionAfterComma()
+        public async Task InvocationExpressionAfterComma()
         {
             var markup = @"
 class Foo
@@ -118,11 +125,11 @@ class Foo
 }
 ";
 
-            VerifyItemExists(markup, "a:");
+            await VerifyItemExistsAsync(markup, "a:");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void ElementAccessExpression()
+        public async Task ElementAccessExpression()
         {
             var markup = @"
 class SampleCollection<T>
@@ -151,11 +158,11 @@ class Program
 }
 ";
 
-            VerifyItemExists(markup, "i:");
+            await VerifyItemExistsAsync(markup, "i:");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void PartialMethods()
+        public async Task PartialMethods()
         {
             var markup = @"
 partial class PartialClass
@@ -171,12 +178,12 @@ partial class PartialClass
 }
 ";
 
-            VerifyItemExists(markup, "declaring:");
-            VerifyItemIsAbsent(markup, "implementing:");
+            await VerifyItemExistsAsync(markup, "declaring:");
+            await VerifyItemIsAbsentAsync(markup, "implementing:");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void NotAfterColon()
+        public async Task NotAfterColon()
         {
             var markup = @"
 class Foo
@@ -188,12 +195,12 @@ class Foo
 }
 ";
 
-            VerifyNoItemsExist(markup);
+            await VerifyNoItemsExistAsync(markup);
         }
 
-        [WorkItem(544292)]
+        [WorkItem(544292, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544292")]
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void NotInCollectionInitializers()
+        public async Task NotInCollectionInitializers()
         {
             var markup = @"
 using System.Collections.Generic;
@@ -206,12 +213,12 @@ class Foo
 }
 ";
 
-            VerifyNoItemsExist(markup);
+            await VerifyNoItemsExistAsync(markup);
         }
 
-        [WorkItem(544191)]
+        [WorkItem(544191, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544191")]
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void FilteringOverloadsByCallSite()
+        public async Task FilteringOverloadsByCallSite()
         {
             var markup = @"
 class Class1
@@ -229,12 +236,12 @@ class Class1
 }
 ";
 
-            VerifyItemExists(markup, "str:");
-            VerifyItemIsAbsent(markup, "character:");
+            await VerifyItemExistsAsync(markup, "str:");
+            await VerifyItemIsAbsentAsync(markup, "character:");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void DontFilterYet()
+        public async Task DontFilterYet()
         {
             var markup = @"
 class Class1
@@ -252,13 +259,13 @@ class Class1
 }
 ";
 
-            VerifyItemExists(markup, "boolean:");
-            VerifyItemExists(markup, "character:");
+            await VerifyItemExistsAsync(markup, "boolean:");
+            await VerifyItemExistsAsync(markup, "character:");
         }
 
-        [WorkItem(544191)]
+        [WorkItem(544191, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544191")]
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void FilteringOverloadsByCallSiteComplex()
+        public async Task FilteringOverloadsByCallSiteComplex()
         {
             var markup = @"
 class Foo
@@ -284,14 +291,14 @@ class Foo
 }
 class Bar { }
 ";
-            VerifyItemExists(markup, "str:");
-            VerifyItemExists(markup, "num:");
-            VerifyItemExists(markup, "b:");
-            VerifyItemIsAbsent(markup, "dbl:");
+            await VerifyItemExistsAsync(markup, "str:");
+            await VerifyItemExistsAsync(markup, "num:");
+            await VerifyItemExistsAsync(markup, "b:");
+            await VerifyItemIsAbsentAsync(markup, "dbl:");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void MethodOverloads()
+        public async Task MethodOverloads()
         {
             var markup = @"
 class Foo
@@ -313,13 +320,13 @@ class Foo
     }
 }
 ";
-            VerifyItemExists(markup, "str:");
-            VerifyItemExists(markup, "num:");
-            VerifyItemExists(markup, "b:");
+            await VerifyItemExistsAsync(markup, "str:");
+            await VerifyItemExistsAsync(markup, "num:");
+            await VerifyItemExistsAsync(markup, "b:");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void ExistingNamedParamsAreFilteredOut()
+        public async Task ExistingNamedParamsAreFilteredOut()
         {
             var markup = @"
 class Foo
@@ -344,15 +351,15 @@ class Foo
     }
 }
 ";
-            VerifyItemExists(markup, "num:");
-            VerifyItemExists(markup, "b:");
-            VerifyItemIsAbsent(markup, "obj:");
-            VerifyItemIsAbsent(markup, "str:");
+            await VerifyItemExistsAsync(markup, "num:");
+            await VerifyItemExistsAsync(markup, "b:");
+            await VerifyItemIsAbsentAsync(markup, "obj:");
+            await VerifyItemIsAbsentAsync(markup, "str:");
         }
 
-        [WorkItem(529369)]
+        [WorkItem(529369, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529369")]
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void VerbatimIdentifierNotAKeyword()
+        public async Task VerbatimIdentifierNotAKeyword()
         {
             var markup = @"
 class Program
@@ -363,12 +370,12 @@ class Program
     }
 }
 ";
-            VerifyItemExists(markup, "integer:");
+            await VerifyItemExistsAsync(markup, "integer:");
         }
 
-        [WorkItem(544209)]
+        [WorkItem(544209, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544209")]
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void DescriptionStringInMethodOverloads()
+        public async Task DescriptionStringInMethodOverloads()
         {
             var markup = @"
 class Class1
@@ -385,12 +392,12 @@ class Class1
     { }
 }
 ";
-            VerifyItemExists(markup, "obj:",
-                expectedDescriptionOrNull: $"({FeaturesResources.Parameter}) Class1 obj = default(Class1)");
+            await VerifyItemExistsAsync(markup, "obj:",
+                expectedDescriptionOrNull: $"({FeaturesResources.parameter}) Class1 obj = default(Class1)");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void InDelegates()
+        public async Task InDelegates()
         {
             var markup = @"
 public delegate void Del(string message);
@@ -408,11 +415,11 @@ class Program
         handler($$
     }
 }";
-            VerifyItemExists(markup, "message:");
+            await VerifyItemExistsAsync(markup, "message:");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void InDelegateInvokeSyntax()
+        public async Task InDelegateInvokeSyntax()
         {
             var markup = @"
 public delegate void Del(string message);
@@ -430,11 +437,11 @@ class Program
         handler.Invoke($$
     }
 }";
-            VerifyItemExists(markup, "message:");
+            await VerifyItemExistsAsync(markup, "message:");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void NotInComment()
+        public async Task NotInComment()
         {
             var markup = @"
 public class Test
@@ -447,7 +454,57 @@ y: 1);
 static void M(int x, int y) { }
 }
 ";
-            VerifyNoItemsExist(markup);
+            await VerifyNoItemsExistAsync(markup);
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task CommitWithColonWordFullyTyped()
+        {
+            var markup = @"
+class Program
+{
+    static void Main(string[] args)
+    {
+        Main(args$$)
+    }
+}
+";
+
+            var expected = @"
+class Program
+{
+    static void Main(string[] args)
+    {
+        Main(args:)
+    }
+}
+";
+            await VerifyProviderCommitAsync(markup, "args:", expected, ':', "args");
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
+        public async Task CommitWithColonWordPartiallyTyped()
+        {
+            var markup = @"
+class Program
+{
+    static void Main(string[] args)
+    {
+        Main(ar$$)
+    }
+}
+";
+
+            var expected = @"
+class Program
+{
+    static void Main(string[] args)
+    {
+        Main(args:)
+    }
+}
+";
+            await VerifyProviderCommitAsync(markup, "args:", expected, ':', "arg");
         }
     }
 }

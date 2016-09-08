@@ -25,20 +25,30 @@ namespace Microsoft.CodeAnalysis.FindSymbols.Finders
             IImmutableSet<Project> projects,
             CancellationToken cancellationToken)
         {
-            IEnumerable<ISymbol> result = SpecializedCollections.EmptyEnumerable<ISymbol>();
-
+            List<ISymbol> result = null;
             if (symbol.AssociatedSymbol != null)
             {
-                result = result.Concat(SpecializedCollections.SingletonEnumerable(symbol.AssociatedSymbol));
+                result = Add(result, SpecializedCollections.SingletonEnumerable(symbol.AssociatedSymbol));
             }
 
             // cascade to constructors
-            result = result.Concat(symbol.Constructors);
+            result = Add(result, symbol.Constructors);
 
             // cascade to destructor
-            result = result.Concat(symbol.GetMembers(WellKnownMemberNames.DestructorName));
+            result = Add(result, symbol.GetMembers(WellKnownMemberNames.DestructorName));
 
-            return Task.FromResult(result);
+            return Task.FromResult<IEnumerable<ISymbol>>(result ?? SpecializedCollections.EmptyList<ISymbol>());
+        }
+
+        private List<ISymbol> Add(List<ISymbol> result, IEnumerable<ISymbol> enumerable)
+        {
+            if (enumerable != null)
+            {
+                result = result ?? new List<ISymbol>();
+                result.AddRange(enumerable);
+            }
+
+            return result;
         }
 
         protected override async Task<IEnumerable<Document>> DetermineDocumentsToSearchAsync(

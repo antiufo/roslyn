@@ -1,9 +1,11 @@
 ' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
+Imports System.Threading.Tasks
+
 Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
     Partial Public Class FindReferencesTests
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestFunctionDynamicParameterCall()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestFunctionDynamicParameterCall() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -23,11 +25,11 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestFunctionDynamicArgumentCall()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestFunctionDynamicArgumentCall() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -48,11 +50,11 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestDoubleFunctionCallWithKnownTypeReturn()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestDoubleFunctionCallWithKnownTypeReturn() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -73,11 +75,11 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestDoubleFunctionCallWithDynamicTypeReturn()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestDoubleFunctionCallWithDynamicTypeReturn() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -98,11 +100,11 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestFunctionDynamicParameterOnDefinition()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestFunctionDynamicParameterOnDefinition() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -122,11 +124,11 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
          </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestFunctionDynamicArgumentOnDefinition()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestFunctionDynamicArgumentOnDefinition() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -147,11 +149,11 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestDoubleFunctionDynamicOnDefinition()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestDoubleFunctionDynamicOnDefinition() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -172,11 +174,11 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestFunctionOverloadOnKnownTypeDefinition()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestFunctionOverloadOnKnownTypeDefinition() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -201,11 +203,11 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestFunctionOverloadOnDynamicTypeDefinition()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestFunctionOverloadOnDynamicTypeDefinition() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -229,11 +231,11 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestFunctionOverloadOnDynamicTypeCall()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestFunctionOverloadOnDynamicTypeCall() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -258,11 +260,11 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestFunctionOverloadOnStaticTypeCall()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestFunctionOverloadOnStaticTypeCall() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -287,8 +289,8 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
     End Class
 End Namespace
 

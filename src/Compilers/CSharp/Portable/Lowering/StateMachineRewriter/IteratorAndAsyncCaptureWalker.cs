@@ -29,7 +29,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         // Contains variables that are captured but can't be hoisted since their type can't be allocated on heap.
         // The value is a list of all uses of each such variable.
-        private MultiDictionary<Symbol, CSharpSyntaxNode> _lazyDisallowedCaptures;
+        private MultiDictionary<Symbol, SyntaxNode> _lazyDisallowedCaptures;
 
         private bool _seenYieldInCurrentTry;
 
@@ -47,8 +47,11 @@ namespace Microsoft.CodeAnalysis.CSharp
         // Returns deterministically ordered list of variables that ought to be hoisted.
         public static OrderedSet<Symbol> Analyze(CSharpCompilation compilation, MethodSymbol method, BoundNode node, DiagnosticBag diagnostics)
         {
-            var initiallyAssignedVariables = UnassignedVariablesWalker.Analyze(compilation, method, node);
+            var initiallyAssignedVariables = UnassignedVariablesWalker.Analyze(compilation, method, node, convertInsufficientExecutionStackExceptionToCancelledByStackGuardException: true);
             var walker = new IteratorAndAsyncCaptureWalker(compilation, method, node, new NeverEmptyStructTypeCache(), initiallyAssignedVariables);
+
+            walker._convertInsufficientExecutionStackExceptionToCancelledByStackGuardException = true;
+
             bool badRegion = false;
             walker.Analyze(ref badRegion);
             Debug.Assert(!badRegion);
@@ -183,7 +186,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             return base.Scan(ref badRegion);
         }
 
-        private void CaptureVariable(Symbol variable, CSharpSyntaxNode syntax)
+        private void CaptureVariable(Symbol variable, SyntaxNode syntax)
         {
             var type = (variable.Kind == SymbolKind.Local) ? ((LocalSymbol)variable).Type : ((ParameterSymbol)variable).Type;
             if (type.IsRestrictedType())
@@ -196,7 +199,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                 if (_lazyDisallowedCaptures == null)
                 {
-                    _lazyDisallowedCaptures = new MultiDictionary<Symbol, CSharpSyntaxNode>();
+                    _lazyDisallowedCaptures = new MultiDictionary<Symbol, SyntaxNode>();
                 }
 
                 _lazyDisallowedCaptures.Add(variable, syntax);
@@ -214,7 +217,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             GetOrCreateSlot(parameter);
         }
 
-        protected override void ReportUnassigned(Symbol symbol, CSharpSyntaxNode node)
+        protected override void ReportUnassigned(Symbol symbol, SyntaxNode node)
         {
             if (symbol is LocalSymbol || symbol is ParameterSymbol)
             {
@@ -229,7 +232,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             return this.State;
         }
 
-        protected override void ReportUnassigned(FieldSymbol fieldSymbol, int unassignedSlot, CSharpSyntaxNode node)
+        protected override void ReportUnassigned(FieldSymbol fieldSymbol, int unassignedSlot, SyntaxNode node)
         {
             CaptureVariable(GetNonFieldSymbol(unassignedSlot), node);
         }
@@ -292,23 +295,31 @@ namespace Microsoft.CodeAnalysis.CSharp
             {
                 // Locals cannot be used to communicate between the finally block and the rest of the method.
                 // So we just capture any outside variables that are used inside.
-                new OutsideVariablesUsedInside(this, this.topLevelMethod).Visit(finallyBlock);
+                new OutsideVariablesUsedInside(this, this.topLevelMethod, this).Visit(finallyBlock);
             }
 
             base.VisitFinallyBlock(finallyBlock, ref unsetInFinally);
         }
 
-        private sealed class OutsideVariablesUsedInside : BoundTreeWalker
+        private sealed class OutsideVariablesUsedInside : BoundTreeWalkerWithStackGuardWithoutRecursionOnTheLeftOfBinaryOperator
         {
             private readonly HashSet<Symbol> _localsInScope;
             private readonly IteratorAndAsyncCaptureWalker _analyzer;
             private readonly MethodSymbol _topLevelMethod;
+            private readonly IteratorAndAsyncCaptureWalker _parent;
 
-            public OutsideVariablesUsedInside(IteratorAndAsyncCaptureWalker analyzer, MethodSymbol topLevelMethod)
+            public OutsideVariablesUsedInside(IteratorAndAsyncCaptureWalker analyzer, MethodSymbol topLevelMethod, IteratorAndAsyncCaptureWalker parent)
+                : base(parent._recursionDepth)
             {
                 _analyzer = analyzer;
                 _topLevelMethod = topLevelMethod;
                 _localsInScope = new HashSet<Symbol>();
+                _parent = parent;
+            }
+
+            protected override bool ConvertInsufficientExecutionStackExceptionToCancelledByStackGuardException()
+            {
+                return _parent.ConvertInsufficientExecutionStackExceptionToCancelledByStackGuardException();
             }
 
             public override BoundNode VisitBlock(BoundBlock node)
@@ -327,7 +338,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             public override BoundNode VisitCatchBlock(BoundCatchBlock node)
             {
-                AddVariable(node.LocalOpt);
+                AddVariables(node.Locals);
                 return base.VisitCatchBlock(node);
             }
 
@@ -366,7 +377,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 return base.VisitParameter(node);
             }
 
-            private void Capture(Symbol s, CSharpSyntaxNode syntax)
+            private void Capture(Symbol s, SyntaxNode syntax)
             {
                 if ((object)s != null && !_localsInScope.Contains(s))
                 {

@@ -1,6 +1,6 @@
 ' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
-Imports Microsoft.CodeAnalysis.Editor.UnitTests.Extensions
+Imports System.Threading.Tasks
 
 Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
     Public MustInherit Class AbstractCodeFunctionTests
@@ -130,110 +130,86 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
             Throw New NotSupportedException
         End Function
 
-        Protected Sub TestCanOverride(code As XElement, expected As Boolean)
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim codeElement = state.GetCodeElementAtCursor(Of EnvDTE80.CodeFunction2)()
-                Assert.NotNull(codeElement)
+        Protected Async Function TestCanOverride(code As XElement, expected As Boolean) As Task
+            Await TestElement(code,
+                Sub(codeElement)
+                    Assert.Equal(expected, codeElement.CanOverride)
+                End Sub)
+        End Function
 
-                Assert.Equal(expected, codeElement.CanOverride)
-            End Using
-        End Sub
+        Protected Async Function TestSetCanOverride(code As XElement, expectedCode As XElement, value As Boolean) As Task
+            Await TestSetCanOverride(code, expectedCode, value, NoThrow(Of Boolean)())
+        End Function
 
-        Protected Sub TestSetCanOverride(code As XElement, expectedCode As XElement, value As Boolean)
-            TestSetCanOverride(code, expectedCode, value, NoThrow(Of Boolean)())
-        End Sub
+        Protected Async Function TestSetCanOverride(code As XElement, expectedCode As XElement, value As Boolean, action As SetterAction(Of Boolean)) As Task
+            Await TestElementUpdate(code, expectedCode,
+                Sub(codeElement)
+                    action(value, Sub(v) codeElement.CanOverride = v)
+                End Sub)
+        End Function
 
-        Protected Sub TestSetCanOverride(code As XElement, expectedCode As XElement, value As Boolean, action As SetterAction(Of Boolean))
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim codeElement = state.GetCodeElementAtCursor(Of EnvDTE80.CodeFunction2)()
-                Assert.NotNull(codeElement)
+        Protected Async Function TestIsOverloaded(code As XElement, expectedOverloaded As Boolean) As Task
+            Await TestElement(code,
+                Sub(codeElement)
+                    Dim overloaded = GetIsOverloaded(codeElement)
+                    Assert.Equal(expectedOverloaded, overloaded)
+                End Sub)
+        End Function
 
-                action(value, Sub(v) codeElement.CanOverride = v)
+        Protected Async Function TestOverloadsUniqueSignatures(code As XElement, ParamArray expectedOverloadNames As String()) As Task
+            Await TestElement(code,
+                Sub(codeElement)
+                    Dim actualOverloads = GetOverloads(codeElement)
+                    Assert.Equal(expectedOverloadNames.Count, actualOverloads.Count)
+                    For index = 1 To actualOverloads.Count
+                        Dim codeFunction = CType(actualOverloads.Item(index), EnvDTE80.CodeFunction2)
+                        Dim signature = GetPrototype(codeFunction, EnvDTE.vsCMPrototype.vsCMPrototypeUniqueSignature)
+                        Assert.True(expectedOverloadNames.Contains(signature))
+                    Next
+                End Sub)
+        End Function
 
-                Dim text = state.GetDocumentAtCursor().GetTextAsync().Result.ToString()
+        Protected Async Function TestFunctionKind(code As XElement, expected As EnvDTE.vsCMFunction) As Task
+            Await TestElement(code,
+                Sub(codeElement)
+                    Assert.Equal(expected, codeElement.FunctionKind)
+                End Sub)
+        End Function
 
-                Assert.Equal(expectedCode.NormalizedValue.Trim(), text.Trim())
-            End Using
-        End Sub
+        Protected Async Function TestFunctionKind(code As XElement, expected As EnvDTE80.vsCMFunction2) As Task
+            Await TestElement(code,
+                Sub(codeElement)
+                    Assert.Equal(expected, CType(codeElement.FunctionKind, EnvDTE80.vsCMFunction2))
+                End Sub)
+        End Function
 
-        Protected Sub TestIsOverloaded(code As XElement, expectedOverloaded As Boolean)
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim codeElement = state.GetCodeElementAtCursor(Of EnvDTE80.CodeFunction2)()
-                Assert.NotNull(codeElement)
+        Protected Async Function TestExtensionMethodExtender_IsExtension(code As XElement, expected As Boolean) As Task
+            Await TestElement(code,
+                Sub(codeElement)
+                    Assert.Equal(expected, ExtensionMethodExtender_GetIsExtension(codeElement))
+                End Sub)
+        End Function
 
-                Dim overloaded = GetIsOverloaded(codeElement)
-                Assert.Equal(expectedOverloaded, overloaded)
-            End Using
-        End Sub
+        Protected Async Function TestPartialMethodExtender_IsPartial(code As XElement, expected As Boolean) As Task
+            Await TestElement(code,
+                Sub(codeElement)
+                    Assert.Equal(expected, PartialMethodExtender_GetIsPartial(codeElement))
+                End Sub)
+        End Function
 
-        Protected Sub TestOverloadsUniqueSignatures(code As XElement, ParamArray expectedOverloadNames As String())
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim codeElement = state.GetCodeElementAtCursor(Of EnvDTE80.CodeFunction2)()
-                Assert.NotNull(codeElement)
+        Protected Async Function TestPartialMethodExtender_IsDeclaration(code As XElement, expected As Boolean) As Task
+            Await TestElement(code,
+                Sub(codeElement)
+                    Assert.Equal(expected, PartialMethodExtender_GetIsDeclaration(codeElement))
+                End Sub)
+        End Function
 
-                Dim actualOverloads = GetOverloads(codeElement)
-                Assert.Equal(expectedOverloadNames.Count, actualOverloads.Count)
-                For index = 1 To actualOverloads.Count
-                    Dim codeFunction = CType(actualOverloads.Item(index), EnvDTE80.CodeFunction2)
-                    Dim signature = GetPrototype(codeFunction, EnvDTE.vsCMPrototype.vsCMPrototypeUniqueSignature)
-                    Assert.True(expectedOverloadNames.Contains(signature))
-                Next
-            End Using
-        End Sub
-
-        Protected Sub TestFunctionKind(code As XElement, expected As EnvDTE.vsCMFunction)
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim codeElement = state.GetCodeElementAtCursor(Of EnvDTE80.CodeFunction2)()
-                Assert.NotNull(codeElement)
-
-                Assert.Equal(expected, codeElement.FunctionKind)
-            End Using
-        End Sub
-
-        Protected Sub TestFunctionKind(code As XElement, expected As EnvDTE80.vsCMFunction2)
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim codeElement = state.GetCodeElementAtCursor(Of EnvDTE80.CodeFunction2)()
-                Assert.NotNull(codeElement)
-
-                Assert.Equal(expected, CType(codeElement.FunctionKind, EnvDTE80.vsCMFunction2))
-            End Using
-        End Sub
-
-        Protected Sub TestExtensionMethodExtender_IsExtension(code As XElement, expected As Boolean)
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim codeElement = state.GetCodeElementAtCursor(Of EnvDTE80.CodeFunction2)()
-                Assert.NotNull(codeElement)
-
-                Assert.Equal(expected, ExtensionMethodExtender_GetIsExtension(codeElement))
-            End Using
-        End Sub
-
-        Protected Sub TestPartialMethodExtender_IsPartial(code As XElement, expected As Boolean)
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim codeElement = state.GetCodeElementAtCursor(Of EnvDTE80.CodeFunction2)()
-                Assert.NotNull(codeElement)
-
-                Assert.Equal(expected, PartialMethodExtender_GetIsPartial(codeElement))
-            End Using
-        End Sub
-
-        Protected Sub TestPartialMethodExtender_IsDeclaration(code As XElement, expected As Boolean)
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim codeElement = state.GetCodeElementAtCursor(Of EnvDTE80.CodeFunction2)()
-                Assert.NotNull(codeElement)
-
-                Assert.Equal(expected, PartialMethodExtender_GetIsDeclaration(codeElement))
-            End Using
-        End Sub
-
-        Protected Sub TestPartialMethodExtender_HasOtherPart(code As XElement, expected As Boolean)
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim codeElement = state.GetCodeElementAtCursor(Of EnvDTE80.CodeFunction2)()
-                Assert.NotNull(codeElement)
-
-                Assert.Equal(expected, PartialMethodExtender_GetHasOtherPart(codeElement))
-            End Using
-        End Sub
+        Protected Async Function TestPartialMethodExtender_HasOtherPart(code As XElement, expected As Boolean) As Task
+            Await TestElement(code,
+                Sub(codeElement)
+                    Assert.Equal(expected, PartialMethodExtender_GetHasOtherPart(codeElement))
+                End Sub)
+        End Function
 
     End Class
 End Namespace

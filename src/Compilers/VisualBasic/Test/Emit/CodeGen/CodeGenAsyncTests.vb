@@ -13,7 +13,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
     Public Class AsyncTests
         Inherits BasicTestBase
 
-        <WorkItem(1004348, "DevDiv")>
+        <WorkItem(1004348, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1004348")>
         <Fact>
         Public Sub StructVsClass()
             Dim source =
@@ -1318,6 +1318,156 @@ End Class
         End Sub
 
         <Fact()>
+        Public Sub Simple_TaskOfT_Lambda_6_D()
+            Dim c = CompileAndVerify(
+<compilation>
+    <file name="a.vb">
+Imports System
+Imports System.Threading.Tasks
+
+Module Form1
+    Sub Main()
+        Console.Write("X1 ")
+        Console.Write((New CLAZZ()).F(1000).Result.ToString + " ")
+        Console.Write("X2 ")
+    End Sub
+End Module
+
+Class CLAZZ
+    Public FX As Integer = 1
+
+    Public Async Function F(p As Integer) As Task(Of Integer)
+        Dim outer As Integer = 100
+        Console.Write("0 ")
+        Dim a = Async Function()
+                    Dim result = outer + Me.FX
+                    Dim x = Await f2()
+                    Return x + result + p
+                End Function
+        Console.Write("1 ")
+        Return Await a()
+    End Function
+
+    Async Function f2() As Task(Of Integer)
+        Console.Write("2 ")
+        Await Task.Yield
+        Console.Write("3 ")
+        Return 10
+    End Function
+End Class
+    </file>
+</compilation>, useLatestFramework:=True, options:=TestOptions.ReleaseDebugExe, expectedOutput:="X1 0 1 2 3 1111 X2")
+            c.VerifyIL("CLAZZ._Closure$__2-0.VB$StateMachine___Lambda$__0.MoveNext",
+            <![CDATA[
+{
+  // Code size      243 (0xf3)
+  .maxstack  3
+  .locals init (Integer V_0,
+                Integer V_1,
+                System.Threading.Tasks.Task(Of Integer) V_2,
+                Integer V_3, //x
+                System.Runtime.CompilerServices.TaskAwaiter(Of Integer) V_4,
+                Integer V_5,
+                System.Exception V_6)
+  IL_0000:  ldarg.0
+  IL_0001:  ldfld      "CLAZZ._Closure$__2-0.VB$StateMachine___Lambda$__0.$State As Integer"
+  IL_0006:  stloc.1
+  .try
+  {
+    IL_0007:  ldloc.1
+    IL_0008:  brfalse.s  IL_0070
+    IL_000a:  ldarg.0
+    IL_000b:  ldarg.0
+    IL_000c:  ldfld      "CLAZZ._Closure$__2-0.VB$StateMachine___Lambda$__0.$VB$NonLocal__Closure$__2-0 As CLAZZ._Closure$__2-0"
+    IL_0011:  ldfld      "CLAZZ._Closure$__2-0.$VB$Local_outer As Integer"
+    IL_0016:  ldarg.0
+    IL_0017:  ldfld      "CLAZZ._Closure$__2-0.VB$StateMachine___Lambda$__0.$VB$NonLocal__Closure$__2-0 As CLAZZ._Closure$__2-0"
+    IL_001c:  ldfld      "CLAZZ._Closure$__2-0.$VB$Me As CLAZZ"
+    IL_0021:  ldfld      "CLAZZ.FX As Integer"
+    IL_0026:  add.ovf
+    IL_0027:  stfld      "CLAZZ._Closure$__2-0.VB$StateMachine___Lambda$__0.$VB$ResumableLocal_result$0 As Integer"
+    IL_002c:  ldarg.0
+    IL_002d:  ldfld      "CLAZZ._Closure$__2-0.VB$StateMachine___Lambda$__0.$VB$NonLocal__Closure$__2-0 As CLAZZ._Closure$__2-0"
+    IL_0032:  ldfld      "CLAZZ._Closure$__2-0.$VB$Me As CLAZZ"
+    IL_0037:  call       "Function CLAZZ.f2() As System.Threading.Tasks.Task(Of Integer)"
+    IL_003c:  callvirt   "Function System.Threading.Tasks.Task(Of Integer).GetAwaiter() As System.Runtime.CompilerServices.TaskAwaiter(Of Integer)"
+    IL_0041:  stloc.s    V_4
+    IL_0043:  ldloca.s   V_4
+    IL_0045:  call       "Function System.Runtime.CompilerServices.TaskAwaiter(Of Integer).get_IsCompleted() As Boolean"
+    IL_004a:  brtrue.s   IL_008d
+    IL_004c:  ldarg.0
+    IL_004d:  ldc.i4.0
+    IL_004e:  dup
+    IL_004f:  stloc.1
+    IL_0050:  stfld      "CLAZZ._Closure$__2-0.VB$StateMachine___Lambda$__0.$State As Integer"
+    IL_0055:  ldarg.0
+    IL_0056:  ldloc.s    V_4
+    IL_0058:  stfld      "CLAZZ._Closure$__2-0.VB$StateMachine___Lambda$__0.$A0 As System.Runtime.CompilerServices.TaskAwaiter(Of Integer)"
+    IL_005d:  ldarg.0
+    IL_005e:  ldflda     "CLAZZ._Closure$__2-0.VB$StateMachine___Lambda$__0.$Builder As System.Runtime.CompilerServices.AsyncTaskMethodBuilder(Of Integer)"
+    IL_0063:  ldloca.s   V_4
+    IL_0065:  ldarg.0
+    IL_0066:  call       "Sub System.Runtime.CompilerServices.AsyncTaskMethodBuilder(Of Integer).AwaitUnsafeOnCompleted(Of System.Runtime.CompilerServices.TaskAwaiter(Of Integer), CLAZZ._Closure$__2-0.VB$StateMachine___Lambda$__0)(ByRef System.Runtime.CompilerServices.TaskAwaiter(Of Integer), ByRef CLAZZ._Closure$__2-0.VB$StateMachine___Lambda$__0)"
+    IL_006b:  leave      IL_00f2
+    IL_0070:  ldarg.0
+    IL_0071:  ldc.i4.m1
+    IL_0072:  dup
+    IL_0073:  stloc.1
+    IL_0074:  stfld      "CLAZZ._Closure$__2-0.VB$StateMachine___Lambda$__0.$State As Integer"
+    IL_0079:  ldarg.0
+    IL_007a:  ldfld      "CLAZZ._Closure$__2-0.VB$StateMachine___Lambda$__0.$A0 As System.Runtime.CompilerServices.TaskAwaiter(Of Integer)"
+    IL_007f:  stloc.s    V_4
+    IL_0081:  ldarg.0
+    IL_0082:  ldflda     "CLAZZ._Closure$__2-0.VB$StateMachine___Lambda$__0.$A0 As System.Runtime.CompilerServices.TaskAwaiter(Of Integer)"
+    IL_0087:  initobj    "System.Runtime.CompilerServices.TaskAwaiter(Of Integer)"
+    IL_008d:  ldloca.s   V_4
+    IL_008f:  call       "Function System.Runtime.CompilerServices.TaskAwaiter(Of Integer).GetResult() As Integer"
+    IL_0094:  stloc.s    V_5
+    IL_0096:  ldloca.s   V_4
+    IL_0098:  initobj    "System.Runtime.CompilerServices.TaskAwaiter(Of Integer)"
+    IL_009e:  ldloc.s    V_5
+    IL_00a0:  stloc.3
+    IL_00a1:  ldloc.3
+    IL_00a2:  ldarg.0
+    IL_00a3:  ldfld      "CLAZZ._Closure$__2-0.VB$StateMachine___Lambda$__0.$VB$ResumableLocal_result$0 As Integer"
+    IL_00a8:  add.ovf
+    IL_00a9:  ldarg.0
+    IL_00aa:  ldfld      "CLAZZ._Closure$__2-0.VB$StateMachine___Lambda$__0.$VB$NonLocal__Closure$__2-0 As CLAZZ._Closure$__2-0"
+    IL_00af:  ldfld      "CLAZZ._Closure$__2-0.$VB$Local_p As Integer"
+    IL_00b4:  add.ovf
+    IL_00b5:  stloc.0
+    IL_00b6:  leave.s    IL_00dc
+  }
+  catch System.Exception
+  {
+    IL_00b8:  dup
+    IL_00b9:  call       "Sub Microsoft.VisualBasic.CompilerServices.ProjectData.SetProjectError(System.Exception)"
+    IL_00be:  stloc.s    V_6
+    IL_00c0:  ldarg.0
+    IL_00c1:  ldc.i4.s   -2
+    IL_00c3:  stfld      "CLAZZ._Closure$__2-0.VB$StateMachine___Lambda$__0.$State As Integer"
+    IL_00c8:  ldarg.0
+    IL_00c9:  ldflda     "CLAZZ._Closure$__2-0.VB$StateMachine___Lambda$__0.$Builder As System.Runtime.CompilerServices.AsyncTaskMethodBuilder(Of Integer)"
+    IL_00ce:  ldloc.s    V_6
+    IL_00d0:  call       "Sub System.Runtime.CompilerServices.AsyncTaskMethodBuilder(Of Integer).SetException(System.Exception)"
+    IL_00d5:  call       "Sub Microsoft.VisualBasic.CompilerServices.ProjectData.ClearProjectError()"
+    IL_00da:  leave.s    IL_00f2
+  }
+  IL_00dc:  ldarg.0
+  IL_00dd:  ldc.i4.s   -2
+  IL_00df:  dup
+  IL_00e0:  stloc.1
+  IL_00e1:  stfld      "CLAZZ._Closure$__2-0.VB$StateMachine___Lambda$__0.$State As Integer"
+  IL_00e6:  ldarg.0
+  IL_00e7:  ldflda     "CLAZZ._Closure$__2-0.VB$StateMachine___Lambda$__0.$Builder As System.Runtime.CompilerServices.AsyncTaskMethodBuilder(Of Integer)"
+  IL_00ec:  ldloc.0
+  IL_00ed:  call       "Sub System.Runtime.CompilerServices.AsyncTaskMethodBuilder(Of Integer).SetResult(Integer)"
+  IL_00f2:  ret
+}
+]]>)
+        End Sub
+
+        <Fact()>
         Public Sub Simple_Finalizer()
             Dim c = CompileAndVerify(
 <compilation>
@@ -1465,7 +1615,7 @@ End Module
 ]]>)
         End Sub
 
-        <Fact, WorkItem(1002672)>
+        <Fact, WorkItem(1002672, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1002672")>
         Public Sub Simple_LateBinding_1()
             Dim c = CompileAndVerify(
 <compilation>
@@ -1499,7 +1649,7 @@ End Module
             c.VerifyIL("Program.VB$StateMachine_0_Test2.MoveNext",
             <![CDATA[
 {
-  // Code size      489 (0x1e9)
+  // Code size      485 (0x1e5)
   .maxstack  8
   .locals init (Integer V_0,
                 Object V_1,
@@ -1507,10 +1657,9 @@ End Module
                 System.Runtime.CompilerServices.INotifyCompletion V_3,
                 Program.VB$StateMachine_0_Test2 V_4,
                 Object V_5,
-                Object V_6,
-                System.Runtime.CompilerServices.ICriticalNotifyCompletion V_7,
-                System.Runtime.CompilerServices.INotifyCompletion V_8,
-                System.Exception V_9)
+                System.Runtime.CompilerServices.ICriticalNotifyCompletion V_6,
+                System.Runtime.CompilerServices.INotifyCompletion V_7,
+                System.Exception V_8)
  ~IL_0000:  ldarg.0
   IL_0001:  ldfld      "Program.VB$StateMachine_0_Test2.$State As Integer"
   IL_0006:  stloc.0
@@ -1524,7 +1673,7 @@ End Module
     IL_000e:  beq.s      IL_0017
     IL_0010:  br.s       IL_001c
     IL_0012:  br         IL_00af
-    IL_0017:  br         IL_0178
+    IL_0017:  br         IL_0174
    -IL_001c:  nop
    -IL_001d:  ldarg.0
     IL_001e:  newobj     "Sub MyTask(Of Integer)..ctor()"
@@ -1585,7 +1734,7 @@ End Module
     IL_00a2:  ldloca.s   V_4
     IL_00a4:  call       "Sub System.Runtime.CompilerServices.AsyncVoidMethodBuilder.AwaitOnCompleted(Of System.Runtime.CompilerServices.INotifyCompletion, Program.VB$StateMachine_0_Test2)(ByRef System.Runtime.CompilerServices.INotifyCompletion, ByRef Program.VB$StateMachine_0_Test2)"
     IL_00a9:  nop
-    IL_00aa:  leave      IL_01e8
+    IL_00aa:  leave      IL_01e4
    >IL_00af:  ldarg.0
     IL_00b0:  ldc.i4.m1
     IL_00b1:  dup
@@ -1607,127 +1756,125 @@ End Module
     IL_00d5:  ldnull
     IL_00d6:  ldnull
     IL_00d7:  call       "Function Microsoft.VisualBasic.CompilerServices.NewLateBinding.LateGet(Object, System.Type, String, Object(), String(), System.Type(), Boolean()) As Object"
-    IL_00dc:  stloc.s    V_5
-    IL_00de:  ldnull
-    IL_00df:  stloc.1
-    IL_00e0:  ldloc.s    V_5
-    IL_00e2:  call       "Function System.Runtime.CompilerServices.RuntimeHelpers.GetObjectValue(Object) As Object"
-    IL_00e7:  stfld      "Program.VB$StateMachine_0_Test2.$VB$ResumableLocal_x$1 As Object"
-   -IL_00ec:  ldarg.0
-    IL_00ed:  ldfld      "Program.VB$StateMachine_0_Test2.$VB$ResumableLocal_o$0 As Object"
-    IL_00f2:  ldnull
-    IL_00f3:  ldstr      "GetAwaiter"
-    IL_00f8:  ldc.i4.0
-    IL_00f9:  newarr     "Object"
-    IL_00fe:  ldnull
-    IL_00ff:  ldnull
-    IL_0100:  ldnull
-    IL_0101:  call       "Function Microsoft.VisualBasic.CompilerServices.NewLateBinding.LateGet(Object, System.Type, String, Object(), String(), System.Type(), Boolean()) As Object"
-    IL_0106:  stloc.s    V_6
-   ~IL_0108:  ldloc.s    V_6
-    IL_010a:  ldnull
-    IL_010b:  ldstr      "IsCompleted"
-    IL_0110:  ldc.i4.0
-    IL_0111:  newarr     "Object"
-    IL_0116:  ldnull
-    IL_0117:  ldnull
-    IL_0118:  ldnull
-    IL_0119:  call       "Function Microsoft.VisualBasic.CompilerServices.NewLateBinding.LateGet(Object, System.Type, String, Object(), String(), System.Type(), Boolean()) As Object"
-    IL_011e:  call       "Function Microsoft.VisualBasic.CompilerServices.Conversions.ToBoolean(Object) As Boolean"
-    IL_0123:  brfalse.s  IL_0127
-    IL_0125:  br.s       IL_0190
-    IL_0127:  ldarg.0
-    IL_0128:  ldc.i4.1
-    IL_0129:  dup
-    IL_012a:  stloc.0
-    IL_012b:  stfld      "Program.VB$StateMachine_0_Test2.$State As Integer"
-   <IL_0130:  ldarg.0
-    IL_0131:  ldloc.s    V_6
-    IL_0133:  stfld      "Program.VB$StateMachine_0_Test2.$A0 As Object"
-    IL_0138:  ldloc.s    V_6
-    IL_013a:  isinst     "System.Runtime.CompilerServices.ICriticalNotifyCompletion"
-    IL_013f:  stloc.s    V_7
-    IL_0141:  ldloc.s    V_7
-    IL_0143:  brfalse.s  IL_015a
-    IL_0145:  ldarg.0
-    IL_0146:  ldflda     "Program.VB$StateMachine_0_Test2.$Builder As System.Runtime.CompilerServices.AsyncVoidMethodBuilder"
-    IL_014b:  ldloca.s   V_7
-    IL_014d:  ldarg.0
-    IL_014e:  stloc.s    V_4
-    IL_0150:  ldloca.s   V_4
-    IL_0152:  call       "Sub System.Runtime.CompilerServices.AsyncVoidMethodBuilder.AwaitUnsafeOnCompleted(Of System.Runtime.CompilerServices.ICriticalNotifyCompletion, Program.VB$StateMachine_0_Test2)(ByRef System.Runtime.CompilerServices.ICriticalNotifyCompletion, ByRef Program.VB$StateMachine_0_Test2)"
-    IL_0157:  nop
-    IL_0158:  br.s       IL_0176
-    IL_015a:  ldloc.s    V_6
-    IL_015c:  castclass  "System.Runtime.CompilerServices.INotifyCompletion"
-    IL_0161:  stloc.s    V_8
-    IL_0163:  ldarg.0
-    IL_0164:  ldflda     "Program.VB$StateMachine_0_Test2.$Builder As System.Runtime.CompilerServices.AsyncVoidMethodBuilder"
-    IL_0169:  ldloca.s   V_8
-    IL_016b:  ldarg.0
-    IL_016c:  stloc.s    V_4
-    IL_016e:  ldloca.s   V_4
-    IL_0170:  call       "Sub System.Runtime.CompilerServices.AsyncVoidMethodBuilder.AwaitOnCompleted(Of System.Runtime.CompilerServices.INotifyCompletion, Program.VB$StateMachine_0_Test2)(ByRef System.Runtime.CompilerServices.INotifyCompletion, ByRef Program.VB$StateMachine_0_Test2)"
-    IL_0175:  nop
-    IL_0176:  leave.s    IL_01e8
-   >IL_0178:  ldarg.0
-    IL_0179:  ldc.i4.m1
-    IL_017a:  dup
-    IL_017b:  stloc.0
-    IL_017c:  stfld      "Program.VB$StateMachine_0_Test2.$State As Integer"
-    IL_0181:  ldarg.0
-    IL_0182:  ldfld      "Program.VB$StateMachine_0_Test2.$A0 As Object"
-    IL_0187:  stloc.s    V_6
-    IL_0189:  ldarg.0
-    IL_018a:  ldnull
-    IL_018b:  stfld      "Program.VB$StateMachine_0_Test2.$A0 As Object"
-    IL_0190:  ldloc.s    V_6
-    IL_0192:  ldnull
-    IL_0193:  ldstr      "GetResult"
-    IL_0198:  ldc.i4.0
-    IL_0199:  newarr     "Object"
-    IL_019e:  ldnull
-    IL_019f:  ldnull
-    IL_01a0:  ldnull
-    IL_01a1:  ldc.i4.1
-    IL_01a2:  call       "Function Microsoft.VisualBasic.CompilerServices.NewLateBinding.LateCall(Object, System.Type, String, Object(), String(), System.Type(), Boolean(), Boolean) As Object"
-    IL_01a7:  pop
-    IL_01a8:  ldnull
-    IL_01a9:  stloc.s    V_6
-   -IL_01ab:  leave.s    IL_01d2
+    IL_00dc:  ldnull
+    IL_00dd:  stloc.1
+    IL_00de:  call       "Function System.Runtime.CompilerServices.RuntimeHelpers.GetObjectValue(Object) As Object"
+    IL_00e3:  stfld      "Program.VB$StateMachine_0_Test2.$VB$ResumableLocal_x$1 As Object"
+   -IL_00e8:  ldarg.0
+    IL_00e9:  ldfld      "Program.VB$StateMachine_0_Test2.$VB$ResumableLocal_o$0 As Object"
+    IL_00ee:  ldnull
+    IL_00ef:  ldstr      "GetAwaiter"
+    IL_00f4:  ldc.i4.0
+    IL_00f5:  newarr     "Object"
+    IL_00fa:  ldnull
+    IL_00fb:  ldnull
+    IL_00fc:  ldnull
+    IL_00fd:  call       "Function Microsoft.VisualBasic.CompilerServices.NewLateBinding.LateGet(Object, System.Type, String, Object(), String(), System.Type(), Boolean()) As Object"
+    IL_0102:  stloc.s    V_5
+   ~IL_0104:  ldloc.s    V_5
+    IL_0106:  ldnull
+    IL_0107:  ldstr      "IsCompleted"
+    IL_010c:  ldc.i4.0
+    IL_010d:  newarr     "Object"
+    IL_0112:  ldnull
+    IL_0113:  ldnull
+    IL_0114:  ldnull
+    IL_0115:  call       "Function Microsoft.VisualBasic.CompilerServices.NewLateBinding.LateGet(Object, System.Type, String, Object(), String(), System.Type(), Boolean()) As Object"
+    IL_011a:  call       "Function Microsoft.VisualBasic.CompilerServices.Conversions.ToBoolean(Object) As Boolean"
+    IL_011f:  brfalse.s  IL_0123
+    IL_0121:  br.s       IL_018c
+    IL_0123:  ldarg.0
+    IL_0124:  ldc.i4.1
+    IL_0125:  dup
+    IL_0126:  stloc.0
+    IL_0127:  stfld      "Program.VB$StateMachine_0_Test2.$State As Integer"
+   <IL_012c:  ldarg.0
+    IL_012d:  ldloc.s    V_5
+    IL_012f:  stfld      "Program.VB$StateMachine_0_Test2.$A0 As Object"
+    IL_0134:  ldloc.s    V_5
+    IL_0136:  isinst     "System.Runtime.CompilerServices.ICriticalNotifyCompletion"
+    IL_013b:  stloc.s    V_6
+    IL_013d:  ldloc.s    V_6
+    IL_013f:  brfalse.s  IL_0156
+    IL_0141:  ldarg.0
+    IL_0142:  ldflda     "Program.VB$StateMachine_0_Test2.$Builder As System.Runtime.CompilerServices.AsyncVoidMethodBuilder"
+    IL_0147:  ldloca.s   V_6
+    IL_0149:  ldarg.0
+    IL_014a:  stloc.s    V_4
+    IL_014c:  ldloca.s   V_4
+    IL_014e:  call       "Sub System.Runtime.CompilerServices.AsyncVoidMethodBuilder.AwaitUnsafeOnCompleted(Of System.Runtime.CompilerServices.ICriticalNotifyCompletion, Program.VB$StateMachine_0_Test2)(ByRef System.Runtime.CompilerServices.ICriticalNotifyCompletion, ByRef Program.VB$StateMachine_0_Test2)"
+    IL_0153:  nop
+    IL_0154:  br.s       IL_0172
+    IL_0156:  ldloc.s    V_5
+    IL_0158:  castclass  "System.Runtime.CompilerServices.INotifyCompletion"
+    IL_015d:  stloc.s    V_7
+    IL_015f:  ldarg.0
+    IL_0160:  ldflda     "Program.VB$StateMachine_0_Test2.$Builder As System.Runtime.CompilerServices.AsyncVoidMethodBuilder"
+    IL_0165:  ldloca.s   V_7
+    IL_0167:  ldarg.0
+    IL_0168:  stloc.s    V_4
+    IL_016a:  ldloca.s   V_4
+    IL_016c:  call       "Sub System.Runtime.CompilerServices.AsyncVoidMethodBuilder.AwaitOnCompleted(Of System.Runtime.CompilerServices.INotifyCompletion, Program.VB$StateMachine_0_Test2)(ByRef System.Runtime.CompilerServices.INotifyCompletion, ByRef Program.VB$StateMachine_0_Test2)"
+    IL_0171:  nop
+    IL_0172:  leave.s    IL_01e4
+   >IL_0174:  ldarg.0
+    IL_0175:  ldc.i4.m1
+    IL_0176:  dup
+    IL_0177:  stloc.0
+    IL_0178:  stfld      "Program.VB$StateMachine_0_Test2.$State As Integer"
+    IL_017d:  ldarg.0
+    IL_017e:  ldfld      "Program.VB$StateMachine_0_Test2.$A0 As Object"
+    IL_0183:  stloc.s    V_5
+    IL_0185:  ldarg.0
+    IL_0186:  ldnull
+    IL_0187:  stfld      "Program.VB$StateMachine_0_Test2.$A0 As Object"
+    IL_018c:  ldloc.s    V_5
+    IL_018e:  ldnull
+    IL_018f:  ldstr      "GetResult"
+    IL_0194:  ldc.i4.0
+    IL_0195:  newarr     "Object"
+    IL_019a:  ldnull
+    IL_019b:  ldnull
+    IL_019c:  ldnull
+    IL_019d:  ldc.i4.1
+    IL_019e:  call       "Function Microsoft.VisualBasic.CompilerServices.NewLateBinding.LateCall(Object, System.Type, String, Object(), String(), System.Type(), Boolean(), Boolean) As Object"
+    IL_01a3:  pop
+    IL_01a4:  ldnull
+    IL_01a5:  stloc.s    V_5
+   -IL_01a7:  leave.s    IL_01ce
   }
   catch System.Exception
   {
-  ~$IL_01ad:  dup
-    IL_01ae:  call       "Sub Microsoft.VisualBasic.CompilerServices.ProjectData.SetProjectError(System.Exception)"
-    IL_01b3:  stloc.s    V_9
-   ~IL_01b5:  ldarg.0
-    IL_01b6:  ldc.i4.s   -2
-    IL_01b8:  stfld      "Program.VB$StateMachine_0_Test2.$State As Integer"
-    IL_01bd:  ldarg.0
-    IL_01be:  ldflda     "Program.VB$StateMachine_0_Test2.$Builder As System.Runtime.CompilerServices.AsyncVoidMethodBuilder"
-    IL_01c3:  ldloc.s    V_9
-    IL_01c5:  call       "Sub System.Runtime.CompilerServices.AsyncVoidMethodBuilder.SetException(System.Exception)"
-    IL_01ca:  nop
-    IL_01cb:  call       "Sub Microsoft.VisualBasic.CompilerServices.ProjectData.ClearProjectError()"
-    IL_01d0:  leave.s    IL_01e8
+  ~$IL_01a9:  dup
+    IL_01aa:  call       "Sub Microsoft.VisualBasic.CompilerServices.ProjectData.SetProjectError(System.Exception)"
+    IL_01af:  stloc.s    V_8
+   ~IL_01b1:  ldarg.0
+    IL_01b2:  ldc.i4.s   -2
+    IL_01b4:  stfld      "Program.VB$StateMachine_0_Test2.$State As Integer"
+    IL_01b9:  ldarg.0
+    IL_01ba:  ldflda     "Program.VB$StateMachine_0_Test2.$Builder As System.Runtime.CompilerServices.AsyncVoidMethodBuilder"
+    IL_01bf:  ldloc.s    V_8
+    IL_01c1:  call       "Sub System.Runtime.CompilerServices.AsyncVoidMethodBuilder.SetException(System.Exception)"
+    IL_01c6:  nop
+    IL_01c7:  call       "Sub Microsoft.VisualBasic.CompilerServices.ProjectData.ClearProjectError()"
+    IL_01cc:  leave.s    IL_01e4
   }
- -IL_01d2:  ldarg.0
-  IL_01d3:  ldc.i4.s   -2
-  IL_01d5:  dup
-  IL_01d6:  stloc.0
-  IL_01d7:  stfld      "Program.VB$StateMachine_0_Test2.$State As Integer"
- ~IL_01dc:  ldarg.0
-  IL_01dd:  ldflda     "Program.VB$StateMachine_0_Test2.$Builder As System.Runtime.CompilerServices.AsyncVoidMethodBuilder"
-  IL_01e2:  call       "Sub System.Runtime.CompilerServices.AsyncVoidMethodBuilder.SetResult()"
-  IL_01e7:  nop
-  IL_01e8:  ret
+ -IL_01ce:  ldarg.0
+  IL_01cf:  ldc.i4.s   -2
+  IL_01d1:  dup
+  IL_01d2:  stloc.0
+  IL_01d3:  stfld      "Program.VB$StateMachine_0_Test2.$State As Integer"
+ ~IL_01d8:  ldarg.0
+  IL_01d9:  ldflda     "Program.VB$StateMachine_0_Test2.$Builder As System.Runtime.CompilerServices.AsyncVoidMethodBuilder"
+  IL_01de:  call       "Sub System.Runtime.CompilerServices.AsyncVoidMethodBuilder.SetResult()"
+  IL_01e3:  nop
+  IL_01e4:  ret
 }
 ]]>,
             sequencePoints:="Program+VB$StateMachine_0_Test2.MoveNext")
         End Sub
 
-        <Fact, WorkItem(1002672)>
+        <Fact, WorkItem(1002672, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1002672")>
         Public Sub Simple_LateBinding_2()
             Dim c = CompileAndVerify(
 <compilation>
@@ -2134,7 +2281,7 @@ End Class
 ]]>)
         End Sub
 
-        <WorkItem(553894, "DevDiv")>
+        <WorkItem(553894, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/553894")>
         <Fact()>
         Public Sub Simple_TaskOfT_EmitMetadataOnly()
             Dim compilation = CompilationUtils.CreateCompilationWithReferences(
@@ -3534,7 +3681,9 @@ End Module
 </compilation>, useLatestFramework:=True, expectedOutput:="1")
         End Sub
 
-        <Fact(Skip:="785170"), WorkItem(785170, "DevDiv")>
+        <Fact,
+         WorkItem(94940, "https://devdiv.visualstudio.com/defaultcollection/DevDiv/_workitems#_a=edit&id=94940"),
+         WorkItem(785170, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/785170")>
         Public Sub Imported_AsyncWithEH()
             CompileAndVerify(
 <compilation>
@@ -7163,7 +7312,7 @@ End Module
 </compilation>, useLatestFramework:=True, expectedOutput:="1 3 5 7 9")
         End Sub
 
-        <Fact, WorkItem(1003196)>
+        <Fact, WorkItem(1003196, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1003196")>
         Public Sub AsyncAndPartialMethods()
             CompileAndVerify(
 <compilation>
@@ -8244,7 +8393,7 @@ End Class
                 symbolValidator:=moduleValidator)
         End Sub
 
-        <Fact, WorkItem(1002672)>
+        <Fact, WorkItem(1002672, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1002672")>
         Public Sub EmittedSymbolsCheck_Debug()
             EmittedSymbolsCheck(True)
         End Sub
@@ -8254,39 +8403,113 @@ End Class
             EmittedSymbolsCheck(False)
         End Sub
 
-        <WorkItem(840843, "DevDiv")>
+        <WorkItem(840843, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/840843")>
         <Fact>
-        Public Sub MissingAsyncMethodBuilder()
-            Dim source = <compilation name="Async">
-                             <file name="a.vb">
+        Public Sub MissingAsyncVoidMethodBuilder()
+            Dim source =
+<compilation name="AsyncVoid">
+    <file name="a.vb">
 Public Class TestCase
     Async Sub M()
     End Sub
 End Class
     </file>
-                         </compilation>
-
+</compilation>
             Dim comp = CreateCompilationWithReferences(source, {MscorlibRef}, TestOptions.ReleaseDll) ' NOTE: 4.0, Not 4.5, so it's missing the async helpers.
-
-            Using stream As New MemoryStream()
-                AssertTheseDiagnostics(comp.Emit(stream).Diagnostics, <errors><![CDATA[
-BC31091: Import of type 'AsyncVoidMethodBuilder' from assembly or module 'Async.dll' failed.
+            comp.AssertTheseEmitDiagnostics(
+ <errors>
+BC31091: Import of type 'AsyncVoidMethodBuilder' from assembly or module 'AsyncVoid.dll' failed.
     Async Sub M()
     ~~~~~~~~~~~~~~
-BC31091: Import of type 'AsyncVoidMethodBuilder' from assembly or module 'Async.dll' failed.
+BC31091: Import of type 'AsyncVoidMethodBuilder' from assembly or module 'AsyncVoid.dll' failed.
     Async Sub M()
     ~~~~~~~~~~~~~~
-BC31091: Import of type 'IAsyncStateMachine' from assembly or module 'Async.dll' failed.
+BC31091: Import of type 'IAsyncStateMachine' from assembly or module 'AsyncVoid.dll' failed.
     Async Sub M()
     ~~~~~~~~~~~~~~
 BC35000: Requested operation is not available because the runtime library function 'System.Runtime.CompilerServices.IAsyncStateMachine.MoveNext' is not defined.
     Async Sub M()
     ~~~~~~~~~~~~~~
+BC35000: Requested operation is not available because the runtime library function 'System.Runtime.CompilerServices.IAsyncStateMachine.SetStateMachine' is not defined.
+    Async Sub M()
+    ~~~~~~~~~~~~~~
 BC42356: This async method lacks 'Await' operators and so will run synchronously. Consider using the 'Await' operator to await non-blocking API calls, or 'Await Task.Run(...)' to do CPU-bound work on a background thread.
     Async Sub M()
               ~
-]]></errors>)
-            End Using
+</errors>)
+        End Sub
+
+        <Fact>
+        Public Sub MissingAsyncTaskMethodBuilder()
+            Dim source =
+<compilation name="AsyncTask">
+    <file name="a.vb">
+Imports System.Threading.Tasks
+Public Class TestCase
+    Async Function M() As Task
+    End Function
+End Class
+    </file>
+</compilation>
+            Dim comp = CreateCompilationWithReferences(source, {MscorlibRef}, TestOptions.ReleaseDll) ' NOTE: 4.0, Not 4.5, so it's missing the async helpers.
+            comp.AssertTheseEmitDiagnostics(
+ <errors>
+BC31091: Import of type 'AsyncTaskMethodBuilder' from assembly or module 'AsyncTask.dll' failed.
+    Async Function M() As Task
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+BC31091: Import of type 'AsyncTaskMethodBuilder' from assembly or module 'AsyncTask.dll' failed.
+    Async Function M() As Task
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+BC31091: Import of type 'IAsyncStateMachine' from assembly or module 'AsyncTask.dll' failed.
+    Async Function M() As Task
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+BC35000: Requested operation is not available because the runtime library function 'System.Runtime.CompilerServices.IAsyncStateMachine.MoveNext' is not defined.
+    Async Function M() As Task
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+BC35000: Requested operation is not available because the runtime library function 'System.Runtime.CompilerServices.IAsyncStateMachine.SetStateMachine' is not defined.
+    Async Function M() As Task
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+BC42356: This async method lacks 'Await' operators and so will run synchronously. Consider using the 'Await' operator to await non-blocking API calls, or 'Await Task.Run(...)' to do CPU-bound work on a background thread.
+    Async Function M() As Task
+                   ~
+</errors>)
+        End Sub
+
+        <Fact>
+        Public Sub MissingAsyncTaskMethodBuilder_T()
+            Dim source =
+<compilation name="AsyncTask_T">
+    <file name="a.vb">
+Imports System.Threading.Tasks
+Public Class TestCase
+    Async Function M() As Task(Of Integer)
+        Return 3
+    End Function
+End Class
+    </file>
+</compilation>
+            Dim comp = CreateCompilationWithReferences(source, {MscorlibRef}, TestOptions.ReleaseDll) ' NOTE: 4.0, Not 4.5, so it's missing the async helpers.
+            comp.AssertTheseEmitDiagnostics(
+ <errors>
+BC31091: Import of type 'AsyncTaskMethodBuilder(Of )' from assembly or module 'AsyncTask_T.dll' failed.
+    Async Function M() As Task(Of Integer)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+BC31091: Import of type 'AsyncTaskMethodBuilder(Of )' from assembly or module 'AsyncTask_T.dll' failed.
+    Async Function M() As Task(Of Integer)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+BC31091: Import of type 'IAsyncStateMachine' from assembly or module 'AsyncTask_T.dll' failed.
+    Async Function M() As Task(Of Integer)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+BC35000: Requested operation is not available because the runtime library function 'System.Runtime.CompilerServices.IAsyncStateMachine.MoveNext' is not defined.
+    Async Function M() As Task(Of Integer)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+BC35000: Requested operation is not available because the runtime library function 'System.Runtime.CompilerServices.IAsyncStateMachine.SetStateMachine' is not defined.
+    Async Function M() As Task(Of Integer)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+BC42356: This async method lacks 'Await' operators and so will run synchronously. Consider using the 'Await' operator to await non-blocking API calls, or 'Await Task.Run(...)' to do CPU-bound work on a background thread.
+    Async Function M() As Task(Of Integer)
+                   ~
+</errors>)
         End Sub
 
         <WorkItem(863, "https://github.com/dotnet/roslyn/issues/863")>
@@ -8409,6 +8632,322 @@ After 12]]>
 
             CompileAndVerify(compilation.WithOptions(TestOptions.ReleaseExe), expectedOutput:=expectedOutput)
         End Sub
+
+        <Fact, WorkItem(7669, "https://github.com/dotnet/roslyn/issues/7669")>
+        Public Sub HoistUsing001()
+            Dim source =
+<compilation name="Async">
+    <file name="a.vb">
+Imports System
+Imports System.Threading.Tasks
+
+Module Module1
+    Class D
+        Implements IDisposable
+
+        Public Sub Dispose() Implements IDisposable.Dispose
+            Console.WriteLine("disposed")
+        End Sub
+    End Class
+
+    Sub Main()
+        Console.WriteLine(Test.Result)
+    End Sub
+
+    Private Async Function Test() As Task(Of String)
+        Console.WriteLine("Pre")
+
+        Using window = New D
+            Console.WriteLine("show")
+
+            For index = 1 To 2
+                Await Task.Delay(100)
+            Next
+        End Using
+
+        Console.WriteLine("Post")
+        Return "result"
+    End Function
+End Module
+
+    </file>
+</compilation>
+
+            Dim expectedOutput = <![CDATA[Pre
+show
+disposed
+Post
+result]]>
+
+            Dim compilation = CompilationUtils.CreateCompilationWithReferences(source, references:=LatestVbReferences, options:=TestOptions.DebugExe)
+            CompileAndVerify(compilation, expectedOutput:=expectedOutput)
+            CompileAndVerify(compilation.WithOptions(TestOptions.ReleaseExe), expectedOutput:=expectedOutput)
+        End Sub
+
+        <Fact, WorkItem(7669, "https://github.com/dotnet/roslyn/issues/7669")>
+        Public Sub HoistUsing002()
+            Dim source =
+<compilation name="Async">
+    <file name="a.vb">
+Imports System
+Imports System.Threading.Tasks
+
+Module Module1
+    Class D
+        Implements IDisposable
+
+        Public Sub Dispose() Implements IDisposable.Dispose
+            Console.WriteLine("disposed")
+        End Sub
+    End Class
+
+    Sub Main()
+        Console.WriteLine(Test.Result)
+    End Sub
+
+    Private Async Function Test() As Task(Of String)
+        Console.WriteLine("Pre")
+
+        Dim window = New D
+        Try
+            Console.WriteLine("show")
+
+            For index = 1 To 2
+                Await Task.Delay(100)
+            Next
+        Finally
+            window.Dispose()
+        End Try
+
+        Console.WriteLine("Post")
+        Return "result"
+    End Function
+End Module
+
+    </file>
+</compilation>
+
+            Dim expectedOutput = <![CDATA[Pre
+show
+disposed
+Post
+result]]>
+
+            Dim compilation = CompilationUtils.CreateCompilationWithReferences(source, references:=LatestVbReferences, options:=TestOptions.DebugExe)
+            CompileAndVerify(compilation, expectedOutput:=expectedOutput)
+            CompileAndVerify(compilation.WithOptions(TestOptions.ReleaseExe), expectedOutput:=expectedOutput)
+        End Sub
+
+        <Fact, WorkItem(7669, "https://github.com/dotnet/roslyn/issues/7669")>
+        Public Sub HoistUsing003()
+            Dim source =
+<compilation name="Async">
+    <file name="a.vb">
+Imports System
+Imports System.Threading.Tasks
+
+Module Module1
+    Class D
+        Implements IDisposable
+
+        Public Sub Dispose() Implements IDisposable.Dispose
+            Console.WriteLine("disposed")
+        End Sub
+    End Class
+
+    Sub Main()
+        Console.WriteLine(Test.Result)
+    End Sub
+
+    Private Async Function Test() As Task(Of String)
+        Console.WriteLine("Pre")
+
+        Dim window as D
+        Try
+            window = New D
+
+            Console.WriteLine("show")
+
+            For index = 1 To 2
+                Await Task.Delay(100)
+            Next
+        Finally
+            window.Dispose()
+        End Try
+
+        Console.WriteLine("Post")
+        Return "result"
+    End Function
+End Module
+
+    </file>
+</compilation>
+
+            Dim expectedOutput = <![CDATA[Pre
+show
+disposed
+Post
+result]]>
+
+            Dim compilation = CompilationUtils.CreateCompilationWithReferences(source, references:=LatestVbReferences, options:=TestOptions.DebugExe)
+            CompileAndVerify(compilation, expectedOutput:=expectedOutput)
+            CompileAndVerify(compilation.WithOptions(TestOptions.ReleaseExe), expectedOutput:=expectedOutput)
+        End Sub
+
+        <Fact, WorkItem(7669, "https://github.com/dotnet/roslyn/issues/7669")>
+        Public Sub HoistUsing004()
+            Dim source =
+<compilation name="Async">
+    <file name="a.vb">
+Imports System
+Imports System.Threading.Tasks
+
+Module Module1
+    Class D
+        Implements IDisposable
+
+        Public Sub Dispose() Implements IDisposable.Dispose
+            Console.WriteLine("disposed")
+        End Sub
+    End Class
+
+    Sub Main()
+        Console.WriteLine(Test.Result)
+    End Sub
+
+    Private Async Function Test() As Task(Of String)
+        Console.WriteLine("Pre")
+
+        Using window1 = New D
+            Console.WriteLine("show")
+
+            Using window = New D
+                Console.WriteLine("show")
+
+                For index = 1 To 2
+                    Await Task.Delay(100)
+                Next
+            End Using
+        End Using
+
+        Console.WriteLine("Post")
+        Return "result"
+    End Function
+End Module
+
+    </file>
+</compilation>
+
+            Dim expectedOutput = <![CDATA[Pre
+show
+show
+disposed
+disposed
+Post
+result]]>
+
+            Dim compilation = CompilationUtils.CreateCompilationWithReferences(source, references:=LatestVbReferences, options:=TestOptions.DebugExe)
+            CompileAndVerify(compilation, expectedOutput:=expectedOutput)
+            CompileAndVerify(compilation.WithOptions(TestOptions.ReleaseExe), expectedOutput:=expectedOutput)
+        End Sub
+
+        <Fact, WorkItem(9463, "https://github.com/dotnet/roslyn/issues/9463")>
+        Public Sub AsyncIteratorReportsDiagnosticsWhenCoreTypesAreMissing()
+
+            Dim source = "
+Imports System.Threading.Tasks
+Namespace System
+    Public Class [Object]
+    End Class
+    Public Class [Int32]
+    End Class
+    Public Class [Boolean]
+    End Class
+    Public Class [String]
+    End Class
+    Public Class Exception
+    End Class
+    Public Class ValueType
+    End Class
+    Public Class [Enum]
+    End Class
+    Public Class Void
+    End Class
+End Namespace
+
+Namespace System.Threading.Tasks
+    Public Class Task
+        Public Function GetAwaiter() As TaskAwaiter
+            Return Nothing
+        End Function
+    End Class
+
+    Public Class TaskAwaiter
+        Implements System.Runtime.CompilerServices.INotifyCompletion
+
+        Public ReadOnly Property IsCompleted As Boolean
+            Get
+                Return True
+            End Get
+        End Property
+
+        Public Sub GetResult()
+        End Sub
+    End Class
+End Namespace
+
+Namespace System.Runtime.CompilerServices
+    Public Interface INotifyCompletion
+    End Interface
+
+    Public Interface ICriticalNotifyCompletion
+    End Interface
+
+    Public Interface IAsyncStateMachine
+        Sub MoveNext()
+        Sub SetStateMachine(stateMachine As IAsyncStateMachine)
+    End Interface
+
+    Public Class AsyncVoidMethodBuilder
+    End Class
+End Namespace
+
+Class C
+    Public Async Sub GetNumber(task As Task)
+        Await task
+    End Sub
+End Class
+"
+            Dim compilation = CreateCompilation({Parse(source)})
+
+            compilation.AssertTheseEmitDiagnostics(<expected>
+BC30456: 'Create' is not a member of 'AsyncVoidMethodBuilder'.
+    Public Async Sub GetNumber(task As Task)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+BC30456: 'SetException' is not a member of 'AsyncVoidMethodBuilder'.
+    Public Async Sub GetNumber(task As Task)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+BC30456: 'SetResult' is not a member of 'AsyncVoidMethodBuilder'.
+    Public Async Sub GetNumber(task As Task)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+BC30456: 'SetStateMachine' is not a member of 'AsyncVoidMethodBuilder'.
+    Public Async Sub GetNumber(task As Task)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+BC30456: 'Start' is not a member of 'AsyncVoidMethodBuilder'.
+    Public Async Sub GetNumber(task As Task)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+BC35000: Requested operation is not available because the runtime library function 'Microsoft.VisualBasic.CompilerServices.ProjectData.ClearProjectError' is not defined.
+    Public Async Sub GetNumber(task As Task)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+BC35000: Requested operation is not available because the runtime library function 'Microsoft.VisualBasic.CompilerServices.ProjectData.SetProjectError' is not defined.
+    Public Async Sub GetNumber(task As Task)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+BC30456: 'AwaitOnCompleted' is not a member of 'AsyncVoidMethodBuilder'.
+        Await task
+        ~~~~~~~~~~
+                </expected>)
+        End Sub
+
     End Class
 End Namespace
 

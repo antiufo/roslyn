@@ -1,5 +1,6 @@
 ' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
+Imports System.Threading.Tasks
 Imports Microsoft.VisualStudio.GraphModel
 Imports Microsoft.VisualStudio.LanguageServices.Implementation.Progression
 Imports Roslyn.Test.Utilities
@@ -7,8 +8,8 @@ Imports Roslyn.Test.Utilities
 Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Progression
     Public Class IsUsedByGraphQueryTests
         <Fact, Trait(Traits.Feature, Traits.Features.Progression)>
-        Public Sub IsUsedByTests()
-            Using testState = New ProgressionTestState(
+        Public Async Function IsUsedByTests() As Task
+            Using testState = Await ProgressionTestState.CreateAsync(
                     <Workspace>
                         <Project Language="C#" CommonReferences="true" FilePath="Z:\Project.csproj">
                             <Document FilePath="Z:\Project.cs">
@@ -24,8 +25,8 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Progression
                         </Project>
                     </Workspace>)
 
-                Dim inputGraph = testState.GetGraphWithMarkedSymbolNode()
-                Dim outputContext = testState.GetGraphContextAfterQuery(inputGraph, New IsUsedByGraphQuery(), GraphContextDirection.Target)
+                Dim inputGraph = Await testState.GetGraphWithMarkedSymbolNodeAsync()
+                Dim outputContext = Await testState.GetGraphContextAfterQuery(inputGraph, New IsUsedByGraphQuery(), GraphContextDirection.Target)
 
                 AssertSimplifiedGraphIs(
                     outputContext.Graph,
@@ -49,6 +50,6 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Progression
                         </IdentifierAliases>
                     </DirectedGraph>)
             End Using
-        End Sub
+        End Function
     End Class
 End Namespace

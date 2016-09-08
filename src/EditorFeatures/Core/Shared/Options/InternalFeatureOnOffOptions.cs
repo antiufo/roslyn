@@ -50,8 +50,12 @@ namespace Microsoft.CodeAnalysis.Editor.Shared.Options
         [ExportOption]
         public static readonly Option<bool> EventHookup = new Option<bool>(OptionName, "Event Hookup", defaultValue: true);
 
+        /// <remarks>
+        /// Due to https://github.com/dotnet/roslyn/issues/5393, the name "Snippets" is unusable.
+        /// (Summary: Some builds incorrectly set it without providing a way to clear it so it exists in many registries.)
+        /// </remarks>
         [ExportOption]
-        public static readonly Option<bool> Snippets = new Option<bool>(OptionName, "Snippets", defaultValue: true);
+        public static readonly Option<bool> Snippets = new Option<bool>(OptionName, "Snippets2", defaultValue: true);
 
         [ExportOption]
         public static readonly Option<bool> TodoComments = new Option<bool>(OptionName, "Todo Comments", defaultValue: true);
@@ -60,6 +64,9 @@ namespace Microsoft.CodeAnalysis.Editor.Shared.Options
         public static readonly Option<bool> DesignerAttributes = new Option<bool>(OptionName, "Designer Attribute", defaultValue: true);
 
         [ExportOption]
-        public static readonly Option<bool> EsentPerformanceMonitor = new Option<bool>(OptionName, "Esent PerfMon", defaultValue: false);
+        public static readonly Option<bool> FullSolutionAnalysisMemoryMonitor = new Option<bool>(OptionName, "Full Solution Analysis Memory Monitor", defaultValue: true);
+
+        [ExportOption]
+        public static readonly Option<bool> ProjectReferenceConversion = new Option<bool>(OptionName, "Project Reference Conversion", defaultValue: true);
     }
 }

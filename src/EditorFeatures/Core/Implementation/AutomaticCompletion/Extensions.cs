@@ -2,12 +2,10 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis.Editor.Shared.Extensions;
 using Microsoft.CodeAnalysis.Editor.Shared.Utilities;
 using Microsoft.CodeAnalysis.Formatting.Rules;
-using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.BraceCompletion;
@@ -48,7 +46,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.AutomaticCompletion
                 return default(SyntaxToken);
             }
 
-            var root = document.GetSyntaxRootAsync(cancellationToken).WaitAndGetResult(CancellationToken.None);
+            var root = document.GetSyntaxRootSynchronously(cancellationToken);
             return root.FindToken(position, findInsideTrivia: true);
         }
 

@@ -1,12 +1,11 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading;
-using Microsoft.CodeAnalysis.Shared.Extensions;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 
@@ -20,7 +19,6 @@ namespace Microsoft.CodeAnalysis
 
         // text buffer maps
         private readonly Dictionary<SourceTextContainer, DocumentId> _bufferToDocumentInCurrentContextMap = new Dictionary<SourceTextContainer, DocumentId>();
-        private readonly Dictionary<SourceTextContainer, ImmutableArray<DocumentId>> _bufferToDocumentIdMap = new Dictionary<SourceTextContainer, ImmutableArray<DocumentId>>();
         private readonly Dictionary<DocumentId, TextTracker> _textTrackers = new Dictionary<DocumentId, TextTracker>();
 
         /// <summary>
@@ -75,7 +73,9 @@ namespace Microsoft.CodeAnalysis
 
             if (openDocs != null)
             {
-                foreach (var docId in openDocs)
+                // ClearOpenDocument will remove the document from the original set.
+                var copyOfOpenDocs = openDocs.ToList();
+                foreach (var docId in copyOfOpenDocs)
                 {
                     this.ClearOpenDocument(docId);
                 }
@@ -120,7 +120,7 @@ namespace Microsoft.CodeAnalysis
                 tracker.Disconnect();
                 _textTrackers.Remove(documentId);
 
-                var currentContextDocumentId = RemoveTextToDocumentIdMapping_NoLock(tracker.TextContainer, documentId);
+                var currentContextDocumentId = UpdateCurrentContextMapping_NoLock(tracker.TextContainer, documentId);
                 if (currentContextDocumentId != null)
                 {
                     return currentContextDocumentId;
@@ -171,7 +171,7 @@ namespace Microsoft.CodeAnalysis
         {
             if (!this.CanOpenDocuments)
             {
-                throw new NotSupportedException(WorkspacesResources.OpenDocumentNotSupported);
+                throw new NotSupportedException(WorkspacesResources.This_workspace_does_not_support_opening_and_closing_documents);
             }
         }
 
@@ -179,7 +179,7 @@ namespace Microsoft.CodeAnalysis
         {
             if (ProjectHasOpenDocuments(projectId))
             {
-                throw new ArgumentException(string.Format(WorkspacesResources.ProjectContainsOpenDocuments, this.GetProjectName(projectId)));
+                throw new ArgumentException(string.Format(WorkspacesResources._0_still_contains_open_documents, this.GetProjectName(projectId)));
             }
         }
 
@@ -249,15 +249,14 @@ namespace Microsoft.CodeAnalysis
 
         private ImmutableArray<DocumentId> GetRelatedDocumentIds_NoLock(SourceTextContainer container)
         {
-            ImmutableArray<DocumentId> docIds;
-            if (_bufferToDocumentIdMap.TryGetValue(container, out docIds))
+            DocumentId documentId;
+            if (!_bufferToDocumentInCurrentContextMap.TryGetValue(container, out documentId))
             {
-                return docIds;
+                // it is not an opened file
+                return ImmutableArray<DocumentId>.Empty;
             }
-            else
-            {
-                return ImmutableArray.Create<DocumentId>();
-            }
+
+            return this.CurrentSolution.GetRelatedDocumentIds(documentId);
         }
 
         /// <summary>
@@ -292,12 +291,19 @@ namespace Microsoft.CodeAnalysis
                 throw new ArgumentNullException(nameof(documentId));
             }
 
-            SourceTextContainer container = null;
             using (_stateLock.DisposableWait())
             {
-                container = _bufferToDocumentIdMap.Where(kvp => kvp.Value.Contains(documentId)).Select(kvp => kvp.Key).FirstOrDefault();
+                var container = GetOpenDocumentSourceTextContainer_NoLock(documentId);
                 return container != null ? GetDocumentIdInCurrentContext_NoLock(container) : documentId;
             }
+        }
+
+        private SourceTextContainer GetOpenDocumentSourceTextContainer_NoLock(DocumentId documentId)
+        {
+            SourceTextContainer container;
+            var documentIds = this.CurrentSolution.GetRelatedDocumentIds(documentId);
+            container = _bufferToDocumentInCurrentContextMap.Where(kvp => documentIds.Contains(kvp.Value)).Select(kvp => kvp.Key).FirstOrDefault();
+            return container;
         }
 
         private DocumentId GetDocumentIdInCurrentContext_NoLock(SourceTextContainer container)
@@ -311,8 +317,6 @@ namespace Microsoft.CodeAnalysis
             }
             else
             {
-                Debug.Assert(!_bufferToDocumentIdMap.ContainsKey(container) ||
-                             !_bufferToDocumentIdMap[container].Any());
                 return null;
             }
         }
@@ -335,7 +339,7 @@ namespace Microsoft.CodeAnalysis
             SourceTextContainer container = null;
             using (_stateLock.DisposableWait())
             {
-                container = _bufferToDocumentIdMap.Where(kvp => kvp.Value.Contains(documentId)).Select(kvp => kvp.Key).FirstOrDefault();
+                container = GetOpenDocumentSourceTextContainer_NoLock(documentId);
             }
 
             if (container != null)
@@ -351,13 +355,16 @@ namespace Microsoft.CodeAnalysis
         {
             using (_serializationLock.DisposableWait())
             {
+                DocumentId oldActiveContextDocumentId;
+
                 using (_stateLock.DisposableWait())
                 {
+                    oldActiveContextDocumentId = _bufferToDocumentInCurrentContextMap[container];
                     _bufferToDocumentInCurrentContextMap[container] = documentId;
                 }
 
                 // fire and forget
-                this.RaiseDocumentActiveContextChangedEventAsync(this.CurrentSolution.GetDocument(documentId));
+                this.RaiseDocumentActiveContextChangedEventAsync(container, oldActiveContextDocumentId: oldActiveContextDocumentId, newActiveContextDocumentId: documentId);
             }
         }
 
@@ -366,7 +373,7 @@ namespace Microsoft.CodeAnalysis
             if (this.IsDocumentOpen(documentId))
             {
                 throw new ArgumentException(
-                    string.Format(WorkspacesResources.DocumentIsOpen,
+                    string.Format(WorkspacesResources._0_is_still_open,
                     this.GetDocumentName(documentId)));
             }
         }
@@ -376,7 +383,7 @@ namespace Microsoft.CodeAnalysis
             if (!this.IsDocumentOpen(documentId))
             {
                 throw new ArgumentException(string.Format(
-                    WorkspacesResources.DocumentIsNotOpen,
+                    WorkspacesResources._0_is_not_open,
                     this.GetDocumentName(documentId)));
             }
         }
@@ -391,7 +398,9 @@ namespace Microsoft.CodeAnalysis
             return openDocs;
         }
 
-        protected internal void OnDocumentOpened(DocumentId documentId, SourceTextContainer textContainer, bool isCurrentContext = true)
+        protected internal void OnDocumentOpened(
+            DocumentId documentId, SourceTextContainer textContainer,
+            bool isCurrentContext = true)
         {
             CheckDocumentIsInCurrentSolution(documentId);
             CheckDocumentIsClosed(documentId);
@@ -400,24 +409,36 @@ namespace Microsoft.CodeAnalysis
             {
                 var oldSolution = this.CurrentSolution;
                 var oldDocument = oldSolution.GetDocument(documentId);
-                var oldText = oldDocument.GetTextAsync(CancellationToken.None).WaitAndGetResult(CancellationToken.None);
+                var oldDocumentState = oldDocument.State;
 
                 AddToOpenDocumentMap(documentId);
 
-                // keep open document text alive by using PreserveIdentity
                 var newText = textContainer.CurrentText;
-                var currentSolution = oldSolution;
+                Solution currentSolution;
 
-                if (oldText == newText || oldText.ContentEquals(newText))
+                SourceText oldText;
+                VersionStamp version;
+                if (oldDocument.TryGetText(out oldText) &&
+                    oldDocument.TryGetTextVersion(out version))
                 {
-                    // if the supplied text is the same as the previous text, then also use same version
-                    var version = oldDocument.GetTextVersionAsync(CancellationToken.None).WaitAndGetResult(CancellationToken.None);
-                    var newTextAndVersion = TextAndVersion.Create(newText, version, oldDocument.FilePath);
+                    // Optimize the case where we've already got the previous text and version.
+                    var newTextAndVersion = GetProperTextAndVersion(oldText, newText, version, oldDocumentState.FilePath);
+
+                    // keep open document text alive by using PreserveIdentity
                     currentSolution = oldSolution.WithDocumentText(documentId, newTextAndVersion, PreservationMode.PreserveIdentity);
                 }
                 else
                 {
-                    currentSolution = oldSolution.WithDocumentText(documentId, newText, PreservationMode.PreserveIdentity);
+                    // We don't have the old text or version.  And we don't want to retrieve them
+                    // just yet (as that would cause blocking in this synchronous method).  So just
+                    // make a simple loader to do that for us later when requested.
+                    //
+                    // keep open document text alive by using PreserveIdentity
+                    //
+                    // Note: we pass along the newText here so that clients can easily get the text
+                    // of an opened document just by calling TryGetText without any blocking.
+                    currentSolution = oldSolution.WithDocumentTextLoader(documentId,
+                        new ReuseVersionLoader((DocumentState)oldDocument.State, newText), newText, PreservationMode.PreserveIdentity);
                 }
 
                 var newSolution = this.SetCurrentSolution(currentSolution);
@@ -426,19 +447,50 @@ namespace Microsoft.CodeAnalysis
                 var newDoc = newSolution.GetDocument(documentId);
                 this.OnDocumentTextChanged(newDoc);
 
-                this.RaiseWorkspaceChangedEventAsync(WorkspaceChangeKind.DocumentChanged, oldSolution, newSolution, documentId: documentId);
-                var tsk = this.RaiseDocumentOpenedEventAsync(newDoc); // don't await this
+                // Fire and forget that the workspace is changing.
+                RaiseWorkspaceChangedEventAsync(WorkspaceChangeKind.DocumentChanged, oldSolution, newSolution, documentId: documentId);
+                this.RaiseDocumentOpenedEventAsync(newDoc);
             }
 
-            // register outside of lock since it may call user code.
             this.RegisterText(textContainer);
+        }
+
+        private class ReuseVersionLoader : TextLoader
+        {
+            // Capture DocumentState instead of Document so that we don't hold onto the old solution.
+            private readonly DocumentState _oldDocumentState;
+            private readonly SourceText _newText;
+
+            public ReuseVersionLoader(DocumentState oldDocumentState, SourceText newText)
+            {
+                _oldDocumentState = oldDocumentState;
+                _newText = newText;
+            }
+
+            public override async Task<TextAndVersion> LoadTextAndVersionAsync(
+                Workspace workspace, DocumentId documentId, CancellationToken cancellationToken)
+            {
+                var oldText = await _oldDocumentState.GetTextAsync(cancellationToken).ConfigureAwait(false);
+                var version = await _oldDocumentState.GetTextVersionAsync(cancellationToken).ConfigureAwait(false);
+
+                return GetProperTextAndVersion(oldText, _newText, version, _oldDocumentState.FilePath);
+            }
+        }
+
+        private static TextAndVersion GetProperTextAndVersion(SourceText oldText, SourceText newText, VersionStamp version, string filePath)
+        {
+            // if the supplied text is the same as the previous text, then also use same version
+            // otherwise use new version
+            return oldText.ContentEquals(newText)
+                ? TextAndVersion.Create(newText, version, filePath)
+                : TextAndVersion.Create(newText, version.GetNewerVersion(), filePath);
         }
 
         private void SignupForTextChanges(DocumentId documentId, SourceTextContainer textContainer, bool isCurrentContext, Action<Workspace, DocumentId, SourceText, PreservationMode> onChangedHandler)
         {
             var tracker = new TextTracker(this, documentId, textContainer, onChangedHandler);
             _textTrackers.Add(documentId, tracker);
-            this.AddTextToDocumentIdMapping_NoLock(textContainer, documentId, isCurrentContext);
+            this.UpdateCurrentContextMapping_NoLock(textContainer, documentId, isCurrentContext);
             tracker.Connect();
         }
 
@@ -467,16 +519,16 @@ namespace Microsoft.CodeAnalysis
             {
                 var oldSolution = this.CurrentSolution;
                 var oldDocument = oldSolution.GetAdditionalDocument(documentId);
-                var oldText = oldDocument.GetTextAsync(CancellationToken.None).WaitAndGetResult(CancellationToken.None);
+                var oldText = oldDocument.GetTextAsync(CancellationToken.None).WaitAndGetResult_CanCallOnBackground(CancellationToken.None);
 
                 // keep open document text alive by using PreserveIdentity
                 var newText = textContainer.CurrentText;
-                var currentSolution = oldSolution;
+                Solution currentSolution;
 
                 if (oldText == newText || oldText.ContentEquals(newText))
                 {
                     // if the supplied text is the same as the previous text, then also use same version
-                    var version = oldDocument.GetTextVersionAsync(CancellationToken.None).WaitAndGetResult(CancellationToken.None);
+                    var version = oldDocument.GetTextVersionAsync(CancellationToken.None).WaitAndGetResult_CanCallOnBackground(CancellationToken.None);
                     var newTextAndVersion = TextAndVersion.Create(newText, version, oldDocument.FilePath);
                     currentSolution = oldSolution.WithAdditionalDocumentText(documentId, newTextAndVersion, PreservationMode.PreserveIdentity);
                 }
@@ -489,10 +541,10 @@ namespace Microsoft.CodeAnalysis
 
                 SignupForTextChanges(documentId, textContainer, isCurrentContext, (w, id, text, mode) => w.OnAdditionalDocumentTextChanged(id, text, mode));
 
+                // Fire and forget.
                 this.RaiseWorkspaceChangedEventAsync(WorkspaceChangeKind.AdditionalDocumentChanged, oldSolution, newSolution, documentId: documentId);
             }
 
-            // register outside of lock since it may call user code.
             this.RegisterText(textContainer);
         }
 
@@ -564,18 +616,8 @@ namespace Microsoft.CodeAnalysis
             }
         }
 
-        private void AddTextToDocumentIdMapping_NoLock(SourceTextContainer textContainer, DocumentId id, bool isCurrentContext)
+        private void UpdateCurrentContextMapping_NoLock(SourceTextContainer textContainer, DocumentId id, bool isCurrentContext)
         {
-            ImmutableArray<DocumentId> docIds;
-            if (_bufferToDocumentIdMap.TryGetValue(textContainer, out docIds))
-            {
-                _bufferToDocumentIdMap[textContainer] = docIds.Add(id);
-            }
-            else
-            {
-                _bufferToDocumentIdMap[textContainer] = ImmutableArray.Create(id);
-            }
-
             if (isCurrentContext || !_bufferToDocumentInCurrentContextMap.ContainsKey(textContainer))
             {
                 _bufferToDocumentInCurrentContextMap[textContainer] = id;
@@ -583,38 +625,33 @@ namespace Microsoft.CodeAnalysis
         }
 
         /// <returns>The DocumentId of the current context document attached to the textContainer, if any.</returns>
-        private DocumentId RemoveTextToDocumentIdMapping_NoLock(SourceTextContainer textContainer, DocumentId id)
+        private DocumentId UpdateCurrentContextMapping_NoLock(SourceTextContainer textContainer, DocumentId id)
         {
-            ImmutableArray<DocumentId> docIds;
-            if (_bufferToDocumentIdMap.TryGetValue(textContainer, out docIds))
+            var documentIds = this.CurrentSolution.GetRelatedDocumentIds(id);
+            if (documentIds.Length == 0)
             {
-                docIds = docIds.Remove(id);
-                if (docIds.Length > 0)
-                {
-                    _bufferToDocumentIdMap[textContainer] = docIds;
-
-                    if (_bufferToDocumentInCurrentContextMap[textContainer] == id)
-                    {
-                        // The current context document for this buffer has been removed, but there are
-                        // other documents associated with the buffer. Arbitrarily choose the first
-                        // remaining document as the new current context document.
-                        var newCurrentContextDocumentId = docIds.First();
-                        _bufferToDocumentInCurrentContextMap[textContainer] = newCurrentContextDocumentId;
-                        return newCurrentContextDocumentId;
-                    }
-                    else
-                    {
-                        return _bufferToDocumentInCurrentContextMap[textContainer];
-                    }
-                }
-                else
-                {
-                    _bufferToDocumentIdMap.Remove(textContainer);
-                    _bufferToDocumentInCurrentContextMap.Remove(textContainer);
-                }
+                // no related document. remove map and return no context
+                _bufferToDocumentInCurrentContextMap.Remove(textContainer);
+                return null;
             }
 
-            return null;
+            if (documentIds.Length == 1 && documentIds[0] == id)
+            {
+                // only related document is myself. remove map and return no context
+                _bufferToDocumentInCurrentContextMap.Remove(textContainer);
+                return null;
+            }
+
+            if (documentIds[0] != id)
+            {
+                // there are related documents, set first one as new context.
+                _bufferToDocumentInCurrentContextMap[textContainer] = documentIds[0];
+                return documentIds[0];
+            }
+
+            // there are multiple related documents, and first one is myself. return next one.
+            _bufferToDocumentInCurrentContextMap[textContainer] = documentIds[1];
+            return documentIds[1];
         }
 
         private SourceText GetOpenDocumentText(Solution solution, DocumentId documentId)

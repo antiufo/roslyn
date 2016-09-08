@@ -13,6 +13,7 @@ using Microsoft.CodeAnalysis.Emit;
 using Microsoft.CodeAnalysis.Test.Utilities;
 using Roslyn.Test.Utilities;
 using Xunit;
+using System.Globalization;
 
 namespace Microsoft.CodeAnalysis.CSharp.UnitTests.Emit
 {
@@ -225,7 +226,7 @@ class C
             );
         }
 
-        [WorkItem(543501, "DevDiv")]
+        [WorkItem(543501, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543501")]
         [Fact]
         public void CS1508_DuplicateMainfestResourceIdentifier()
         {
@@ -245,7 +246,7 @@ class C
             );
         }
 
-        [WorkItem(543501, "DevDiv")]
+        [WorkItem(543501, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543501")]
         [Fact]
         public void CS1508_DuplicateMainfestResourceIdentifier_EmbeddedResource()
         {
@@ -278,7 +279,7 @@ class C
             );
         }
 
-        [WorkItem(543501, "DevDiv")]
+        [WorkItem(543501, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543501")]
         [Fact]
         public void CS7041_DuplicateMainfestResourceFileName()
         {
@@ -298,7 +299,7 @@ class C
             );
         }
 
-        [WorkItem(543501, "DevDiv")]
+        [WorkItem(543501, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543501")]
         [Fact]
         public void NoDuplicateMainfestResourceFileNameDiagnosticForEmbeddedResources()
         {
@@ -325,7 +326,7 @@ class C
             result.Diagnostics.Verify();
         }
 
-        [WorkItem(543501, "DevDiv"), WorkItem(546297, "DevDiv")]
+        [WorkItem(543501, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543501"), WorkItem(546297, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546297")]
         [Fact]
         public void CS1508_CS7041_DuplicateMainfestResourceDiagnostics()
         {
@@ -433,7 +434,7 @@ class C
         }
         [Fact]
 
-        private void AddResourceToModule()
+        public void AddResourceToModule()
         {
             for (int metadataOnlyIfNonzero = 0; metadataOnlyIfNonzero < 2; metadataOnlyIfNonzero++)
             {
@@ -862,7 +863,7 @@ public class Maine
             string expected =
 @"<?xml version=""1.0"" encoding=""utf-16""?>
 <VersionResource Size=""964"">
-  <VS_FIXEDFILEINFO FileVersionMS=""00050006"" FileVersionLS=""00070008"" ProductVersionMS=""00000000"" ProductVersionLS=""00000000"" />
+  <VS_FIXEDFILEINFO FileVersionMS=""00050006"" FileVersionLS=""00070008"" ProductVersionMS=""00010002"" ProductVersionLS=""00030000"" />
   <KeyValuePair Key=""Comments"" Value=""A classic of magical realist literature"" />
   <KeyValuePair Key=""CompanyName"" Value=""MossBrain"" />
   <KeyValuePair Key=""FileDescription"" Value=""One Hundred Years of Solitude"" />
@@ -877,6 +878,33 @@ public class Maine
 </VersionResource>";
 
             Assert.Equal(expected, versionData);
+        }
+
+        [Fact]
+        public void ResourceProviderStreamGivesBadLength()
+        {
+            var backingStream = new MemoryStream(new byte[] { 1, 2, 3, 4 });
+            var stream = new TestStream(
+                canRead: true,
+                canSeek: true,
+                readFunc: backingStream.Read,
+                length: 6, // Lie about the length (> backingStream.Length)
+                getPosition: () => backingStream.Position);
+
+            var c1 = CreateCompilationWithMscorlib("");
+
+            using (new EnsureEnglishUICulture())
+            {
+                var result = c1.Emit(new MemoryStream(), manifestResources:
+                    new[]
+                    {
+                        new ResourceDescription("res", () => stream, false)
+                    });
+
+                result.Diagnostics.Verify(
+                    // error CS1566: Error reading resource 'res' -- 'Resource stream ended at 4 bytes, expected 6 bytes.'
+                    Diagnostic(ErrorCode.ERR_CantReadResource).WithArguments("res", "Resource stream ended at 4 bytes, expected 6 bytes.").WithLocation(1, 1));
+            }
         }
     }
 }

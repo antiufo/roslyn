@@ -11,8 +11,8 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.KeywordHighlightin
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestMultilineIf1()
-            Test(<Text><![CDATA[
+        Public Async Function TestMultilineIf1() As Task
+            Await TestAsync(<Text><![CDATA[
 Class C
 Sub M()
 {|Cursor:[|If|]|} a < b [|Then|]
@@ -24,11 +24,11 @@ Sub M()
 [|End If|]
 End Sub
 End Class]]></Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestMultilineIf2()
-            Test(<Text><![CDATA[
+        Public Async Function TestMultilineIf2() As Task
+            Await TestAsync(<Text><![CDATA[
 Class C
 Sub M()
 [|If|] a < b {|Cursor:[|Then|]|}
@@ -40,11 +40,11 @@ Sub M()
 [|End If|]
 End Sub
 End Class]]></Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestMultilineIf3()
-            Test(<Text><![CDATA[
+        Public Async Function TestMultilineIf3() As Task
+            Await TestAsync(<Text><![CDATA[
 Class C
 Sub M()
 [|If|] a < b [|Then|]
@@ -56,11 +56,11 @@ Sub M()
 [|End If|]
 End Sub
 End Class]]></Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestMultilineIf4()
-            Test(<Text><![CDATA[
+        Public Async Function TestMultilineIf4() As Task
+            Await TestAsync(<Text><![CDATA[
 Class C
 Sub M()
 [|If|] a < b [|Then|]
@@ -72,11 +72,11 @@ Sub M()
 [|End If|]
 End Sub
 End Class]]></Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestMultilineIf5()
-            Test(<Text><![CDATA[
+        Public Async Function TestMultilineIf5() As Task
+            Await TestAsync(<Text><![CDATA[
 Class C
 Sub M()
 [|If|] a < b [|Then|]
@@ -88,12 +88,12 @@ Sub M()
 {|Cursor:[|End If|]|}
 End Sub
 End Class]]></Text>)
-        End Sub
+        End Function
 
-        <WorkItem(542614)>
+        <WorkItem(542614, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542614")>
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestMultilineIf6()
-            Test(<Text><![CDATA[
+        Public Async Function TestMultilineIf6() As Task
+            Await TestAsync(<Text><![CDATA[
 Imports System
 Module M
     Sub C()
@@ -104,6 +104,6 @@ Module M
         [|End If|]
     End Sub
 End Module]]></Text>)
-        End Sub
+        End Function
     End Class
 End Namespace

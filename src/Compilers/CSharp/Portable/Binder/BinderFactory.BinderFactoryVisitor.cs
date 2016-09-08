@@ -16,6 +16,8 @@ namespace Microsoft.CodeAnalysis.CSharp
         private sealed class BinderFactoryVisitor : CSharpSyntaxVisitor<Binder>
         {
             private int _position;
+            private CSharpSyntaxNode _memberDeclarationOpt;
+            private Symbol _memberOpt;
             private readonly BinderFactory _factory;
 
             internal BinderFactoryVisitor(BinderFactory factory)
@@ -23,12 +25,13 @@ namespace Microsoft.CodeAnalysis.CSharp
                 _factory = factory;
             }
 
-            internal int Position
+            internal void Initialize(int position, CSharpSyntaxNode memberDeclarationOpt, Symbol memberOpt)
             {
-                set
-                {
-                    _position = value;
-                }
+                Debug.Assert((memberDeclarationOpt == null) == (memberOpt == null));
+
+                _position = position;
+                _memberDeclarationOpt = memberDeclarationOpt;
+                _memberOpt = memberOpt;
             }
 
             private CSharpCompilation compilation
@@ -449,6 +452,11 @@ namespace Microsoft.CodeAnalysis.CSharp
             // Get the correct methods symbol within container that corresponds to the given method syntax.
             private SourceMethodSymbol GetMethodSymbol(BaseMethodDeclarationSyntax baseMethodDeclarationSyntax, Binder outerBinder)
             {
+                if (baseMethodDeclarationSyntax == _memberDeclarationOpt)
+                {
+                    return (SourceMethodSymbol)_memberOpt;
+                }
+
                 NamedTypeSymbol container = GetContainerType(outerBinder, baseMethodDeclarationSyntax);
                 if ((object)container == null)
                 {
@@ -461,7 +469,17 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             private SourcePropertySymbol GetPropertySymbol(BasePropertyDeclarationSyntax basePropertyDeclarationSyntax, Binder outerBinder)
             {
+                if (basePropertyDeclarationSyntax == _memberDeclarationOpt)
+                {
+                    return (SourcePropertySymbol)_memberOpt;
+                }
+
                 Debug.Assert(basePropertyDeclarationSyntax.Kind() == SyntaxKind.PropertyDeclaration || basePropertyDeclarationSyntax.Kind() == SyntaxKind.IndexerDeclaration);
+
+                if (basePropertyDeclarationSyntax == _memberDeclarationOpt)
+                {
+                    return (SourcePropertySymbol)_memberOpt;
+                }
 
                 NamedTypeSymbol container = GetContainerType(outerBinder, basePropertyDeclarationSyntax);
                 if ((object)container == null)
@@ -475,6 +493,11 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             private SourceEventSymbol GetEventSymbol(EventDeclarationSyntax eventDeclarationSyntax, Binder outerBinder)
             {
+                if (eventDeclarationSyntax == _memberDeclarationOpt)
+                {
+                    return (SourceEventSymbol)_memberOpt;
+                }
+
                 NamedTypeSymbol container = GetContainerType(outerBinder, eventDeclarationSyntax);
                 if ((object)container == null)
                 {
@@ -514,15 +537,9 @@ namespace Microsoft.CodeAnalysis.CSharp
                             }
                         }
                     }
-                    else
+                    else if (InSpan(sym.Locations, this.syntaxTree, memberSpan))
                     {
-                        foreach (Location loc in sym.Locations)
-                        {
-                            if (InSpan(loc, this.syntaxTree, memberSpan))
-                            {
-                                return sym;
-                            }
-                        }
+                        return sym;
                     }
                 }
 
@@ -536,6 +553,22 @@ namespace Microsoft.CodeAnalysis.CSharp
             {
                 Debug.Assert(syntaxTree != null);
                 return (location.SourceTree == syntaxTree) && span.Contains(location.SourceSpan);
+            }
+
+            /// <summary>
+            /// Returns true if one of the locations is within the syntax tree and span.
+            /// </summary>
+            private static bool InSpan(ImmutableArray<Location> locations, SyntaxTree syntaxTree, TextSpan span)
+            {
+                Debug.Assert(syntaxTree != null);
+                foreach (var loc in locations)
+                {
+                    if (InSpan(loc, syntaxTree, span))
+                    {
+                        return true;
+                    }
+                }
+                return false;
             }
 
             public override Binder VisitDelegateDeclaration(DelegateDeclarationSyntax parent)
@@ -758,15 +791,15 @@ namespace Microsoft.CodeAnalysis.CSharp
                 NamespaceOrTypeSymbol container = outer.Container;
                 NamespaceSymbol ns = ((NamespaceSymbol)container).GetNestedNamespace(name);
                 if ((object)ns == null) return outer;
-                return new InContainerBinder(ns, outer, node, allowStaticClassUsings: ((CSharpParseOptions)syntaxTree.Options).LanguageVersion >= LanguageVersion.CSharp6, inUsing: inUsing);
+                return new InContainerBinder(ns, outer, node, inUsing: inUsing);
             }
 
             public override Binder VisitCompilationUnit(CompilationUnitSyntax parent)
             {
                 return VisitCompilationUnit(
-                parent,
-                inUsing: IsInUsing(parent),
-                inScript: InScript);
+                    parent,
+                    inUsing: IsInUsing(parent),
+                    inScript: InScript);
             }
 
             internal InContainerBinder VisitCompilationUnit(CompilationUnitSyntax compilationUnit, bool inUsing, bool inScript)
@@ -786,8 +819,6 @@ namespace Microsoft.CodeAnalysis.CSharp
                 {
                     result = this.buckStopsHereBinder;
 
-                    NamespaceOrTypeSymbol importsContainer;
-
                     if (inScript)
                     {
                         Debug.Assert((object)compilation.ScriptClass != null);
@@ -795,22 +826,38 @@ namespace Microsoft.CodeAnalysis.CSharp
                         //
                         // Binder chain in script/interactive code:
                         //
-                        // + global usings
-                        //   + interactive usings (in an interactive session)
+                        // + global imports
+                        //   + current and previous submission imports (except using aliases)
                         //     + global namespace
                         //       + host object members
-                        //         + previous submissions (in an interactive submission)
-                        //           + script class members & top-level using aliases
+                        //         + previous submissions and corresponding using aliases
+                        //           + script class members and using aliases
                         //
 
-                        if (compilation.GlobalImports.Usings.Length > 0)
+                        bool isSubmissionTree = compilation.IsSubmissionSyntaxTree(compilationUnit.SyntaxTree);
+                        if (!isSubmissionTree)
                         {
-                            result = new UsingsBinder(result, compilation.GlobalImports.Usings);
+                            result = result.WithAdditionalFlags(BinderFlags.InLoadedSyntaxTree);
                         }
 
-                        if (compilation.IsSubmission)
+                        // This is declared here so it can be captured.  It's initialized below.
+                        InContainerBinder scriptClassBinder = null;
+
+                        if (inUsing)
                         {
-                            result = new InteractiveUsingsBinder(result);
+                            result = result.WithAdditionalFlags(BinderFlags.InScriptUsing);
+                        }
+                        else
+                        {
+                            result = new InContainerBinder(container: null, next: result, imports: compilation.GlobalImports);
+
+                            // NB: This binder has a full Imports object, but only the non-alias imports are
+                            // ever consumed.  Aliases are actually checked in scriptClassBinder (below).
+                            // Note: #loaded trees don't consume previous submission imports.
+                            result = compilation.PreviousSubmission == null || !isSubmissionTree
+                                ? new InContainerBinder(result, basesBeingResolved => scriptClassBinder.GetImports(basesBeingResolved))
+                                : new InContainerBinder(result, basesBeingResolved =>
+                                    compilation.GetPreviousSubmissionImports().Concat(scriptClassBinder.GetImports(basesBeingResolved)));
                         }
 
                         result = new InContainerBinder(compilation.GlobalNamespace, result);
@@ -820,7 +867,8 @@ namespace Microsoft.CodeAnalysis.CSharp
                             result = new HostObjectModelBinder(result);
                         }
 
-                        importsContainer = compilation.ScriptClass;
+                        scriptClassBinder = new InContainerBinder(compilation.ScriptClass, result, compilationUnit, inUsing: inUsing);
+                        result = scriptClassBinder;
                     }
                     else
                     {
@@ -829,10 +877,9 @@ namespace Microsoft.CodeAnalysis.CSharp
                         //
                         // + global namespace with top-level imports
                         // 
-                        importsContainer = compilation.GlobalNamespace;
+                        result = new InContainerBinder(compilation.GlobalNamespace, result, compilationUnit, inUsing: inUsing);
                     }
 
-                    result = new InContainerBinder(importsContainer, result, compilationUnit, allowStaticClassUsings: ((CSharpParseOptions)syntaxTree.Options).LanguageVersion >= LanguageVersion.CSharp6, inUsing: inUsing);
                     binderCache.TryAdd(key, result);
                 }
 

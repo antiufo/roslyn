@@ -33,14 +33,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests.Editting
         Private Sub VerifySyntax(Of TSyntax As SyntaxNode)(type As SyntaxNode, expectedText As String)
             Assert.IsAssignableFrom(GetType(TSyntax), type)
             Dim normalized = type.NormalizeWhitespace().ToFullString()
-            Dim fixedExpectations = expectedText.Replace(vbLf, vbCrLf)
+            Dim fixedExpectations = expectedText.Replace(vbCrLf, vbLf).Replace(vbLf, vbCrLf)
             Assert.Equal(fixedExpectations, normalized)
         End Sub
 
         Private Sub VerifySyntaxRaw(Of TSyntax As SyntaxNode)(type As SyntaxNode, expectedText As String)
             Assert.IsAssignableFrom(GetType(TSyntax), type)
-            Dim normalized = type.ToFullString()
-            Assert.Equal(expectedText, normalized)
+            Dim text = type.ToFullString()
+            Assert.Equal(expectedText, text)
         End Sub
 
         Private Function ParseCompilationUnit(text As String) As CompilationUnitSyntax
@@ -328,6 +328,17 @@ End Class
         End Sub
 
         <Fact>
+        Public Sub TestArrayCreationExpressions()
+            VerifySyntax(Of ArrayCreationExpressionSyntax)(
+                _g.ArrayCreationExpression(_g.IdentifierName("x"), _g.LiteralExpression(10)),
+                "New x(10) {}")
+
+            VerifySyntax(Of ArrayCreationExpressionSyntax)(
+                _g.ArrayCreationExpression(_g.IdentifierName("x"), {_g.IdentifierName("y"), _g.IdentifierName("z")}),
+                "New x() {y, z}")
+        End Sub
+
+        <Fact>
         Public Sub TestObjectCreationExpressions()
             VerifySyntax(Of ObjectCreationExpressionSyntax)(
                 _g.ObjectCreationExpression(_g.IdentifierName("x")),
@@ -429,6 +440,11 @@ End Class
         <Fact>
         Public Sub TestAwaitExpressions()
             VerifySyntax(Of AwaitExpressionSyntax)(_g.AwaitExpression(_g.IdentifierName("x")), "Await x")
+        End Sub
+
+        <Fact>
+        Public Sub TestNameOfExpressions()
+            VerifySyntax(Of NameOfExpressionSyntax)(_g.NameOfExpression(_g.IdentifierName("x")), "NameOf(x)")
         End Sub
 
         <Fact>
@@ -793,12 +809,183 @@ End Function</x>.Value)
 
             VerifySyntax(Of MethodStatementSyntax)(
                 _g.MethodDeclaration("m", returnType:=_g.IdentifierName("x"), accessibility:=Accessibility.Public, modifiers:=DeclarationModifiers.Abstract),
-<x>Public MustInherit Function m() As x</x>.Value)
+<x>Public MustOverride Function m() As x</x>.Value)
 
             VerifySyntax(Of MethodBlockSyntax)(
                 _g.MethodDeclaration("m", accessibility:=Accessibility.Private, modifiers:=DeclarationModifiers.Partial),
 <x>Private Partial Sub m()
 End Sub</x>.Value)
+
+        End Sub
+
+        <Fact>
+        Public Sub TestSealedDeclarationModifier()
+            Dim md = _g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Sealed)
+            Assert.Equal(DeclarationModifiers.Sealed, _g.GetModifiers(md))
+            VerifySyntax(Of MethodBlockSyntax)(
+                md,
+<x>NotOverridable Sub m()
+End Sub</x>.Value)
+
+            Dim md2 = _g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Sealed + DeclarationModifiers.Override)
+            Assert.Equal(DeclarationModifiers.Sealed + DeclarationModifiers.Override, _g.GetModifiers(md2))
+            VerifySyntax(Of MethodBlockSyntax)(
+                md2,
+<x>NotOverridable Overrides Sub m()
+End Sub</x>.Value)
+
+            Dim cd = _g.ClassDeclaration("c", modifiers:=DeclarationModifiers.Sealed)
+            Assert.Equal(DeclarationModifiers.Sealed, _g.GetModifiers(cd))
+            VerifySyntax(Of ClassBlockSyntax)(
+                cd,
+<x>NotInheritable Class c
+End Class</x>.Value)
+
+        End Sub
+
+        <Fact>
+        Public Sub TestAbstractDeclarationModifier()
+            Dim md = _g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract)
+            Assert.Equal(DeclarationModifiers.Abstract, _g.GetModifiers(md))
+            VerifySyntax(Of MethodStatementSyntax)(
+                md,
+<x>MustOverride Sub m()</x>.Value)
+
+            Dim cd = _g.ClassDeclaration("c", modifiers:=DeclarationModifiers.Abstract)
+            Assert.Equal(DeclarationModifiers.Abstract, _g.GetModifiers(cd))
+            VerifySyntax(Of ClassBlockSyntax)(
+                cd,
+<x>MustInherit Class c
+End Class</x>.Value)
+
+        End Sub
+
+        <Fact>
+        Public Sub TestOperatorDeclaration()
+            Dim parameterTypes = {
+                _emptyCompilation.GetSpecialType(SpecialType.System_Int32),
+                _emptyCompilation.GetSpecialType(SpecialType.System_String)
+                }
+
+            Dim parameters = parameterTypes.Select(Function(t, i) _g.ParameterDeclaration("p" & i, _g.TypeExpression(t))).ToList()
+            Dim returnType = _g.TypeExpression(SpecialType.System_Boolean)
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                _g.OperatorDeclaration(OperatorKind.Addition, parameters, returnType),
+"Operator +(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                _g.OperatorDeclaration(OperatorKind.BitwiseAnd, parameters, returnType),
+"Operator And(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                _g.OperatorDeclaration(OperatorKind.BitwiseOr, parameters, returnType),
+"Operator Or(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                _g.OperatorDeclaration(OperatorKind.Division, parameters, returnType),
+"Operator /(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                _g.OperatorDeclaration(OperatorKind.Equality, parameters, returnType),
+"Operator =(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                _g.OperatorDeclaration(OperatorKind.ExclusiveOr, parameters, returnType),
+"Operator Xor(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                _g.OperatorDeclaration(OperatorKind.False, parameters, returnType),
+"Operator IsFalse(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                _g.OperatorDeclaration(OperatorKind.GreaterThan, parameters, returnType),
+"Operator>(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                _g.OperatorDeclaration(OperatorKind.GreaterThanOrEqual, parameters, returnType),
+"Operator >=(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                _g.OperatorDeclaration(OperatorKind.Inequality, parameters, returnType),
+"Operator <>(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                _g.OperatorDeclaration(OperatorKind.LeftShift, parameters, returnType),
+"Operator <<(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                _g.OperatorDeclaration(OperatorKind.LessThan, parameters, returnType),
+"Operator <(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                _g.OperatorDeclaration(OperatorKind.LessThanOrEqual, parameters, returnType),
+"Operator <=(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                _g.OperatorDeclaration(OperatorKind.LogicalNot, parameters, returnType),
+"Operator Not(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                _g.OperatorDeclaration(OperatorKind.Modulus, parameters, returnType),
+"Operator Mod(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                _g.OperatorDeclaration(OperatorKind.Multiply, parameters, returnType),
+"Operator *(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                _g.OperatorDeclaration(OperatorKind.RightShift, parameters, returnType),
+"Operator >>(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                _g.OperatorDeclaration(OperatorKind.Subtraction, parameters, returnType),
+"Operator -(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                _g.OperatorDeclaration(OperatorKind.True, parameters, returnType),
+"Operator IsTrue(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                _g.OperatorDeclaration(OperatorKind.UnaryNegation, parameters, returnType),
+"Operator -(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                _g.OperatorDeclaration(OperatorKind.UnaryPlus, parameters, returnType),
+"Operator +(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            ' Conversion operators
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                _g.OperatorDeclaration(OperatorKind.ImplicitConversion, parameters, returnType),
+"Widening Operator CType(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
+
+            VerifySyntax(Of OperatorBlockSyntax)(
+                _g.OperatorDeclaration(OperatorKind.ExplicitConversion, parameters, returnType),
+"Narrowing Operator CType(p0 As System.Int32, p1 As System.String) As Boolean
+End Operator")
         End Sub
 
         <Fact>
@@ -821,11 +1008,11 @@ End Sub</x>.Value)
         Public Sub TestPropertyDeclarations()
             VerifySyntax(Of PropertyStatementSyntax)(
                 _g.PropertyDeclaration("p", _g.IdentifierName("x"), modifiers:=DeclarationModifiers.Abstract + DeclarationModifiers.ReadOnly),
-<x>MustInherit ReadOnly Property p As x</x>.Value)
+<x>MustOverride ReadOnly Property p As x</x>.Value)
 
             VerifySyntax(Of PropertyStatementSyntax)(
                 _g.PropertyDeclaration("p", _g.IdentifierName("x"), modifiers:=DeclarationModifiers.Abstract + DeclarationModifiers.WriteOnly),
-<x>MustInherit WriteOnly Property p As x</x>.Value)
+<x>MustOverride WriteOnly Property p As x</x>.Value)
 
             VerifySyntax(Of PropertyBlockSyntax)(
                 _g.PropertyDeclaration("p", _g.IdentifierName("x"), modifiers:=DeclarationModifiers.ReadOnly),
@@ -843,7 +1030,7 @@ End Property</x>.Value)
 
             VerifySyntax(Of PropertyStatementSyntax)(
                 _g.PropertyDeclaration("p", _g.IdentifierName("x"), modifiers:=DeclarationModifiers.Abstract),
-<x>MustInherit Property p As x</x>.Value)
+<x>MustOverride Property p As x</x>.Value)
 
             VerifySyntax(Of PropertyBlockSyntax)(
                 _g.PropertyDeclaration("p", _g.IdentifierName("x"), modifiers:=DeclarationModifiers.ReadOnly, getAccessorStatements:={_g.IdentifierName("y")}),
@@ -877,15 +1064,15 @@ End Property</x>.Value)
         Public Sub TestIndexerDeclarations()
             VerifySyntax(Of PropertyStatementSyntax)(
                 _g.IndexerDeclaration({_g.ParameterDeclaration("z", _g.IdentifierName("y"))}, _g.IdentifierName("x"), modifiers:=DeclarationModifiers.Abstract + DeclarationModifiers.ReadOnly),
-<x>Default MustInherit ReadOnly Property Item(z As y) As x</x>.Value)
+<x>Default MustOverride ReadOnly Property Item(z As y) As x</x>.Value)
 
             VerifySyntax(Of PropertyStatementSyntax)(
                 _g.IndexerDeclaration({_g.ParameterDeclaration("z", _g.IdentifierName("y"))}, _g.IdentifierName("x"), modifiers:=DeclarationModifiers.Abstract + DeclarationModifiers.WriteOnly),
-<x>Default MustInherit WriteOnly Property Item(z As y) As x</x>.Value)
+<x>Default MustOverride WriteOnly Property Item(z As y) As x</x>.Value)
 
             VerifySyntax(Of PropertyStatementSyntax)(
                 _g.IndexerDeclaration({_g.ParameterDeclaration("z", _g.IdentifierName("y"))}, _g.IdentifierName("x"), modifiers:=DeclarationModifiers.Abstract),
-<x>Default MustInherit Property Item(z As y) As x</x>.Value)
+<x>Default MustOverride Property Item(z As y) As x</x>.Value)
 
             VerifySyntax(Of PropertyBlockSyntax)(
                 _g.IndexerDeclaration({_g.ParameterDeclaration("z", _g.IdentifierName("y"))}, _g.IdentifierName("x"), modifiers:=DeclarationModifiers.ReadOnly),
@@ -1493,7 +1680,7 @@ End Function</x>.Value)
                 _g.WithTypeParameters(
                     _g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract),
                     "a"),
-<x>MustInherit Sub m(Of a)()</x>.Value)
+<x>MustOverride Sub m(Of a)()</x>.Value)
 
             VerifySyntax(Of MethodBlockSyntax)(
                 _g.WithTypeParameters(
@@ -1506,7 +1693,7 @@ End Sub</x>.Value)
             VerifySyntax(Of MethodStatementSyntax)(
                 _g.WithTypeParameters(
                     _g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract)),
-<x>MustInherit Sub m()</x>.Value)
+<x>MustOverride Sub m()</x>.Value)
 
             VerifySyntax(Of MethodBlockSyntax)(
                 _g.WithTypeParameters(
@@ -1519,7 +1706,7 @@ End Sub</x>.Value)
                 _g.WithTypeParameters(_g.WithTypeParameters(
                     _g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract),
                     "a")),
-<x>MustInherit Sub m()</x>.Value)
+<x>MustOverride Sub m()</x>.Value)
 
             VerifySyntax(Of MethodBlockSyntax)(
                 _g.WithTypeParameters(_g.WithTypeParameters(
@@ -1533,7 +1720,7 @@ End Sub</x>.Value)
                 _g.WithTypeParameters(
                     _g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract),
                     "a", "b"),
-<x>MustInherit Sub m(Of a, b)()</x>.Value)
+<x>MustOverride Sub m(Of a, b)()</x>.Value)
 
             VerifySyntax(Of MethodBlockSyntax)(
                 _g.WithTypeParameters(
@@ -1572,7 +1759,7 @@ End Interface</x>.Value)
                 _g.WithTypeConstraint(
                     _g.WithTypeParameters(_g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a"),
                     "a", _g.IdentifierName("b")),
-<x>MustInherit Sub m(Of a As b)()</x>.Value)
+<x>MustOverride Sub m(Of a As b)()</x>.Value)
 
             VerifySyntax(Of MethodBlockSyntax)(
                 _g.WithTypeConstraint(
@@ -1586,7 +1773,7 @@ End Sub</x>.Value)
                 _g.WithTypeConstraint(
                     _g.WithTypeParameters(_g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a"),
                     "a", _g.IdentifierName("b"), _g.IdentifierName("c")),
-<x>MustInherit Sub m(Of a As {b, c})()</x>.Value)
+<x>MustOverride Sub m(Of a As {b, c})()</x>.Value)
 
             VerifySyntax(Of MethodBlockSyntax)(
                 _g.WithTypeConstraint(
@@ -1600,7 +1787,7 @@ End Sub</x>.Value)
                 _g.WithTypeConstraint(
                     _g.WithTypeParameters(_g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a"),
                     "a"),
-<x>MustInherit Sub m(Of a)()</x>.Value)
+<x>MustOverride Sub m(Of a)()</x>.Value)
 
             VerifySyntax(Of MethodBlockSyntax)(
                 _g.WithTypeConstraint(
@@ -1614,7 +1801,7 @@ End Sub</x>.Value)
                 _g.WithTypeConstraint(_g.WithTypeConstraint(
                     _g.WithTypeParameters(_g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a"),
                     "a", _g.IdentifierName("b"), _g.IdentifierName("c")), "a"),
-<x>MustInherit Sub m(Of a)()</x>.Value)
+<x>MustOverride Sub m(Of a)()</x>.Value)
 
             VerifySyntax(Of MethodBlockSyntax)(
                 _g.WithTypeConstraint(_g.WithTypeConstraint(
@@ -1630,49 +1817,49 @@ End Sub</x>.Value)
                         _g.WithTypeParameters(_g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a", "x"),
                         "a", _g.IdentifierName("b"), _g.IdentifierName("c")),
                     "x", _g.IdentifierName("y")),
-<x>MustInherit Sub m(Of a As {b, c}, x As y)()</x>.Value)
+<x>MustOverride Sub m(Of a As {b, c}, x As y)()</x>.Value)
 
             ' with constructor constraint
             VerifySyntax(Of MethodStatementSyntax)(
                 _g.WithTypeConstraint(
                     _g.WithTypeParameters(_g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a"),
                     "a", SpecialTypeConstraintKind.Constructor),
-<x>MustInherit Sub m(Of a As New)()</x>.Value)
+<x>MustOverride Sub m(Of a As New)()</x>.Value)
 
             ' with reference constraint
             VerifySyntax(Of MethodStatementSyntax)(
                 _g.WithTypeConstraint(
                     _g.WithTypeParameters(_g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a"),
                     "a", SpecialTypeConstraintKind.ReferenceType),
-<x>MustInherit Sub m(Of a As Class)()</x>.Value)
+<x>MustOverride Sub m(Of a As Class)()</x>.Value)
 
             ' with value type constraint
             VerifySyntax(Of MethodStatementSyntax)(
                 _g.WithTypeConstraint(
                     _g.WithTypeParameters(_g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a"),
                     "a", SpecialTypeConstraintKind.ValueType),
-<x>MustInherit Sub m(Of a As Structure)()</x>.Value)
+<x>MustOverride Sub m(Of a As Structure)()</x>.Value)
 
             ' with reference constraint and constructor constraint
             VerifySyntax(Of MethodStatementSyntax)(
                 _g.WithTypeConstraint(
                     _g.WithTypeParameters(_g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a"),
                     "a", SpecialTypeConstraintKind.ReferenceType Or SpecialTypeConstraintKind.Constructor),
-<x>MustInherit Sub m(Of a As {Class, New})()</x>.Value)
+<x>MustOverride Sub m(Of a As {Class, New})()</x>.Value)
 
             ' with value type constraint and constructor constraint
             VerifySyntax(Of MethodStatementSyntax)(
                 _g.WithTypeConstraint(
                     _g.WithTypeParameters(_g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a"),
                     "a", SpecialTypeConstraintKind.ValueType Or SpecialTypeConstraintKind.Constructor),
-<x>MustInherit Sub m(Of a As {Structure, New})()</x>.Value)
+<x>MustOverride Sub m(Of a As {Structure, New})()</x>.Value)
 
             ' with reference constraint and type constraints
             VerifySyntax(Of MethodStatementSyntax)(
                 _g.WithTypeConstraint(
                     _g.WithTypeParameters(_g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), "a"),
                     "a", SpecialTypeConstraintKind.ReferenceType, _g.IdentifierName("b"), _g.IdentifierName("c")),
-<x>MustInherit Sub m(Of a As {Class, b, c})()</x>.Value)
+<x>MustOverride Sub m(Of a As {Class, b, c})()</x>.Value)
 
             ' class declarations
             VerifySyntax(Of ClassBlockSyntax)(
@@ -1765,13 +1952,13 @@ Dim y As x</x>.Value)
                     _g.MethodDeclaration("m", returnType:=_g.IdentifierName("t"), modifiers:=DeclarationModifiers.Abstract),
                     _g.Attribute("a")),
 <x>&lt;a&gt;
-MustInherit Function m() As t</x>.Value)
+MustOverride Function m() As t</x>.Value)
 
             VerifySyntax(Of MethodStatementSyntax)(
                 _g.AddReturnAttributes(
                     _g.MethodDeclaration("m", returnType:=_g.IdentifierName("t"), modifiers:=DeclarationModifiers.Abstract),
                     _g.Attribute("a")),
-<x>MustInherit Function m() As &lt;a&gt; t</x>.Value)
+<x>MustOverride Function m() As &lt;a&gt; t</x>.Value)
 
             VerifySyntax(Of MethodBlockSyntax)(
                 _g.AddAttributes(
@@ -1793,7 +1980,7 @@ End Function</x>.Value)
                     _g.PropertyDeclaration("p", _g.IdentifierName("x"), modifiers:=DeclarationModifiers.Abstract),
                     _g.Attribute("a")),
 <x>&lt;a&gt;
-MustInherit Property p As x</x>.Value)
+MustOverride Property p As x</x>.Value)
 
             VerifySyntax(Of PropertyBlockSyntax)(
                 _g.AddAttributes(
@@ -1813,7 +2000,7 @@ End Property</x>.Value)
                     _g.IndexerDeclaration({_g.ParameterDeclaration("z", _g.IdentifierName("y"))}, _g.IdentifierName("x"), modifiers:=DeclarationModifiers.Abstract),
                     _g.Attribute("a")),
 <x>&lt;a&gt;
-Default MustInherit Property Item(z As y) As x</x>.Value)
+Default MustOverride Property Item(z As y) As x</x>.Value)
 
             VerifySyntax(Of PropertyBlockSyntax)(
                 _g.AddAttributes(
@@ -1858,6 +2045,46 @@ End Namespace
 <x>&lt;a&gt;
 Delegate Sub d()</x>.Value)
 
+        End Sub
+
+        <Fact>
+        <WorkItem(5066, "https://github.com/dotnet/roslyn/issues/5066")>
+        Public Sub TestAddAttributesOnAccessors()
+            Dim prop = _g.PropertyDeclaration("P", _g.IdentifierName("T"))
+
+            Dim evnt = DirectCast(SyntaxFactory.ParseCompilationUnit("
+Class C
+  Custom Event MyEvent As MyDelegate
+      AddHandler(ByVal value As MyDelegate)
+      End AddHandler
+ 
+      RemoveHandler(ByVal value As MyDelegate)
+      End RemoveHandler
+ 
+      RaiseEvent(ByVal message As String)
+      End RaiseEvent
+  End Event
+End Class
+").Members(0), ClassBlockSyntax).Members(0)
+
+            CheckAddRemoveAttribute(_g.GetAccessor(prop, DeclarationKind.GetAccessor))
+            CheckAddRemoveAttribute(_g.GetAccessor(prop, DeclarationKind.SetAccessor))
+            CheckAddRemoveAttribute(_g.GetAccessor(evnt, DeclarationKind.AddAccessor))
+            CheckAddRemoveAttribute(_g.GetAccessor(evnt, DeclarationKind.RemoveAccessor))
+            CheckAddRemoveAttribute(_g.GetAccessor(evnt, DeclarationKind.RaiseAccessor))
+        End Sub
+
+        Private Sub CheckAddRemoveAttribute(declaration As SyntaxNode)
+            Dim initialAttributes = _g.GetAttributes(declaration)
+            Assert.Equal(0, initialAttributes.Count)
+
+            Dim withAttribute = _g.AddAttributes(declaration, _g.Attribute("a"))
+            Dim attrsAdded = _g.GetAttributes(withAttribute)
+            Assert.Equal(1, attrsAdded.Count)
+
+            Dim withoutAttribute = _g.RemoveNode(withAttribute, attrsAdded(0))
+            Dim attrsRemoved = _g.GetAttributes(withoutAttribute)
+            Assert.Equal(0, attrsRemoved.Count)
         End Sub
 
         <Fact>
@@ -2207,11 +2434,11 @@ End Function</x>.Value)
 
             VerifySyntax(Of MethodStatementSyntax)(
                 _g.WithType(_g.MethodDeclaration("m", returnType:=_g.IdentifierName("x"), modifiers:=DeclarationModifiers.Abstract), Nothing),
-<x>MustInherit Sub m()</x>.Value)
+<x>MustOverride Sub m()</x>.Value)
 
             VerifySyntax(Of MethodStatementSyntax)(
                 _g.WithType(_g.MethodDeclaration("m", modifiers:=DeclarationModifiers.Abstract), _g.IdentifierName("x")),
-<x>MustInherit Function m() As x</x>.Value)
+<x>MustOverride Function m() As x</x>.Value)
 
             VerifySyntax(Of DelegateStatementSyntax)(
                 _g.WithType(_g.DelegateDeclaration("d", returnType:=_g.IdentifierName("x")), Nothing),
@@ -2782,6 +3009,77 @@ End Structure</x>.Value)
     Inherits T
 
 End Interface</x>.Value)
+
+        End Sub
+
+        <Fact>
+        <WorkItem(5097, "https://github.com/dotnet/roslyn/issues/5097")>
+        Public Sub TestAddInterfaceWithEOLs()
+            Dim classC = SyntaxFactory.ParseCompilationUnit("
+Public Class C
+End Class").Members(0)
+
+            VerifySyntaxRaw(Of ClassBlockSyntax)(
+                _g.AddInterfaceType(classC, _g.IdentifierName("X")), "
+Public Class C
+ImplementsXEnd Class")
+
+            Dim interfaceI = SyntaxFactory.ParseCompilationUnit("
+Public Interface I
+End Interface").Members(0)
+
+            VerifySyntaxRaw(Of InterfaceBlockSyntax)(
+                _g.AddInterfaceType(interfaceI, _g.IdentifierName("X")), "
+Public Interface I
+InheritsXEnd Interface")
+
+            Dim classCX = SyntaxFactory.ParseCompilationUnit("
+Public Class C
+    Implements X
+End Class").Members(0)
+
+            VerifySyntaxRaw(Of ClassBlockSyntax)(
+                _g.AddInterfaceType(classCX, _g.IdentifierName("Y")), "
+Public Class C
+    Implements X,Y
+End Class")
+
+            Dim interfaceIX = SyntaxFactory.ParseCompilationUnit("
+Public Interface I
+    Inherits X
+End Interface").Members(0)
+
+            VerifySyntaxRaw(Of InterfaceBlockSyntax)(
+                _g.AddInterfaceType(interfaceIX, _g.IdentifierName("Y")), "
+Public Interface I
+    Inherits X,Y
+End Interface")
+
+            Dim classCXY = SyntaxFactory.ParseCompilationUnit("
+Public Class C
+    Implements X
+    Implements Y
+End Class").Members(0)
+
+            VerifySyntaxRaw(Of ClassBlockSyntax)(
+                _g.AddInterfaceType(classCXY, _g.IdentifierName("Z")), "
+Public Class C
+    Implements X
+    Implements Y
+ImplementsZEnd Class")
+
+            Dim interfaceIXY = SyntaxFactory.ParseCompilationUnit("
+Public Interface I
+    Inherits X
+    Inherits Y
+End Interface").Members(0)
+
+            VerifySyntaxRaw(Of InterfaceBlockSyntax)(
+                _g.AddInterfaceType(interfaceIXY, _g.IdentifierName("Z")), "
+Public Interface I
+    Inherits X
+    Inherits Y
+InheritsZEnd Interface")
 
         End Sub
 

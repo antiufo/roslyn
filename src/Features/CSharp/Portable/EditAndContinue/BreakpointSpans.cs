@@ -437,18 +437,27 @@ namespace Microsoft.CodeAnalysis.CSharp.EditAndContinue
                     }
 
                 case SyntaxKind.ForEachStatement:
+                case SyntaxKind.ForEachComponentStatement:
                     // Note: if the user was in the body of the foreach, then we would have hit its
                     // nested statement on the way up.  If they were in the expression then we would
                     // have hit that on the way up as well. In "foreach(var f in expr)" we allow a
                     // bp on "foreach", "var f" and "in".
-                    var forEachStatement = (ForEachStatementSyntax)statement;
+                    var forEachStatement = (CommonForEachStatementSyntax)statement;
                     if (position < forEachStatement.OpenParenToken.Span.End || position > forEachStatement.CloseParenToken.SpanStart)
                     {
                         return CreateSpan(forEachStatement.ForEachKeyword);
                     }
                     else if (position < forEachStatement.InKeyword.FullSpan.Start)
                     {
-                        return CreateSpan(forEachStatement.Type, forEachStatement.Identifier);
+                        if (forEachStatement.Kind() == SyntaxKind.ForEachStatement)
+                        {
+                            var simpleForEachStatement = (ForEachStatementSyntax)statement;
+                            return CreateSpan(simpleForEachStatement.Type, simpleForEachStatement.Identifier);
+                        }
+                        else
+                        {
+                            return ((ForEachComponentStatementSyntax)statement).VariableComponent.Span;
+                        }
                     }
                     else if (position < forEachStatement.Expression.FullSpan.Start)
                     {
@@ -501,7 +510,7 @@ namespace Microsoft.CodeAnalysis.CSharp.EditAndContinue
                 case SyntaxKind.SwitchStatement:
                     // Note: Any nested statements in the switch will already have been hit on the
                     // way up.  Similarly, hitting a 'case' label will already have been taken care
-                    // of.  So i nthis case, we just set the bp on the "switch(expr)" itself.
+                    // of.  So in this case, we just set the bp on the "switch(expr)" itself.
                     var switchStatement = (SwitchStatementSyntax)statement;
                     return CreateSpan(switchStatement, switchStatement.CloseParenToken);
 
@@ -509,7 +518,7 @@ namespace Microsoft.CodeAnalysis.CSharp.EditAndContinue
                     // Note: if the user was in the body of the 'try', then we would have hit its nested
                     // statement on the way up.  This means we must be on the "try" part.  In this case,
                     // just set the BP on the start of the block.  Note: if they were in a catch or
-                    // finally section, then then that will already have been taken care of above.
+                    // finally section, then that will already have been taken care of above.
                     var tryStatement = (TryStatementSyntax)statement;
                     return TryCreateSpanForStatement(tryStatement.Block, position);
 
@@ -704,7 +713,8 @@ namespace Microsoft.CodeAnalysis.CSharp.EditAndContinue
                         forStatement.Incrementors.Contains(expression);
 
                 case SyntaxKind.ForEachStatement:
-                    var forEachStatement = (ForEachStatementSyntax)parent;
+                case SyntaxKind.ForEachComponentStatement:
+                    var forEachStatement = (CommonForEachStatementSyntax)parent;
                     return forEachStatement.Expression == expression;
 
                 default:

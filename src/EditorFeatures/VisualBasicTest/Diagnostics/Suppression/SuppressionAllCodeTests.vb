@@ -11,8 +11,8 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Diagnostics.Suppre
     Public Class VisualBasicSuppressionAllCodeTests
         Inherits AbstractSuppressionAllCodeTests
 
-        Protected Overrides Function CreateWorkspaceFromFile(definition As String, parseOptions As ParseOptions) As TestWorkspace
-            Return VisualBasicWorkspaceFactory.CreateWorkspaceFromFile(definition, DirectCast(parseOptions, VisualBasicParseOptions))
+        Protected Overrides Function CreateWorkspaceFromFileAsync(definition As String, parseOptions As ParseOptions) As Threading.Tasks.Task(Of TestWorkspace)
+            Return TestWorkspace.CreateVisualBasicAsync(definition, DirectCast(parseOptions, VisualBasicParseOptions))
         End Function
 
         Friend Overrides Function CreateDiagnosticProviderAndFixer(workspace As Workspace) As Tuple(Of Analyzer, ISuppressionFixProvider)
@@ -20,19 +20,17 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Diagnostics.Suppre
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)>
-        Public Sub TestPragmaWarningOnEveryNodes()
-            TestPragma(TestResource.AllInOneVisualBasicCode, VisualBasicParseOptions.Default, verifier:=Function(t) t.IndexOf("#Disable Warning", StringComparison.Ordinal) >= 0)
-        End Sub
+        Public Async Function TestPragmaWarningOnEveryNodes() As Threading.Tasks.Task
+            Await TestPragmaAsync(TestResource.AllInOneVisualBasicCode, VisualBasicParseOptions.Default, verifier:=Function(t) t.IndexOf("#Disable Warning", StringComparison.Ordinal) >= 0)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsSuppression)>
-        Public Sub TestLocalSuppressionOnEveryNodes()
-            Dim facts = New VisualBasicSyntaxFactsService()
-
-            TestLocalSuppression(
+        Public Async Function TestSuppressionWithAttributeOnEveryNodes() As Threading.Tasks.Task
+            Await TestSuppressionWithAttributeAsync(
                 TestResource.AllInOneVisualBasicCode,
                 VisualBasicParseOptions.Default,
                 digInto:=Function(n)
-                             Dim member = facts.GetContainingMemberDeclaration(n, n.Span.Start)
+                             Dim member = VisualBasicSyntaxFactsServiceFactory.Instance.GetContainingMemberDeclaration(n, n.Span.Start)
                              If member Is Nothing OrElse member Is n Then
                                  Return True
                              End If
@@ -40,6 +38,6 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Diagnostics.Suppre
                              Return Not TypeOf n Is StatementSyntax
                          End Function,
                 verifier:=Function(t) t.IndexOf("SuppressMessage", StringComparison.Ordinal) >= 0)
-        End Sub
+        End Function
     End Class
 End Namespace

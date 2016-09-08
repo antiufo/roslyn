@@ -15,7 +15,9 @@ using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Diagnostics
 {
-    [ExportIncrementalAnalyzerProvider(highPriorityForActiveFile: true, workspaceKinds: new string[] { WorkspaceKind.Host, WorkspaceKind.Interactive })]
+    [ExportIncrementalAnalyzerProvider(
+        highPriorityForActiveFile: true, name: WellKnownSolutionCrawlerAnalyzers.Diagnostic, 
+        workspaceKinds: new string[] { WorkspaceKind.Host, WorkspaceKind.Interactive, WorkspaceKind.AnyCodeRoslynWorkspace })]
     internal partial class DiagnosticAnalyzerService : IIncrementalAnalyzerProvider
     {
         private readonly ConditionalWeakTable<Workspace, BaseDiagnosticIncrementalAnalyzer> _map;
@@ -29,9 +31,7 @@ namespace Microsoft.CodeAnalysis.Diagnostics
 
         public IIncrementalAnalyzer CreateIncrementalAnalyzer(Workspace workspace)
         {
-            var optionService = workspace.Services.GetService<IOptionService>();
-
-            if (!optionService.GetOption(ServiceComponentOnOffOptions.DiagnosticProvider))
+            if (!workspace.Options.GetOption(ServiceComponentOnOffOptions.DiagnosticProvider))
             {
                 return null;
             }
@@ -44,6 +44,16 @@ namespace Microsoft.CodeAnalysis.Diagnostics
             return _map.GetValue(workspace, _createIncrementalAnalyzer);
         }
 
+        public void ShutdownAnalyzerFrom(Workspace workspace)
+        {
+            // this should be only called once analyzer associated with the workspace is done.
+            BaseDiagnosticIncrementalAnalyzer analyzer;
+            if (_map.TryGetValue(workspace, out analyzer))
+            {
+                analyzer.Shutdown();
+            }
+        }
+
         private BaseDiagnosticIncrementalAnalyzer CreateIncrementalAnalyzerCallback(Workspace workspace)
         {
             // subscribe to active context changed event for new workspace
@@ -51,44 +61,38 @@ namespace Microsoft.CodeAnalysis.Diagnostics
             return new IncrementalAnalyzerDelegatee(this, workspace, _hostAnalyzerManager, _hostDiagnosticUpdateSource);
         }
 
-        private void OnDocumentActiveContextChanged(object sender, DocumentEventArgs e)
+        private void OnDocumentActiveContextChanged(object sender, DocumentActiveContextChangedEventArgs e)
         {
-            Reanalyze(e.Document.Project.Solution.Workspace, documentIds: SpecializedCollections.SingletonEnumerable(e.Document.Id));
+            Reanalyze(e.Solution.Workspace, documentIds: SpecializedCollections.SingletonEnumerable(e.NewActiveContextDocumentId), highPriority: true);
         }
 
         // internal for testing
         internal class IncrementalAnalyzerDelegatee : BaseDiagnosticIncrementalAnalyzer
         {
-            // v1 diagnostic engine
-            private readonly EngineV1.DiagnosticIncrementalAnalyzer _engineV1;
-
             // v2 diagnostic engine - for now v1
             private readonly EngineV2.DiagnosticIncrementalAnalyzer _engineV2;
 
             public IncrementalAnalyzerDelegatee(DiagnosticAnalyzerService owner, Workspace workspace, HostAnalyzerManager hostAnalyzerManager, AbstractHostDiagnosticUpdateSource hostDiagnosticUpdateSource)
                 : base(owner, workspace, hostAnalyzerManager, hostDiagnosticUpdateSource)
             {
-                var v1CorrelationId = LogAggregator.GetNextId();
-                _engineV1 = new EngineV1.DiagnosticIncrementalAnalyzer(owner, v1CorrelationId, workspace, hostAnalyzerManager, hostDiagnosticUpdateSource);
-
                 var v2CorrelationId = LogAggregator.GetNextId();
                 _engineV2 = new EngineV2.DiagnosticIncrementalAnalyzer(owner, v2CorrelationId, workspace, hostAnalyzerManager, hostDiagnosticUpdateSource);
             }
 
             #region IIncrementalAnalyzer
-            public override Task AnalyzeSyntaxAsync(Document document, CancellationToken cancellationToken)
+            public override Task AnalyzeSyntaxAsync(Document document, InvocationReasons reasons, CancellationToken cancellationToken)
             {
-                return Analyzer.AnalyzeSyntaxAsync(document, cancellationToken);
+                return Analyzer.AnalyzeSyntaxAsync(document, reasons, cancellationToken);
             }
 
-            public override Task AnalyzeDocumentAsync(Document document, SyntaxNode bodyOpt, CancellationToken cancellationToken)
+            public override Task AnalyzeDocumentAsync(Document document, SyntaxNode bodyOpt, InvocationReasons reasons, CancellationToken cancellationToken)
             {
-                return Analyzer.AnalyzeDocumentAsync(document, bodyOpt, cancellationToken);
+                return Analyzer.AnalyzeDocumentAsync(document, bodyOpt, reasons, cancellationToken);
             }
 
-            public override Task AnalyzeProjectAsync(Project project, bool semanticsChanged, CancellationToken cancellationToken)
+            public override Task AnalyzeProjectAsync(Project project, bool semanticsChanged, InvocationReasons reasons, CancellationToken cancellationToken)
             {
-                return Analyzer.AnalyzeProjectAsync(project, semanticsChanged, cancellationToken);
+                return Analyzer.AnalyzeProjectAsync(project, semanticsChanged, reasons, cancellationToken);
             }
 
             public override Task DocumentOpenAsync(Document document, CancellationToken cancellationToken)
@@ -126,78 +130,91 @@ namespace Microsoft.CodeAnalysis.Diagnostics
                 return e.Option.Feature == SimplificationOptions.PerLanguageFeatureName ||
                        e.Option.Feature == SimplificationOptions.NonPerLanguageFeatureName ||
                        e.Option == ServiceFeatureOnOffOptions.ClosedFileDiagnostic ||
+                       e.Option == RuntimeOptions.FullSolutionAnalysis ||
                        e.Option == InternalDiagnosticsOptions.UseDiagnosticEngineV2 ||
                        Analyzer.NeedsReanalysisOnOptionChanged(sender, e);
             }
             #endregion
 
             #region delegating methods from diagnostic analyzer service to each implementation of the engine
-            public override Task<ImmutableArray<DiagnosticData>> GetCachedDiagnosticsAsync(Solution solution, ProjectId projectId = null, DocumentId documentId = null, CancellationToken cancellationToken = default(CancellationToken))
+            public override Task<ImmutableArray<DiagnosticData>> GetCachedDiagnosticsAsync(Solution solution, ProjectId projectId = null, DocumentId documentId = null, bool includeSuppressedDiagnostics = false, CancellationToken cancellationToken = default(CancellationToken))
             {
-                return Analyzer.GetCachedDiagnosticsAsync(solution, projectId, documentId, cancellationToken);
+                return Analyzer.GetCachedDiagnosticsAsync(solution, projectId, documentId, includeSuppressedDiagnostics, cancellationToken);
             }
 
-            public override Task<ImmutableArray<DiagnosticData>> GetSpecificCachedDiagnosticsAsync(Solution solution, object id, CancellationToken cancellationToken)
+            public override Task<ImmutableArray<DiagnosticData>> GetSpecificCachedDiagnosticsAsync(Solution solution, object id, bool includeSuppressedDiagnostics = false, CancellationToken cancellationToken = default(CancellationToken))
             {
-                return Analyzer.GetSpecificCachedDiagnosticsAsync(solution, id, cancellationToken);
+                return Analyzer.GetSpecificCachedDiagnosticsAsync(solution, id, includeSuppressedDiagnostics, cancellationToken);
             }
 
-            public override Task<ImmutableArray<DiagnosticData>> GetDiagnosticsAsync(Solution solution, ProjectId projectId = null, DocumentId documentId = null, CancellationToken cancellationToken = default(CancellationToken))
+            public override Task<ImmutableArray<DiagnosticData>> GetDiagnosticsAsync(Solution solution, ProjectId projectId = null, DocumentId documentId = null, bool includeSuppressedDiagnostics = false, CancellationToken cancellationToken = default(CancellationToken))
             {
-                return Analyzer.GetDiagnosticsAsync(solution, projectId, documentId, cancellationToken);
+                return Analyzer.GetDiagnosticsAsync(solution, projectId, documentId, includeSuppressedDiagnostics, cancellationToken);
             }
 
-            public override Task<ImmutableArray<DiagnosticData>> GetSpecificDiagnosticsAsync(Solution solution, object id, CancellationToken cancellationToken)
+            public override Task<ImmutableArray<DiagnosticData>> GetSpecificDiagnosticsAsync(Solution solution, object id, bool includeSuppressedDiagnostics = false, CancellationToken cancellationToken = default(CancellationToken))
             {
-                return Analyzer.GetSpecificDiagnosticsAsync(solution, id, cancellationToken);
+                return Analyzer.GetSpecificDiagnosticsAsync(solution, id, includeSuppressedDiagnostics, cancellationToken);
             }
 
-            public override Task<ImmutableArray<DiagnosticData>> GetDiagnosticsForIdsAsync(Solution solution, ProjectId projectId = null, DocumentId documentId = null, ImmutableHashSet<string> diagnosticIds = null, CancellationToken cancellationToken = default(CancellationToken))
+            public override Task<ImmutableArray<DiagnosticData>> GetDiagnosticsForIdsAsync(Solution solution, ProjectId projectId = null, DocumentId documentId = null, ImmutableHashSet<string> diagnosticIds = null, bool includeSuppressedDiagnostics = false, CancellationToken cancellationToken = default(CancellationToken))
             {
-                return Analyzer.GetDiagnosticsForIdsAsync(solution, projectId, documentId, diagnosticIds, cancellationToken);
+                return Analyzer.GetDiagnosticsForIdsAsync(solution, projectId, documentId, diagnosticIds, includeSuppressedDiagnostics, cancellationToken);
             }
 
-            public override Task<ImmutableArray<DiagnosticData>> GetProjectDiagnosticsForIdsAsync(Solution solution, ProjectId projectId = null, ImmutableHashSet<string> diagnosticIds = null, CancellationToken cancellationToken = default(CancellationToken))
+            public override Task<ImmutableArray<DiagnosticData>> GetProjectDiagnosticsForIdsAsync(Solution solution, ProjectId projectId = null, ImmutableHashSet<string> diagnosticIds = null, bool includeSuppressedDiagnostics = false, CancellationToken cancellationToken = default(CancellationToken))
             {
-                return Analyzer.GetProjectDiagnosticsForIdsAsync(solution, projectId, diagnosticIds, cancellationToken);
+                return Analyzer.GetProjectDiagnosticsForIdsAsync(solution, projectId, diagnosticIds, includeSuppressedDiagnostics, cancellationToken);
             }
 
-            public override Task<bool> TryAppendDiagnosticsForSpanAsync(Document document, TextSpan range, List<DiagnosticData> diagnostics, CancellationToken cancellationToken)
+            public override Task<bool> TryAppendDiagnosticsForSpanAsync(Document document, TextSpan range, List<DiagnosticData> diagnostics, bool includeSuppressedDiagnostics = false, CancellationToken cancellationToken = default(CancellationToken))
             {
-                return Analyzer.TryAppendDiagnosticsForSpanAsync(document, range, diagnostics, cancellationToken);
+                return Analyzer.TryAppendDiagnosticsForSpanAsync(document, range, diagnostics, includeSuppressedDiagnostics, cancellationToken);
             }
 
-            public override Task<IEnumerable<DiagnosticData>> GetDiagnosticsForSpanAsync(Document document, TextSpan range, CancellationToken cancellationToken)
+            public override Task<IEnumerable<DiagnosticData>> GetDiagnosticsForSpanAsync(Document document, TextSpan range, bool includeSuppressedDiagnostics = false, CancellationToken cancellationToken = default(CancellationToken))
             {
-                return Analyzer.GetDiagnosticsForSpanAsync(document, range, cancellationToken);
+                return Analyzer.GetDiagnosticsForSpanAsync(document, range, includeSuppressedDiagnostics, cancellationToken);
+            }
+
+            public override bool ContainsDiagnostics(Workspace workspace, ProjectId projectId)
+            {
+                return Analyzer.ContainsDiagnostics(workspace, projectId);
             }
             #endregion
 
             #region build synchronization
-            public override Task SynchronizeWithBuildAsync(Project project, ImmutableArray<DiagnosticData> diagnostics)
+            public override Task SynchronizeWithBuildAsync(Workspace workspace, ImmutableDictionary<ProjectId, ImmutableArray<DiagnosticData>> diagnostics)
             {
-                return Analyzer.SynchronizeWithBuildAsync(project, diagnostics);
-            }
-
-            public override Task SynchronizeWithBuildAsync(Document document, ImmutableArray<DiagnosticData> diagnostics)
-            {
-                return Analyzer.SynchronizeWithBuildAsync(document, diagnostics);
+                return Analyzer.SynchronizeWithBuildAsync(workspace, diagnostics);
             }
             #endregion
 
+            public override void Shutdown()
+            {
+                Analyzer.Shutdown();
+            }
+
+            public override void LogAnalyzerCountSummary()
+            {
+                Analyzer.LogAnalyzerCountSummary();
+            }
+
             public void TurnOff(bool useV2)
             {
-                var turnedOffAnalyzer = GetAnalyzer(!useV2);
+                // Uncomment the below when we add a v3 engine.
 
-                foreach (var project in Workspace.CurrentSolution.Projects)
-                {
-                    foreach (var document in project.Documents)
-                    {
-                        turnedOffAnalyzer.RemoveDocument(document.Id);
-                    }
+                //var turnedOffAnalyzer = GetAnalyzer(!useV2);
 
-                    turnedOffAnalyzer.RemoveProject(project.Id);
-                }
+                //foreach (var project in Workspace.CurrentSolution.Projects)
+                //{
+                //    foreach (var document in project.Documents)
+                //    {
+                //        turnedOffAnalyzer.RemoveDocument(document.Id);
+                //    }
+
+                //    turnedOffAnalyzer.RemoveProject(project.Id);
+                //}
             }
 
             // internal for testing
@@ -212,7 +229,10 @@ namespace Microsoft.CodeAnalysis.Diagnostics
 
             private BaseDiagnosticIncrementalAnalyzer GetAnalyzer(bool useV2)
             {
-                return useV2 ? (BaseDiagnosticIncrementalAnalyzer)_engineV2 : _engineV1;
+                // v1 engine has been removed, always use v2 engine (until v3 engine is added).
+                //return useV2 ? (BaseDiagnosticIncrementalAnalyzer)_engineV2 : _engineV1;
+
+                return (BaseDiagnosticIncrementalAnalyzer)_engineV2;
             }
         }
     }

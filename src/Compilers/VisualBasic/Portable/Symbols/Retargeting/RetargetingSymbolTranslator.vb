@@ -149,7 +149,17 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Retargeting
             Private Function RetargetNamedTypeDefinition(type As NamedTypeSymbol, options As RetargetOptions) As NamedTypeSymbol
                 Debug.Assert(type Is type.OriginalDefinition)
 
-                ' Before we do anything else, check if we need to do special retargeting
+                If type.IsTupleType Then
+                    Dim newUnderlyingType = Retarget(type.TupleUnderlyingType, options)
+
+                    If newUnderlyingType.IsTupleOrCompatibleWithTupleOfCardinality(type.TupleElementTypes.Length) Then
+                        Return DirectCast(type, TupleTypeSymbol).WithUnderlyingType(newUnderlyingType)
+                    Else
+                        Return newUnderlyingType
+                    End If
+                End If
+
+                ' Check if we need to do special retargeting
                 ' for primitive type references encoded with enum values in metadata signatures.
                 If (options = RetargetOptions.RetargetPrimitiveTypesByTypeCode) Then
                     Dim typeCode As PrimitiveTypeCode = type.PrimitiveTypeCode
@@ -579,7 +589,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Retargeting
                     Return type
                 End If
 
-                Return New ArrayTypeSymbol(newElement, newModifiers, type.Rank, RetargetingAssembly)
+                If type.IsSZArray Then
+                    Return ArrayTypeSymbol.CreateSZArray(newElement, newModifiers, RetargetingAssembly)
+                End If
+
+                Return ArrayTypeSymbol.CreateMDArray(newElement, newModifiers, type.Rank, type.Sizes, type.LowerBounds, RetargetingAssembly)
             End Function
 
             Friend Function RetargetModifiers(oldModifiers As ImmutableArray(Of CustomModifier), ByRef modifiersHaveChanged As Boolean) As ImmutableArray(Of CustomModifier)
@@ -929,6 +943,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Retargeting
                                                                      method.CallingConvention,
                                                                      IndexedTypeParameterSymbol.Take(method.Arity),
                                                                      targetParamsBuilder.ToImmutableAndFree(),
+                                                                     method.ReturnsByRef,
                                                                      translator.Retarget(method.ReturnType, RetargetOptions.RetargetPrimitiveTypesByTypeCode),
                                                                      translator.RetargetModifiers(method.ReturnTypeCustomModifiers, modifiersHaveChanged),
                                                                      ImmutableArray(Of MethodSymbol).Empty)
@@ -1033,6 +1048,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols.Retargeting
                                                                      [property].IsReadOnly,
                                                                      [property].IsWriteOnly,
                                                                      targetParamsBuilder.ToImmutableAndFree(),
+                                                                     [property].ReturnsByRef,
                                                                      Retarget([property].Type, RetargetOptions.RetargetPrimitiveTypesByTypeCode),
                                                                      RetargetModifiers([property].TypeCustomModifiers, modifiersHaveChanged))
 

@@ -6,11 +6,13 @@ Imports System.Collections.ObjectModel
 Imports System.Runtime.InteropServices
 Imports System.Threading
 Imports Microsoft.CodeAnalysis.Collections
+Imports Microsoft.CodeAnalysis.Debugging
 Imports Microsoft.CodeAnalysis.Emit
 Imports Microsoft.CodeAnalysis.ExpressionEvaluator
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
+Imports Microsoft.VisualStudio.Debugger.Clr
 Imports Microsoft.VisualStudio.Debugger.Evaluation.ClrCompilation
 Imports Roslyn.Utilities
 
@@ -28,7 +30,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         Friend ReadOnly Compilation As VisualBasicCompilation
         Friend ReadOnly NamespaceBinder As Binder ' Internal for test purposes.
 
-        Private ReadOnly _metadataDecoder As MetadataDecoder
         Private ReadOnly _currentFrame As MethodSymbol
         Private ReadOnly _locals As ImmutableArray(Of LocalSymbol)
         Private ReadOnly _displayClassVariables As ImmutableDictionary(Of String, DisplayClassVariable)
@@ -43,11 +44,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         ''' </summary>
         Friend Sub New(
             compilation As VisualBasicCompilation,
-            metadataDecoder As MetadataDecoder,
             currentFrame As MethodSymbol,
             locals As ImmutableArray(Of LocalSymbol),
             inScopeHoistedLocals As InScopeHoistedLocals,
-            methodDebugInfo As MethodDebugInfo,
+            methodDebugInfo As MethodDebugInfo(Of TypeSymbol, LocalSymbol),
             syntax As ExecutableStatementSyntax)
 
             _syntax = syntax
@@ -63,7 +63,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             End If
 
             Dim defaultNamespaceName As String = methodDebugInfo.DefaultNamespaceName
-            If defaultNamespaceName IsNot Nothing Then
+
+            ' Note We don't need to try to bind this string because this is analogous to passing
+            ' a command-line argument - as long as the syntax is valid, an appropriate symbol will
+            ' be created for us.
+            If defaultNamespaceName IsNot Nothing AndAlso TryParseDottedName(defaultNamespaceName, Nothing) Then
                 compilation = compilation.WithOptions(compilation.Options.WithRootNamespace(defaultNamespaceName))
             End If
 
@@ -78,11 +82,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             ' added (anonymous types, for instance).
             Debug.Assert(Me.Compilation IsNot originalCompilation)
 
-            _metadataDecoder = metadataDecoder
-
             NamespaceBinder = CreateBinderChain(
                 Me.Compilation,
-                metadataDecoder,
                 currentFrame.ContainingNamespace,
                 methodDebugInfo.ImportRecordGroups)
 
@@ -152,8 +153,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
 
             Me.Compilation.Compile(
                 moduleBuilder,
-                win32Resources:=Nothing,
-                xmlDocStream:=Nothing,
                 emittingPdb:=False,
                 diagnostics:=diagnostics,
                 filterOpt:=Nothing,
@@ -231,6 +230,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
                             ' Pseudo-variables: $exception, $ReturnValue, etc.
                             Dim typeNameDecoder = New EETypeNameDecoder(Me.Compilation, DirectCast(_currentFrame.ContainingModule, PEModuleSymbol))
                             For Each [alias] As [Alias] In aliases
+                                If [alias].IsReturnValueWithoutIndex() Then
+                                    Debug.Assert(aliases.Count(Function(a) a.Kind = DkmClrAliasKind.ReturnValue) > 1)
+                                    Continue For
+                                End If
+
                                 Dim methodName = GetNextMethodName(methodBuilder)
                                 Dim syntax = SyntaxFactory.IdentifierName(SyntaxFactory.MissingToken(SyntaxKind.IdentifierToken))
                                 Dim local = PlaceholderLocalSymbol.Create(typeNameDecoder, _currentFrame, [alias])
@@ -325,8 +329,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
 
             Me.Compilation.Compile(
                 moduleBuilder,
-                win32Resources:=Nothing,
-                xmlDocStream:=Nothing,
                 emittingPdb:=False,
                 diagnostics:=diagnostics,
                 filterOpt:=Nothing,
@@ -466,9 +468,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             If Not IsAssignableExpression(binder, expression) Then
                 flags = flags Or DkmClrCompilationResultFlags.ReadOnlyResult
             End If
-            If MayHaveSideEffectsVisitor.MayHaveSideEffects(expression) Then
-                flags = flags Or DkmClrCompilationResultFlags.PotentialSideEffect
-            End If
+
+            Try
+                If MayHaveSideEffectsVisitor.MayHaveSideEffects(expression) Then
+                    flags = flags Or DkmClrCompilationResultFlags.PotentialSideEffect
+                End If
+            Catch ex As BoundTreeVisitor.CancelledByStackGuardException
+                ex.AddAnError(diagnostics)
+            End Try
 
             If IsStatement(expression) Then
                 expression = binder.ReclassifyInvocationExpressionAsStatement(expression, diagnostics)
@@ -526,7 +533,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
 
         Private Shared Function CreateBinderChain(
             compilation As VisualBasicCompilation,
-            metadataDecoder As MetadataDecoder,
             [namespace] As NamespaceSymbol,
             importRecordGroups As ImmutableArray(Of ImmutableArray(Of ImportRecord))) As Binder
 
@@ -535,8 +541,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             binder = New IgnoreAccessibilityBinder(binder)
             binder = New SourceModuleBinder(binder, DirectCast(compilation.Assembly.Modules(0), SourceModuleSymbol))
 
-            If Not importRecordGroups.IsDefault Then
-                binder = BuildImportedSymbolsBinder(binder, New NamespaceBinder(binder, compilation.GlobalNamespace), metadataDecoder, importRecordGroups)
+            If Not importRecordGroups.IsEmpty Then
+                binder = BuildImportedSymbolsBinder(binder, New NamespaceBinder(binder, compilation.GlobalNamespace), importRecordGroups)
             End If
 
             Dim stack = ArrayBuilder(Of String).GetInstance()
@@ -618,7 +624,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         Private Shared Function BuildImportedSymbolsBinder(
             containingBinder As Binder,
             importBinder As Binder,
-            metadataDecoder As MetadataDecoder,
             importRecordGroups As ImmutableArray(Of ImmutableArray(Of ImportRecord))) As Binder
 
             Dim projectLevelImportsBuilder As ArrayBuilder(Of NamespaceOrTypeAndImportsClausePosition) = Nothing
@@ -630,9 +635,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             Dim projectLevelXmlImports As Dictionary(Of String, XmlNamespaceAndImportsClausePosition) = Nothing
             Dim fileLevelXmlImports As Dictionary(Of String, XmlNamespaceAndImportsClausePosition) = Nothing
 
-            Debug.Assert(importRecordGroups.Length = 2) ' First project-level, then file-level.
-            Dim projectLevelImportRecords = importRecordGroups(0)
-            Dim fileLevelImportRecords = importRecordGroups(1)
+            Debug.Assert(importRecordGroups.Length = 2) ' First file-level, then project-level.
+            Dim fileLevelImportRecords = importRecordGroups(0)
+            Dim projectLevelImportRecords = importRecordGroups(1)
 
             ' Use this to give the imports different positions
             Dim position = 0
@@ -641,7 +646,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
                 If AddImportForRecord(
                     importRecord,
                     importBinder,
-                    metadataDecoder,
                     position,
                     projectLevelImportsBuilder,
                     projectLevelAliases,
@@ -655,7 +659,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
                 If AddImportForRecord(
                     importRecord,
                     importBinder,
-                    metadataDecoder,
                     position,
                     fileLevelImportsBuilder,
                     fileLevelAliases,
@@ -704,7 +707,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         Private Shared Function AddImportForRecord(
             importRecord As ImportRecord,
             importBinder As Binder,
-            metadataDecoder As MetadataDecoder,
             position As Integer,
             ByRef importsBuilder As ArrayBuilder(Of NamespaceOrTypeAndImportsClausePosition),
             ByRef aliases As Dictionary(Of String, AliasAndImportsClausePosition),
@@ -736,10 +738,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             Select Case importRecord.TargetKind
                 Case ImportTargetKind.Type
                     Dim typeSymbol As TypeSymbol
-                    Dim portableImportRecord = TryCast(importRecord, PortableImportRecord)
-                    If portableImportRecord IsNot Nothing Then
-                        typeSymbol = portableImportRecord.GetTargetType(metadataDecoder)
-                        Debug.Assert(typeSymbol IsNot Nothing)
+                    If importRecord.TargetType IsNot Nothing Then
+                        typeSymbol = DirectCast(importRecord.TargetType, TypeSymbol)
                     Else
                         Debug.Assert(importRecord.Alias Is Nothing) ' Represented as ImportTargetKind.NamespaceOrType in old-format PDBs.
 
@@ -795,15 +795,27 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
                         Return False ' Don't add anything for this import.
                     End If
 
-                    If importsBuilder Is Nothing Then
-                        importsBuilder = ArrayBuilder(Of NamespaceOrTypeAndImportsClausePosition).GetInstance()
+                    ' Native PDBs: aliased namespace is stored as NamespaceOrType
+                    ' Portable PDBs: aliased namespace is stored as Namespace
+                    If [alias] Is Nothing Then
+                        If importsBuilder Is Nothing Then
+                            importsBuilder = ArrayBuilder(Of NamespaceOrTypeAndImportsClausePosition).GetInstance()
+                        End If
+
+                        ' There's no real syntax, so there's no real position.  We'll give them separate numbers though.
+                        importsBuilder.Add(New NamespaceOrTypeAndImportsClausePosition(namespaceOrTypeSymbol, position))
+                    Else
+                        Dim aliasSymbol As New AliasSymbol(importBinder.Compilation, importBinder.ContainingNamespaceOrType, [alias], namespaceOrTypeSymbol, NoLocation.Singleton)
+
+                        If aliases Is Nothing Then
+                            aliases = New Dictionary(Of String, AliasAndImportsClausePosition)()
+                        End If
+
+                        ' There's no real syntax, so there's no real position.  We'll give them separate numbers though.
+                        aliases([alias]) = New AliasAndImportsClausePosition(aliasSymbol, position)
                     End If
 
-                    ' There's no real syntax, so there's no real position.  We'll give them separate numbers though.
-                    importsBuilder.Add(New NamespaceOrTypeAndImportsClausePosition(namespaceOrTypeSymbol, position))
-                Case ImportTargetKind.NamespaceOrType ' Aliased namespace or type
-                    Debug.Assert(TypeOf importRecord Is NativeImportRecord) ' Only happens when reading old-format PDBs
-
+                Case ImportTargetKind.NamespaceOrType ' Aliased namespace or type (native PDB only)
                     Dim unusedDiagnostics = DiagnosticBag.GetInstance()
                     Dim namespaceOrTypeSymbol = importBinder.BindNamespaceOrTypeSyntax(targetSyntax, unusedDiagnostics)
                     unusedDiagnostics.Free()
@@ -826,6 +838,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
 
                     ' There's no real syntax, so there's no real position.  We'll give them separate numbers though.
                     aliases([alias]) = New AliasAndImportsClausePosition(aliasSymbol, position)
+
                 Case ImportTargetKind.XmlNamespace
                     If xmlImports Is Nothing Then
                         xmlImports = New Dictionary(Of String, XmlNamespaceAndImportsClausePosition)()
@@ -872,19 +885,19 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
         End Function
 
         Private Shared Function SelectAndInitializeCollection(Of T)(
-            scope As ImportScope,
+            scope As VBImportScopeKind,
             ByRef projectLevelCollection As T,
             ByRef fileLevelCollection As T,
             initializeCollection As Func(Of T)) As T
 
-            If scope = ImportScope.Project Then
+            If scope = VBImportScopeKind.Project Then
                 If projectLevelCollection Is Nothing Then
                     projectLevelCollection = initializeCollection()
                 End If
 
                 Return projectLevelCollection
             Else
-                Debug.Assert(scope = ImportScope.File OrElse scope = ImportScope.Unspecified)
+                Debug.Assert(scope = VBImportScopeKind.File OrElse scope = VBImportScopeKind.Unspecified)
 
                 If fileLevelCollection Is Nothing Then
                     fileLevelCollection = initializeCollection()
@@ -1271,6 +1284,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
                     ' locals above.  We assert that we are seeing the latter.
                     Debug.Assert((variableKind = DisplayClassVariableKind.Parameter) OrElse
                         (variableKind = DisplayClassVariableKind.Me))
+
+                    If variableKind = DisplayClassVariableKind.Parameter AndAlso GeneratedNames.GetKind(instance.Type.Name) = GeneratedNameKind.LambdaDisplayClass Then
+                        displayClassVariablesBuilder(variableName) = instance.ToVariable(variableName, variableKind, field)
+                    End If
+
                 Else
                     displayClassVariableNamesInOrder.Add(variableName)
                     displayClassVariablesBuilder.Add(variableName, instance.ToVariable(variableName, variableKind, field))

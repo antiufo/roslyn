@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System;
 using System.Collections.Generic;
@@ -9,6 +9,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.ErrorReporting;
 using Microsoft.CodeAnalysis.Internal.Log;
+using Microsoft.CodeAnalysis.Options;
+using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 
@@ -21,32 +23,15 @@ namespace Microsoft.CodeAnalysis
     [DebuggerDisplay("{GetDebuggerDisplay(),nq}")]
     public partial class Document : TextDocument
     {
-        private readonly DocumentState _state;
-
         private WeakReference<SemanticModel> _model;
         private Task<SyntaxTree> _syntaxTreeResultTask;
 
-        internal Document(Project project, DocumentState state)
+        internal Document(Project project, DocumentState state) :
+            base(project, state)
         {
-            Contract.ThrowIfNull(project);
-            Contract.ThrowIfNull(state);
-
-            this.Project = project;
-            _state = state;
         }
 
-        internal DocumentState State
-        {
-            get
-            {
-                return _state;
-            }
-        }
-
-        internal override TextDocumentState GetDocumentState()
-        {
-            return _state;
-        }
+        private DocumentState DocumentState => (DocumentState)State;
 
         /// <summary>
         /// The kind of source code this document contains.
@@ -55,13 +40,14 @@ namespace Microsoft.CodeAnalysis
         {
             get
             {
-                return _state.SourceCodeKind;
+                return DocumentState.SourceCodeKind;
             }
         }
 
         /// <summary>
         /// Get the current syntax tree for the document if the text is already loaded and the tree is already parsed.
-        /// Returns true if the syntax tree is already available, or false if getting the syntax tree would have incurred additional work.
+        /// In almost all cases, you should call <see cref="GetSyntaxTreeAsync"/> to fetch the tree, which will parse the tree
+        /// if it's not already parsed.
         /// </summary>
         public bool TryGetSyntaxTree(out SyntaxTree syntaxTree)
         {
@@ -71,7 +57,7 @@ namespace Microsoft.CodeAnalysis
                 syntaxTree = _syntaxTreeResultTask.Result;
             }
 
-            if (!_state.TryGetSyntaxTree(out syntaxTree))
+            if (!DocumentState.TryGetSyntaxTree(out syntaxTree))
             {
                 return false;
             }
@@ -88,7 +74,8 @@ namespace Microsoft.CodeAnalysis
 
         /// <summary>
         /// Get the current syntax tree version for the document if the text is already loaded and the tree is already parsed.
-        /// Returns true if the syntax tree is already available, or false if getting the syntax tree would have incurred additional work.
+        /// In almost all cases, you should call <see cref="GetSyntaxVersionAsync"/> to fetch the version, which will load the tree
+        /// if it's not already available.
         /// </summary>
         public bool TryGetSyntaxVersion(out VersionStamp version)
         {
@@ -110,7 +97,7 @@ namespace Microsoft.CodeAnalysis
         /// </summary>
         internal bool TryGetTopLevelChangeTextVersion(out VersionStamp version)
         {
-            return _state.TryGetTopLevelChangeTextVersion(out version);
+            return DocumentState.TryGetTopLevelChangeTextVersion(out version);
         }
 
         /// <summary>
@@ -134,7 +121,7 @@ namespace Microsoft.CodeAnalysis
         {
             get
             {
-                return this.State.SupportsSyntaxTree;
+                return DocumentState.SupportsSyntaxTree;
             }
         }
 
@@ -152,18 +139,8 @@ namespace Microsoft.CodeAnalysis
             }
         }
 
-        /// <summary>
-        /// Gets the <see cref="SyntaxTree" /> for this document asynchronously.
-        /// </summary>
-        public Task<SyntaxTree> GetSyntaxTreeAsync(CancellationToken cancellationToken = default(CancellationToken))
+        private Task<SyntaxTree> GetExistingSyntaxTreeTask()
         {
-            // If the language doesn't support getting syntax trees for a document, then bail out
-            // immediately.
-            if (!this.SupportsSyntaxTree)
-            {
-                return SpecializedTasks.Default<SyntaxTree>();
-            }
-
             if (_syntaxTreeResultTask != null)
             {
                 return _syntaxTreeResultTask;
@@ -193,13 +170,55 @@ namespace Microsoft.CodeAnalysis
                 return _syntaxTreeResultTask;
             }
 
-            // we can't cache this result, since internally it uses AsyncLazy which
-            // care about cancellation token
-            return _state.GetSyntaxTreeAsync(cancellationToken);
+            return null;
         }
 
         /// <summary>
-        /// Gets the root node of the current syntax tree if it is available.
+        /// Gets the <see cref="SyntaxTree" /> for this document asynchronously.
+        /// </summary>
+        public Task<SyntaxTree> GetSyntaxTreeAsync(CancellationToken cancellationToken = default(CancellationToken))
+        {
+            // If the language doesn't support getting syntax trees for a document, then bail out
+            // immediately.
+            if (!this.SupportsSyntaxTree)
+            {
+                return SpecializedTasks.Default<SyntaxTree>();
+            }
+
+            var syntaxTreeTask = GetExistingSyntaxTreeTask();
+            if (syntaxTreeTask != null)
+            {
+                return syntaxTreeTask;
+            }
+
+            // we can't cache this result, since internally it uses AsyncLazy which
+            // care about cancellation token
+            return DocumentState.GetSyntaxTreeAsync(cancellationToken);
+        }
+
+        internal SyntaxTree GetSyntaxTreeSynchronously(CancellationToken cancellationToken)
+        {
+            if (!this.SupportsSyntaxTree)
+            {
+                return null;
+            }
+
+            // if we already have a stask for getting this syntax tree, and the task
+            // has completed, then we can just return that value.
+            var syntaxTreeTask = GetExistingSyntaxTreeTask();
+            if (syntaxTreeTask?.Status == TaskStatus.RanToCompletion)
+            {
+                return syntaxTreeTask.Result;
+            }
+
+            // Otherwise defer to our state to get this value.
+            return DocumentState.GetSyntaxTree(cancellationToken);
+        }
+
+        /// <summary>
+        /// Gets the root node of the current syntax tree if the syntax tree has already been parsed and the tree is still cached.
+        /// In almost all cases, you should call <see cref="GetSyntaxRootAsync"/> to fetch the root node, which will parse
+        /// the document if necessary.
         /// </summary>
         public bool TryGetSyntaxRoot(out SyntaxNode root)
         {
@@ -223,7 +242,25 @@ namespace Microsoft.CodeAnalysis
         }
 
         /// <summary>
-        /// Gets the current semantic model for this document if the model is already computed.
+        /// Only for features that absolutely must run synchronously (probably because they're
+        /// on the UI thread).  Right now, the only feature this is for is Outlining as VS will
+        /// block on that feature from the UI thread when a document is opened.
+        /// </summary>
+        internal SyntaxNode GetSyntaxRootSynchronously(CancellationToken cancellationToken)
+        {
+            if (!this.SupportsSyntaxTree)
+            {
+                return null;
+            }
+
+            var tree = this.GetSyntaxTreeSynchronously(cancellationToken);
+            return tree.GetRoot(cancellationToken);
+        }
+
+        /// <summary>
+        /// Gets the current semantic model for this document if the model is already computed and still cached.
+        /// In almost all cases, you should call <see cref="GetSemanticModelAsync"/>, which will compute the semantic model
+        /// if necessary.
         /// </summary>
         public bool TryGetSemanticModel(out SemanticModel semanticModel)
         {
@@ -322,7 +359,7 @@ namespace Microsoft.CodeAnalysis
 
                     if (this.Id != oldDocument.Id)
                     {
-                        throw new ArgumentException(WorkspacesResources.DocumentVersionIsDifferent);
+                        throw new ArgumentException(WorkspacesResources.The_specified_document_is_not_a_version_of_this_document);
                     }
 
                     // first try to see if text already knows its changes
@@ -380,7 +417,8 @@ namespace Microsoft.CodeAnalysis
         public ImmutableArray<DocumentId> GetLinkedDocumentIds()
         {
             var documentIdsWithPath = this.Project.Solution.GetDocumentIdsWithFilePath(this.FilePath);
-            return documentIdsWithPath.Remove(this.Id);
+            var filteredDocumentIds = this.Project.Solution.FilterDocumentIdsByLanguage(documentIdsWithPath, this.Project.Language).ToImmutableArray();
+            return filteredDocumentIds.Remove(this.Id);
         }
 
         /// <summary>
@@ -416,6 +454,18 @@ namespace Microsoft.CodeAnalysis
         private string GetDebuggerDisplay()
         {
             return this.Name;
+        }
+
+        /// <summary>
+        /// Returns the options that should be applied to this document. This consists of global options from <see cref="Solution.Options"/>,
+        /// merged with any settings the user has specified at the solution, project, and document levels.
+        /// </summary>
+        /// <remarks>
+        /// This method is async because this may require reading other files. It is expected this is cheap and synchronous in most cases due to caching.</remarks>
+        public Task<DocumentOptionSet> GetOptionsAsync(CancellationToken cancellationToken = default(CancellationToken))
+        {
+            // TODO: merge with document-specific options
+            return Task.FromResult(new DocumentOptionSet(Project.Solution.Options, Project.Language));
         }
     }
 }

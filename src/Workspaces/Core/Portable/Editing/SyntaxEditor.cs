@@ -1,11 +1,8 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Editing
 {
@@ -85,8 +82,18 @@ namespace Microsoft.CodeAnalysis.Editing
         /// <param name="node">The node to remove that currently exists as part of the tree.</param>
         public void RemoveNode(SyntaxNode node)
         {
+            RemoveNode(node, SyntaxGenerator.DefaultRemoveOptions);
+        }
+
+        /// <summary>
+        /// Remove the node from the tree.
+        /// </summary>
+        /// <param name="node">The node to remove that currently exists as part of the tree.</param>
+        /// <param name="options">Options that affect how node removal works.</param>
+        public void RemoveNode(SyntaxNode node, SyntaxRemoveOptions options)
+        {
             CheckNodeInTree(node);
-            _changes.Add(new RemoveChange(node));
+            _changes.Add(new RemoveChange(node, options));
         }
 
         /// <summary>
@@ -101,6 +108,12 @@ namespace Microsoft.CodeAnalysis.Editing
             _changes.Add(new ReplaceChange(node, computeReplacement));
         }
 
+        internal void ReplaceNode<TArgument>(SyntaxNode node, Func<SyntaxNode, SyntaxGenerator, TArgument, SyntaxNode> computeReplacement, TArgument argument)
+        {
+            CheckNodeInTree(node);
+            _changes.Add(new ReplaceChange<TArgument>(node, computeReplacement, argument));
+        }
+
         /// <summary>
         /// Replace the specified node with a different node.
         /// </summary>
@@ -109,6 +122,11 @@ namespace Microsoft.CodeAnalysis.Editing
         public void ReplaceNode(SyntaxNode node, SyntaxNode newNode)
         {
             CheckNodeInTree(node);
+            if (node == newNode)
+            {
+                return;
+            }
+
             this.ReplaceNode(node, (n, g) => newNode);
         }
 
@@ -160,7 +178,7 @@ namespace Microsoft.CodeAnalysis.Editing
         {
             if (!_root.Contains(node))
             {
-                throw new ArgumentException(Microsoft.CodeAnalysis.WorkspacesResources.TheNodeIsNotPartOfTheTree, nameof(node));
+                throw new ArgumentException(Microsoft.CodeAnalysis.WorkspacesResources.The_node_is_not_part_of_the_tree, nameof(node));
             }
         }
 
@@ -191,14 +209,17 @@ namespace Microsoft.CodeAnalysis.Editing
 
         private class RemoveChange : Change
         {
-            public RemoveChange(SyntaxNode node)
+            private readonly SyntaxRemoveOptions _options;
+
+            public RemoveChange(SyntaxNode node, SyntaxRemoveOptions options)
                 : base(node)
             {
+                _options = options;
             }
 
             public override SyntaxNode Apply(SyntaxNode root, SyntaxGenerator generator)
             {
-                return generator.RemoveNode(root, root.GetCurrentNode(this.Node));
+                return generator.RemoveNode(root, root.GetCurrentNode(this.Node), _options);
             }
         }
 
@@ -216,6 +237,29 @@ namespace Microsoft.CodeAnalysis.Editing
             {
                 var current = root.GetCurrentNode(this.Node);
                 var newNode = _modifier(current, generator);
+                return generator.ReplaceNode(root, current, newNode);
+            }
+        }
+
+        private class ReplaceChange<TArgument> : Change
+        {
+            private readonly Func<SyntaxNode, SyntaxGenerator, TArgument, SyntaxNode> _modifier;
+            private readonly TArgument _argument;
+
+            public ReplaceChange(
+                SyntaxNode node,
+                Func<SyntaxNode, SyntaxGenerator, TArgument, SyntaxNode> modifier,
+                TArgument argument)
+                : base(node)
+            {
+                _modifier = modifier;
+                _argument = argument;
+            }
+
+            public override SyntaxNode Apply(SyntaxNode root, SyntaxGenerator generator)
+            {
+                var current = root.GetCurrentNode(this.Node);
+                var newNode = _modifier(current, generator, _argument);
                 return generator.ReplaceNode(root, current, newNode);
             }
         }

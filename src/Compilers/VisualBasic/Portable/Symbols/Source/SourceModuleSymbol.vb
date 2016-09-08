@@ -102,9 +102,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Get
                 Select Case DeclaringCompilation.Options.Platform
                     Case Platform.Arm
-                        Return System.Reflection.PortableExecutable.Machine.ARMThumb2
+                        Return System.Reflection.PortableExecutable.Machine.ArmThumb2
                     Case Platform.X64
-                        Return System.Reflection.PortableExecutable.Machine.AMD64
+                        Return System.Reflection.PortableExecutable.Machine.Amd64
                     Case Platform.Itanium
                         Return System.Reflection.PortableExecutable.Machine.IA64
                     Case Else
@@ -172,7 +172,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Public Overrides ReadOnly Property GlobalNamespace As NamespaceSymbol
             Get
                 If _lazyGlobalNamespace Is Nothing Then
-                    Dim globalNS = New SourceNamespaceSymbol(_declarationTable.MergedRoot, Nothing, Me)
+                    Dim globalNS = New SourceNamespaceSymbol(DeclaringCompilation.MergedRootDeclaration, Nothing, Me)
                     Interlocked.CompareExchange(_lazyGlobalNamespace, globalNS, Nothing)
                 End If
 
@@ -193,9 +193,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Public Overrides ReadOnly Property Locations As ImmutableArray(Of Location)
             Get
                 If _locations.IsDefault Then
-                    Dim locs = _declarationTable.AllRootNamespaces().SelectAsArray(Function(n) n.Location)
-
-                    ImmutableInterlocked.InterlockedCompareExchange(_locations, locs, Nothing)
+                    ImmutableInterlocked.InterlockedInitialize(
+                        _locations,
+                        DeclaringCompilation.MergedRootDeclaration.Declarations.SelectAsArray(Function(d) d.Location))
                 End If
 
                 Return _locations
@@ -369,6 +369,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                     binder.BindImportClause(globalImport.Clause, data, diagBagForThisImport)
 
                     ' Map diagnostics to new ones.
+                    ' Note, it is safe to resolve diagnostics here because we suppress obsolete diagnostics
+                    ' in ProjectImportsBinder.
                     For Each d As Diagnostic In diagBagForThisImport.AsEnumerable()
                         ' NOTE: Dev10 doesn't report 'ERR_DuplicateImport1' for project level imports. 
                         If d.Code <> ERRID.ERR_DuplicateImport1 Then
@@ -1161,5 +1163,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 End Select
             Next
         End Sub
+
+        Public Overrides Function GetMetadata() As ModuleMetadata
+            Return Nothing
+        End Function
     End Class
 End Namespace

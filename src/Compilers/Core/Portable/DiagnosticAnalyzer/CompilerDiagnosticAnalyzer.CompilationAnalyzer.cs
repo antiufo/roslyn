@@ -8,9 +8,9 @@ namespace Microsoft.CodeAnalysis.Diagnostics
 {
     internal abstract partial class CompilerDiagnosticAnalyzer : DiagnosticAnalyzer
     {
-        private const string Origin = "Origin";
-        private const string Syntactic = "Syntactic";
-        private const string Declaration = "Declaration";
+        private const string Origin = nameof(Origin);
+        private const string Syntactic = nameof(Syntactic);
+        private const string Declaration = nameof(Declaration);
 
         private static readonly ImmutableDictionary<string, string> s_syntactic = ImmutableDictionary<string, string>.Empty.Add(Origin, Syntactic);
         private static readonly ImmutableDictionary<string, string> s_declaration = ImmutableDictionary<string, string>.Empty.Add(Origin, Declaration);
@@ -91,6 +91,7 @@ namespace Microsoft.CodeAnalysis.Diagnostics
                 public override int WarningLevel => _original.WarningLevel;
                 public override Location Location => _original.Location;
                 public override IReadOnlyList<Location> AdditionalLocations => _original.AdditionalLocations;
+                public override bool IsSuppressed => _original.IsSuppressed;
                 public override ImmutableDictionary<string, string> Properties => _properties;
 
                 public override string GetMessage(IFormatProvider formatProvider = null)
@@ -121,6 +122,11 @@ namespace Microsoft.CodeAnalysis.Diagnostics
                 internal override Diagnostic WithSeverity(DiagnosticSeverity severity)
                 {
                     return new CompilerDiagnostic(_original.WithSeverity(severity), _properties);
+                }
+
+                internal override Diagnostic WithIsSuppressed(bool isSuppressed)
+                {
+                    return new CompilerDiagnostic(_original.WithIsSuppressed(isSuppressed), _properties);
                 }
             }
         }

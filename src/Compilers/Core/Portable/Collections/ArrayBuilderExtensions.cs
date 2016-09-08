@@ -2,8 +2,6 @@
 
 using System;
 using System.Collections.Immutable;
-using System.Runtime.CompilerServices;
-using Microsoft.CodeAnalysis.Text;
 
 namespace Microsoft.CodeAnalysis
 {
@@ -138,6 +136,11 @@ namespace Microsoft.CodeAnalysis
         public static T Peek<T>(this ArrayBuilder<T> builder)
         {
             return builder[builder.Count - 1];
+        }
+
+        public static ImmutableArray<T> ToImmutableOrEmptyAndFree<T>(this ArrayBuilder<T> builderOpt)
+        {
+            return builderOpt?.ToImmutableAndFree() ?? ImmutableArray<T>.Empty;
         }
     }
 }

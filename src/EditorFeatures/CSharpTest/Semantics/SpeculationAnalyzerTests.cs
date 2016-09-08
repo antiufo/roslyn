@@ -1,13 +1,9 @@
 // Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
@@ -36,7 +32,7 @@ class Program
 }           ", "Vain(string.Empty)", true);
         }
 
-        [Fact, WorkItem(672396)]
+        [Fact, WorkItem(672396, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/672396")]
         public void SpeculationAnalyzerExtensionMethodExplicitInvocation()
         {
             Test(@"
@@ -301,7 +297,7 @@ class Collection : IEnumerable
 }           ", "5", true);
         }
 
-        [Fact, WorkItem(1088815)]
+        [Fact, WorkItem(1088815, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1088815")]
         public void SpeculationAnalyzerBrokenCode()
         {
             Test(@"
@@ -314,6 +310,34 @@ public interface IRogueAction
         [|this.Name|] = name;
     }
 }           ", "Name", semanticChanges: false, isBrokenCode: true);
+        }
+
+        [Fact, WorkItem(8111, "https://github.com/dotnet/roslyn/issues/8111")]
+        public void SpeculationAnalyzerAnonymousObjectMemberDeclaredWithNeededCast()
+        {
+            Test(@"
+class Program
+{
+    static void Main(string[] args)
+    {
+        object thing = new { shouldBeAnInt = [|(int)Directions.South|] };
+    }
+    public enum Directions { North, East, South, West }
+}           ", "Directions.South", semanticChanges: true);
+        }
+
+        [Fact, WorkItem(8111, "https://github.com/dotnet/roslyn/issues/8111")]
+        public void SpeculationAnalyzerAnonymousObjectMemberDeclaredWithUnneededCast()
+        {
+            Test(@"
+class Program
+{
+    static void Main(string[] args)
+    {
+        object thing = new { shouldBeAnInt = [|(Directions)Directions.South|] };
+    }
+    public enum Directions { North, East, South, West }
+}           ", "Directions.South", semanticChanges: false);
         }
 
         protected override SyntaxTree Parse(string text)

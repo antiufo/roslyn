@@ -5,23 +5,11 @@ using Microsoft.CodeAnalysis.CodeActions;
 
 namespace Microsoft.CodeAnalysis.CodeFixes.Suppression
 {
-    internal sealed class SuppressionCodeAction : CodeAction
+    internal sealed class SuppressionCodeAction : CodeAction.SimpleCodeAction
     {
-        private readonly string _title;
-        public override string Title
-        {
-            get
-            {
-                return _title;
-            }
-        }
-
-        public readonly IEnumerable<CodeAction> NestedActions;
-
         public SuppressionCodeAction(Diagnostic diagnostic, IEnumerable<CodeAction> nestedActions)
+            : base(string.Format(FeaturesResources.Suppress_0, diagnostic.Id), nestedActions.AsImmutableOrEmpty())
         {
-            _title = string.Format(FeaturesResources.SuppressionCodeActionTitle, diagnostic.Id);
-            this.NestedActions = nestedActions;
         }
     }
 }

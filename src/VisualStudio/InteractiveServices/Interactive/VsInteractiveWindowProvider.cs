@@ -1,5 +1,7 @@
 // Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
+extern alias core;
+
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -10,8 +12,11 @@ using Microsoft.VisualStudio.Editor.Interactive;
 using Microsoft.VisualStudio.InteractiveWindow.Commands;
 using Microsoft.VisualStudio.InteractiveWindow.Shell;
 using Microsoft.VisualStudio.Shell;
+using Microsoft.VisualStudio.Shell.Interop;
 using Microsoft.VisualStudio.Text.Classification;
 using Microsoft.VisualStudio.Utilities;
+using Microsoft.VisualStudio.Text.Editor;
+using Microsoft.VisualStudio.InteractiveWindow;
 
 namespace Microsoft.VisualStudio.LanguageServices.Interactive
 {
@@ -57,7 +62,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Interactive
         protected abstract Guid LanguageServiceGuid { get; }
         protected abstract Guid Id { get; }
         protected abstract string Title { get; }
-        protected abstract void LogSession(string key, string value);
+        protected abstract core::Microsoft.CodeAnalysis.Internal.Log.FunctionId InteractiveWindowFunctionId { get; }
 
         protected IInteractiveWindowCommandsFactory CommandsFactory
         {
@@ -75,29 +80,35 @@ namespace Microsoft.VisualStudio.LanguageServices.Interactive
             }
         }
 
-        public IVsInteractiveWindow Create(int instanceId)
+        public void Create(int instanceId)
         {
             var evaluator = CreateInteractiveEvaluator(_vsServiceProvider, _classifierAggregator, _contentTypeRegistry, _vsWorkspace);
 
-            var vsWindow = _vsInteractiveWindowFactory.Create(Id, instanceId, Title, evaluator, 0);
-            vsWindow.SetLanguage(LanguageServiceGuid, evaluator.ContentType);
+            Debug.Assert(_vsInteractiveWindow == null);
+
+            // ForceCreate means that the window should be created if the persisted layout indicates that it is visible.
+            _vsInteractiveWindow = _vsInteractiveWindowFactory.Create(Id, instanceId, Title, evaluator, __VSCREATETOOLWIN.CTW_fForceCreate);
+            _vsInteractiveWindow.SetLanguage(LanguageServiceGuid, evaluator.ContentType);
+
+            var window = _vsInteractiveWindow.InteractiveWindow;
+            window.TextView.Options.SetOptionValue(DefaultTextViewHostOptions.SuggestionMarginId, true);
+
+            EventHandler closeEventDelegate = null;
+            closeEventDelegate = (sender, e) =>
+            {
+                window.TextView.Closed -= closeEventDelegate;
+                LogCloseSession(evaluator.SubmissionCount);
+                evaluator.Dispose();
+            };
 
             // the tool window now owns the engine:
-            vsWindow.InteractiveWindow.TextView.Closed += new EventHandler((_, __) => 
-            {
-                LogSession(LogMessage.Window, LogMessage.Close);
-                evaluator.Dispose();
-            });
+            window.TextView.Closed += closeEventDelegate;
             // vsWindow.AutoSaveOptions = true;
-
-            var window = vsWindow.InteractiveWindow;
 
             // fire and forget:
             window.InitializeAsync();
 
             LogSession(LogMessage.Window, LogMessage.Create);
-
-            return vsWindow;
         }
 
         public IVsInteractiveWindow Open(int instanceId, bool focus)
@@ -107,14 +118,28 @@ namespace Microsoft.VisualStudio.LanguageServices.Interactive
 
             if (_vsInteractiveWindow == null)
             {
-                _vsInteractiveWindow = Create(instanceId);
+                Create(instanceId);
             }
 
             _vsInteractiveWindow.Show(focus);
 
-            LogSession(LogMessage.Window, LogMessage.Open);
-
             return _vsInteractiveWindow;
+        }
+
+        protected void LogSession(string key, string value)
+        {
+            core::Microsoft.CodeAnalysis.Internal.Log.Logger.Log(InteractiveWindowFunctionId,
+                    core::Microsoft.CodeAnalysis.Internal.Log.KeyValueLogMessage.Create(m => m.Add(key, value)));
+        }
+
+        private void LogCloseSession(int languageBufferCount)
+        {
+            core::Microsoft.CodeAnalysis.Internal.Log.Logger.Log(InteractiveWindowFunctionId,
+                       core::Microsoft.CodeAnalysis.Internal.Log.KeyValueLogMessage.Create(m =>
+                       {
+                           m.Add(LogMessage.Window, LogMessage.Close);
+                           m.Add(LogMessage.LanguageBufferCount, languageBufferCount);
+                       }));
         }
 
         private static ImmutableArray<IInteractiveWindowCommand> GetApplicableCommands(IInteractiveWindowCommand[] commands, string coreContentType, string specializedContentType)
@@ -155,6 +180,6 @@ namespace Microsoft.VisualStudio.LanguageServices.Interactive
                 }
             }
             return interactiveCommands.ToImmutableArray();
-            }
+        }
     }
 }

@@ -1,12 +1,10 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
-using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Differencing
 {
@@ -31,8 +29,6 @@ namespace Microsoft.CodeAnalysis.Differencing
             _root1 = root1;
             _root2 = root2;
             _comparer = comparer;
-            _oneToTwo = new Dictionary<TNode, TNode>();
-            _twoToOne = new Dictionary<TNode, TNode>();
 
             int labelCount = comparer.LabelCount;
 
@@ -42,29 +38,33 @@ namespace Microsoft.CodeAnalysis.Differencing
             CategorizeNodesByLabels(comparer, root1, labelCount, out nodes1, out count1);
             CategorizeNodesByLabels(comparer, root2, labelCount, out nodes2, out count2);
 
+            _oneToTwo = new Dictionary<TNode, TNode>();
+            _twoToOne = new Dictionary<TNode, TNode>();
+
+            // Root nodes always match. Add them before adding known matches to make sure we always have root mapping.
+            TryAdd(root1, root2);
+
             if (knownMatches != null)
             {
                 foreach (var knownMatch in knownMatches)
                 {
                     if (comparer.GetLabel(knownMatch.Key) != comparer.GetLabel(knownMatch.Value))
                     {
-                        throw new ArgumentException(string.Format(WorkspacesResources.MatchingNodesMustHaveTheSameLabel, knownMatch.Key, knownMatch.Value), nameof(knownMatches));
+                        throw new ArgumentException(string.Format(WorkspacesResources.Matching_nodes_0_and_1_must_have_the_same_label, knownMatch.Key, knownMatch.Value), nameof(knownMatches));
                     }
 
                     if (!comparer.TreesEqual(knownMatch.Key, root1))
                     {
-                        throw new ArgumentException(string.Format(WorkspacesResources.NodeMustBeContainedInTheOldTree, knownMatch.Key), nameof(knownMatches));
+                        throw new ArgumentException(string.Format(WorkspacesResources.Node_0_must_be_contained_in_the_old_tree, knownMatch.Key), nameof(knownMatches));
                     }
 
                     if (!comparer.TreesEqual(knownMatch.Value, root2))
                     {
-                        throw new ArgumentException(string.Format(WorkspacesResources.NodeMustBeContainedInTheNewTree, knownMatch.Value), nameof(knownMatches));
+                        throw new ArgumentException(string.Format(WorkspacesResources.Node_0_must_be_contained_in_the_new_tree, knownMatch.Value), nameof(knownMatches));
                     }
 
-                    if (!_oneToTwo.ContainsKey(knownMatch.Key))
-                    {
-                        Add(knownMatch.Key, knownMatch.Value);
-                    }
+                    // skip pairs whose key or value is already mapped:
+                    TryAdd(knownMatch.Key, knownMatch.Value);
                 }
             }
 
@@ -90,7 +90,7 @@ namespace Microsoft.CodeAnalysis.Differencing
                 int label = comparer.GetLabel(node);
                 if (label < 0 || label >= labelCount)
                 {
-                    throw new InvalidOperationException(string.Format(WorkspacesResources.LabelForNodeIsInvalid, node, labelCount));
+                    throw new InvalidOperationException(string.Format(WorkspacesResources.Label_for_node_0_is_invalid_it_must_be_within_bracket_0_1, node, labelCount));
                 }
 
                 var list = nodes[label];
@@ -110,12 +110,6 @@ namespace Microsoft.CodeAnalysis.Differencing
         private void ComputeMatch(List<TNode>[] nodes1, List<TNode>[] nodes2)
         {
             Debug.Assert(nodes1.Length == nodes2.Length);
-
-            // Root nodes always match but they might have been added as knownMatches
-            if (!HasPartnerInTree2(_root1))
-            {
-                Add(_root1, _root2);
-            }
 
             // --- The original FastMatch algorithm ---
             // 
@@ -257,7 +251,11 @@ namespace Microsoft.CodeAnalysis.Differencing
 
                 if (matched && bestDistance <= maxAcceptableDistance)
                 {
-                    Add(node1, bestMatch);
+                    bool added = TryAdd(node1, bestMatch);
+
+                    // We checked above that node1 doesn't have a partner. 
+                    // The map is a bijection by construction, so we should be able to add the mapping.
+                    Debug.Assert(added);
 
                     // If we exactly matched to firstNonMatch2 we can advance it.
                     if (i2 == firstNonMatch2)
@@ -268,13 +266,19 @@ namespace Microsoft.CodeAnalysis.Differencing
             }
         }
 
-        internal void Add(TNode node1, TNode node2)
+        internal bool TryAdd(TNode node1, TNode node2)
         {
             Debug.Assert(_comparer.TreesEqual(node1, _root1));
             Debug.Assert(_comparer.TreesEqual(node2, _root2));
 
+            if (_oneToTwo.ContainsKey(node1) || _twoToOne.ContainsKey(node2))
+            {
+                return false;
+            }
+
             _oneToTwo.Add(node1, node2);
             _twoToOne.Add(node2, node1);
+            return true;
         }
 
         internal bool TryGetPartnerInTree1(TNode node2, out TNode partner1)

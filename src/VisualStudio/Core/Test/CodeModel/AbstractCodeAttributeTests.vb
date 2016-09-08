@@ -55,108 +55,71 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
             Return codeElement.AddArgument(data.Value, data.Name, data.Position)
         End Function
 
-        Protected Sub TestAttributeArguments(code As XElement, ParamArray expectedAttributeArguments() As Action(Of Object))
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim codeElement = state.GetCodeElementAtCursor(Of EnvDTE80.CodeAttribute2)()
-                Assert.NotNull(codeElement)
+        Protected Async Function TestAttributeArguments(code As XElement, ParamArray expectedAttributeArguments() As Action(Of Object)) As Tasks.Task
+            Await TestElement(code,
+                Sub(codeElement)
+                    Dim attributes = GetAttributeArguments(codeElement)
+                    Assert.Equal(expectedAttributeArguments.Length, attributes.Count)
 
-                Dim attributes = GetAttributeArguments(codeElement)
-                Assert.Equal(expectedAttributeArguments.Length, attributes.Count)
+                    For i = 1 To attributes.Count
+                        expectedAttributeArguments(i - 1)(attributes.Item(i))
+                    Next
+                End Sub)
+        End Function
 
-                For i = 1 To attributes.Count
-                    expectedAttributeArguments(i - 1)(attributes.Item(i))
-                Next
-            End Using
-        End Sub
+        Protected Async Function TestTarget(code As XElement, expectedTarget As String) As Tasks.Task
+            Await TestElement(code,
+                Sub(codeElement)
+                    Dim target = GetTarget(codeElement)
+                    Assert.Equal(expectedTarget, target)
+                End Sub)
+        End Function
 
-        Protected Sub TestTarget(code As XElement, expectedTarget As String)
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim codeElement = state.GetCodeElementAtCursor(Of EnvDTE80.CodeAttribute2)()
-                Assert.NotNull(codeElement)
+        Protected Async Function TestSetTarget(code As XElement, expectedCode As XElement, target As String) As Tasks.Task
+            Await TestElementUpdate(code, expectedCode,
+                Sub(codeElement)
+                    codeElement.Target = target
+                End Sub)
+        End Function
 
-                Dim target = GetTarget(codeElement)
-                Assert.Equal(expectedTarget, target)
-            End Using
-        End Sub
+        Protected Async Function TestValue(code As XElement, expectedValue As String) As Tasks.Task
+            Await TestElement(code,
+                Sub(codeElement)
+                    Dim target = GetValue(codeElement)
+                    Assert.Equal(expectedValue, target)
+                End Sub)
+        End Function
 
-        Protected Sub TestSetTarget(code As XElement, expectedCode As XElement, target As String)
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim codeAttribute = state.GetCodeElementAtCursor(Of EnvDTE80.CodeAttribute2)()
-                Assert.NotNull(codeAttribute)
+        Protected Async Function TestSetValue(code As XElement, expectedCode As XElement, value As String) As Tasks.Task
+            Await TestElementUpdate(code, expectedCode,
+                Sub(codeElement)
+                    codeElement.Value = value
+                End Sub)
+        End Function
 
-                codeAttribute.Target = target
+        Protected Async Function TestAddAttributeArgument(code As XElement, expectedCode As XElement, data As AttributeArgumentData) As Tasks.Task
+            Await TestElementUpdate(code, expectedCode,
+                Sub(codeElement)
+                    Dim attributeArgument = AddAttributeArgument(codeElement, data)
+                    Assert.NotNull(attributeArgument)
+                    Assert.Equal(data.Name, attributeArgument.Name)
+                End Sub)
+        End Function
 
-                Dim text = state.GetDocumentAtCursor().GetTextAsync(CancellationToken.None).Result.ToString()
+        Protected Async Function TestDelete(code As XElement, expectedCode As XElement) As Tasks.Task
+            Await TestElementUpdate(code, expectedCode,
+                Sub(codeElement)
+                    codeElement.Delete()
+                End Sub)
+        End Function
 
-                Assert.Equal(expectedCode.NormalizedValue().Trim(), text.Trim())
-            End Using
-        End Sub
-
-        Protected Sub TestSetValue(code As XElement, expectedCode As XElement, value As String)
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim codeAttribute = state.GetCodeElementAtCursor(Of EnvDTE80.CodeAttribute2)()
-                Assert.NotNull(codeAttribute)
-
-                codeAttribute.Value = value
-
-                Dim text = state.GetDocumentAtCursor().GetTextAsync(CancellationToken.None).Result.ToString()
-
-                Assert.Equal(expectedCode.NormalizedValue().Trim(), text.Trim())
-            End Using
-        End Sub
-
-        Protected Sub TestValue(code As XElement, expectedValue As String)
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim codeElement = state.GetCodeElementAtCursor(Of EnvDTE80.CodeAttribute2)()
-                Assert.NotNull(codeElement)
-
-                Dim target = GetValue(codeElement)
-                Assert.Equal(expectedValue, target)
-            End Using
-        End Sub
-
-        Protected Sub TestAddAttributeArgument(code As XElement, expectedCode As XElement, data As AttributeArgumentData)
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim codeElement = state.GetCodeElementAtCursor(Of EnvDTE80.CodeAttribute2)()
-                Assert.NotNull(codeElement)
-
-                Dim attributeArgument = AddAttributeArgument(codeElement, data)
-                Assert.NotNull(attributeArgument)
-                Assert.Equal(data.Name, attributeArgument.Name)
-
-                Dim text = state.GetDocumentAtCursor().GetTextAsync(CancellationToken.None).Result.ToString()
-
-                Assert.Equal(expectedCode.NormalizedValue.Trim(), text.Trim())
-            End Using
-        End Sub
-
-        Protected Sub TestDelete(code As XElement, expectedCode As XElement)
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim codeElement = state.GetCodeElementAtCursor(Of EnvDTE80.CodeAttribute2)()
-                Assert.NotNull(codeElement)
-
-                codeElement.Delete()
-
-                Dim text = state.GetDocumentAtCursor().GetTextAsync(CancellationToken.None).Result.ToString()
-
-                Assert.Equal(expectedCode.NormalizedValue.Trim(), text.Trim())
-            End Using
-        End Sub
-
-        Protected Sub TestDeleteAttributeArgument(code As XElement, expectedCode As XElement, indexToDelete As Integer)
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim codeElement = state.GetCodeElementAtCursor(Of EnvDTE80.CodeAttribute2)()
-                Assert.NotNull(codeElement)
-
-                Dim argument = CType(codeElement.Arguments.Item(indexToDelete), EnvDTE80.CodeAttributeArgument)
-
-                argument.Delete()
-
-                Dim text = state.GetDocumentAtCursor().GetTextAsync(CancellationToken.None).Result.ToString()
-
-                Assert.Equal(expectedCode.NormalizedValue.Trim(), text.Trim())
-            End Using
-        End Sub
+        Protected Async Function TestDeleteAttributeArgument(code As XElement, expectedCode As XElement, indexToDelete As Integer) As Tasks.Task
+            Await TestElementUpdate(code, expectedCode,
+                Sub(codeElement)
+                    Dim argument = CType(codeElement.Arguments.Item(indexToDelete), EnvDTE80.CodeAttributeArgument)
+                    argument.Delete()
+                End Sub)
+        End Function
 
         Protected Function IsAttributeArgument(Optional name As String = Nothing, Optional value As String = Nothing) As Action(Of Object)
             Return _
@@ -174,35 +137,31 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel
                 End Sub
         End Function
 
-        Protected Sub TestAttributeArgumentStartPoint(code As XElement, index As Integer, ParamArray expectedParts() As Action(Of Func(Of EnvDTE.vsCMPart, EnvDTE.TextPoint)))
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim codeElement = state.GetCodeElementAtCursor(Of EnvDTE80.CodeAttribute2)()
-                Assert.NotNull(codeElement)
+        Protected Async Function TestAttributeArgumentStartPoint(code As XElement, index As Integer, ParamArray expectedParts() As Action(Of Func(Of EnvDTE.vsCMPart, EnvDTE.TextPoint))) As Tasks.Task
+            Await TestElement(code,
+                Sub(codeElement)
+                    Dim arg = CType(codeElement.Arguments.Item(index), EnvDTE80.CodeAttributeArgument)
 
-                Dim arg = CType(codeElement.Arguments.Item(index), EnvDTE80.CodeAttributeArgument)
+                    Dim startPointGetter = Function(part As EnvDTE.vsCMPart) arg.GetStartPoint(part)
 
-                Dim startPointGetter = Function(part As EnvDTE.vsCMPart) arg.GetStartPoint(part)
+                    For Each action In expectedParts
+                        action(startPointGetter)
+                    Next
+                End Sub)
+        End Function
 
-                For Each action In expectedParts
-                    action(startPointGetter)
-                Next
-            End Using
-        End Sub
+        Protected Async Function TestAttributeArgumentEndPoint(code As XElement, index As Integer, ParamArray expectedParts() As Action(Of Func(Of EnvDTE.vsCMPart, EnvDTE.TextPoint))) As Tasks.Task
+            Await TestElement(code,
+                Sub(codeElement)
+                    Dim arg = CType(codeElement.Arguments.Item(index), EnvDTE80.CodeAttributeArgument)
 
-        Protected Sub TestAttributeArgumentEndPoint(code As XElement, index As Integer, ParamArray expectedParts() As Action(Of Func(Of EnvDTE.vsCMPart, EnvDTE.TextPoint)))
-            Using state = CreateCodeModelTestState(GetWorkspaceDefinition(code))
-                Dim codeElement = state.GetCodeElementAtCursor(Of EnvDTE80.CodeAttribute2)()
-                Assert.NotNull(codeElement)
+                    Dim endPointGetter = Function(part As EnvDTE.vsCMPart) arg.GetEndPoint(part)
 
-                Dim arg = CType(codeElement.Arguments.Item(index), EnvDTE80.CodeAttributeArgument)
-
-                Dim endPointGetter = Function(part As EnvDTE.vsCMPart) arg.GetEndPoint(part)
-
-                For Each action In expectedParts
-                    action(endPointGetter)
-                Next
-            End Using
-        End Sub
+                    For Each action In expectedParts
+                        action(endPointGetter)
+                    Next
+                End Sub)
+        End Function
 
     End Class
 End Namespace

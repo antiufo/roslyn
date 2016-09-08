@@ -973,7 +973,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Debug.Assert(Not HaveDiagnostics(infosBuffer))
             GenerateVarianceDiagnosticsForType(method.ReturnType, VarianceKind.Out, VarianceContext.Return, infosBuffer)
             If HaveDiagnostics(infosBuffer) Then
-                Dim location As location
+                Dim location As Location
                 Dim syntax As MethodBaseSyntax = method.GetDeclaringSyntaxNode(Of MethodBaseSyntax)()
 
                 If syntax Is Nothing AndAlso method.MethodKind = MethodKind.DelegateInvoke Then
@@ -1016,7 +1016,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
                 GenerateVarianceDiagnosticsForType(param.Type, requiredVariance, context, infosBuffer)
                 If HaveDiagnostics(infosBuffer) Then
-                    Dim location As location
+                    Dim location As Location
                     Dim syntax As ParameterSyntax = param.GetDeclaringSyntaxNode(Of ParameterSyntax)()
 
                     If syntax IsNot Nothing AndAlso syntax.AsClause IsNot Nothing Then
@@ -1047,7 +1047,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 For Each constraint As TypeSymbol In param.ConstraintTypesNoUseSiteDiagnostics
                     GenerateVarianceDiagnosticsForType(constraint, VarianceKind.In, VarianceContext.Constraint, infosBuffer)
                     If HaveDiagnostics(infosBuffer) Then
-                        Dim location As location = param.Locations(0)
+                        Dim location As Location = param.Locations(0)
 
                         For Each constraintInfo As TypeParameterConstraint In param.GetConstraints()
                             If constraintInfo.TypeConstraint IsNot Nothing AndAlso
@@ -1087,7 +1087,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
             GenerateVarianceDiagnosticsForType([property].Type, requiredVariance, context, infosBuffer)
             If HaveDiagnostics(infosBuffer) Then
-                Dim location As location
+                Dim location As Location
                 Dim syntax As PropertyStatementSyntax = [property].GetDeclaringSyntaxNode(Of PropertyStatementSyntax)()
 
                 If syntax IsNot Nothing AndAlso syntax.AsClause IsNot Nothing Then
@@ -1123,7 +1123,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             GenerateVarianceDiagnosticsForType(type, VarianceKind.In, VarianceContext.Complex, infosBuffer)
 
             If HaveDiagnostics(infosBuffer) Then
-                Dim location As location
+                Dim location As Location
                 Dim syntax As EventStatementSyntax = [event].GetDeclaringSyntaxNode(Of EventStatementSyntax)()
 
                 If syntax IsNot Nothing AndAlso syntax.AsClause IsNot Nothing Then
@@ -1380,7 +1380,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
         Public NotOverridable Overrides ReadOnly Property Locations As ImmutableArray(Of Location)
             Get
-                Return _declaration.NameLocations
+                Dim result = _declaration.NameLocations
+                Return result
             End Get
         End Property
 
@@ -2229,8 +2230,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Return True
             End If
 
+            ' We can not get the relative order of a declaration without a source location
+            If typeToTest.Locations.IsEmpty Then
+                Return True
+            End If
+
             ' We use simple comparison based on source location 
-            Debug.Assert(typeToTest.Locations.Length > 0)
             Dim typeToTestLocation = typeToTest.Locations(0)
 
             Debug.Assert(Me.Locations.Length > 0)
@@ -2341,7 +2346,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             If initializerSet IsNot Nothing Then
                 For Each initializers In initializerSet
                     For Each initializer In initializers
-                        Dim fieldOrPropertyArray As ImmutableArray(Of Symbol) = initializer.FieldsOrProperty
+                        Dim fieldOrPropertyArray As ImmutableArray(Of Symbol) = initializer.FieldsOrProperties
 
                         If Not fieldOrPropertyArray.IsDefault Then
                             Debug.Assert(fieldOrPropertyArray.Length > 0)
@@ -2522,21 +2527,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                                     ByRef instanceInitializers As ArrayBuilder(Of FieldOrPropertyInitializer),
                                     reportAsInvalid As Boolean)
 
-            ' Currently partial methods are not implemented. Here's my current thinking about the 
-            ' right way to implement them:
-            '  There's an accessor on a Method symbol that indicates its fully partial (no definition). After
-            '  calling DeclareMethodMember, we check to see if the signature matches another already defined method.
-            '  If a partial is declared and we already have a method with the same sig, the second partial is ignored and the first
-            '  partial is updated to add the syntax ref from the second.
-            '  If a non-partial is declared and we already have a partial with the same sig, the existing partial is removed
-            '  and its syntax refs are added to the non-partial.
-            '  This should probably be combined with the logic for detecting duplicate signatures in general.
-            '
-            ' Comparing of signature is a bit tricky when generic methods are taken into account. E.g.:
-            '   f(Of T)(a as T)
-            '   f(Of U)(b as U)
-            ' have the same signature, even though a and b have different types.
-            ' The MethodSignatureComparer class takes care of that, so be sure to use it!
+            ' Partial methods are implemented by a postpass that matches up the declaration with the implementation.
+            ' Here we treat them as independent methods.
 
             Select Case memberSyntax.Kind
                 Case SyntaxKind.FieldDeclaration
@@ -2757,7 +2749,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Dim syntaxRef = SyntaxReferences.Single()
                 Dim scriptInitializer = New SynthesizedInteractiveInitializerMethod(syntaxRef, Me, diagnostics)
                 AddSymbolToMembers(scriptInitializer, members.Members)
-                Dim scriptEntryPoint = SynthesizedEntryPointSymbol.Create(Me, scriptInitializer.ReturnType, diagnostics)
+                Dim scriptEntryPoint = SynthesizedEntryPointSymbol.Create(scriptInitializer, diagnostics)
                 AddSymbolToMembers(scriptEntryPoint, members.Members)
             End If
         End Sub
@@ -3264,6 +3256,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Dim syntaxOffset As Integer
             If TryCalculateSyntaxOffsetOfPositionInInitializer(position, tree, isShared, syntaxOffset:=syntaxOffset) Then
                 Return syntaxOffset
+            End If
+
+            If Me._declaration.Declarations.Length >= 1 AndAlso position = Me._declaration.Declarations(0).Location.SourceSpan.Start Then
+                ' With dynamic analysis instrumentation, the introducing declaration of a type can provide
+                ' the syntax associated with both the analysis payload local of a synthesized constructor
+                ' and with the constructor itself. If the synthesized constructor includes an initializer with a lambda,
+                ' that lambda needs a closure that captures the analysis payload of the constructor,
+                ' and the offset of the syntax for the local within the constructor is by definition zero.
+                Return 0
             End If
 
             ' This point should not be reachable. An implicit constructor has no body and no initializer,

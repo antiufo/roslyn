@@ -4,13 +4,11 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.FindSymbols.Finders;
 using Microsoft.CodeAnalysis.Internal.Log;
 using Microsoft.CodeAnalysis.Shared.Extensions;
-using Microsoft.CodeAnalysis.Shared.Utilities;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.FindSymbols
@@ -134,7 +132,7 @@ namespace Microsoft.CodeAnalysis.FindSymbols
         {
             using (Logger.LogBlock(FunctionId.FindReference_DetermineAllSymbolsAsync, _cancellationToken))
             {
-                var result = new ConcurrentSet<ISymbol>(SymbolEquivalenceComparer.Instance);
+                var result = new ConcurrentSet<ISymbol>(MetadataUnifyingEquivalenceComparer.Instance);
                 await DetermineAllSymbolsCoreAsync(symbol, result).ConfigureAwait(false);
                 return result;
             }
@@ -165,21 +163,39 @@ namespace Microsoft.CodeAnalysis.FindSymbols
                 {
                     finderTasks.Add(Task.Run(async () =>
                     {
-                        var symbols = await f.DetermineCascadedSymbolsAsync(searchSymbol, _solution, projects, _cancellationToken).ConfigureAwait(false) ?? SpecializedCollections.EmptyEnumerable<ISymbol>();
+                        var symbolTasks = new List<Task>();
+
+                        var symbols = await f.DetermineCascadedSymbolsAsync(searchSymbol, _solution, projects, _cancellationToken).ConfigureAwait(false);
+                        AddSymbolTasks(result, symbols, symbolTasks);
+
+                        // Defer to the language to see if it wants to cascade here in some special way.
+                        var symbolProject = _solution.GetProject(searchSymbol.ContainingAssembly);
+                        var service = symbolProject?.LanguageServices.GetService<ILanguageServiceReferenceFinder>();
+                        if (service != null)
+                        {
+                            symbols = await service.DetermineCascadedSymbolsAsync(searchSymbol, symbolProject, _cancellationToken).ConfigureAwait(false);
+                            AddSymbolTasks(result, symbols, symbolTasks);
+                        }
 
                         _cancellationToken.ThrowIfCancellationRequested();
-
-                        List<Task> symbolTasks = new List<Task>();
-                        foreach (var child in symbols)
-                        {
-                            symbolTasks.Add(Task.Run(async () => await DetermineAllSymbolsCoreAsync(child, result).ConfigureAwait(false), _cancellationToken));
-                        }
 
                         await Task.WhenAll(symbolTasks).ConfigureAwait(false);
                     }, _cancellationToken));
                 }
 
                 await Task.WhenAll(finderTasks).ConfigureAwait(false);
+            }
+        }
+
+        private void AddSymbolTasks(ConcurrentSet<ISymbol> result, IEnumerable<ISymbol> symbols, List<Task> symbolTasks)
+        {
+            if (symbols != null)
+            {
+                foreach (var child in symbols)
+                {
+                    _cancellationToken.ThrowIfCancellationRequested();
+                    symbolTasks.Add(Task.Run(async () => await DetermineAllSymbolsCoreAsync(child, result).ConfigureAwait(false), _cancellationToken));
+                }
             }
         }
 

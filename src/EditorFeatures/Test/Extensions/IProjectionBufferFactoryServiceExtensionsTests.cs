@@ -10,6 +10,7 @@ using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
 using Microsoft.VisualStudio.Text.Projection;
 using Microsoft.VisualStudio.Utilities;
+using Roslyn.Test.Utilities;
 using Xunit;
 
 namespace Microsoft.CodeAnalysis.Editor.UnitTests.Extensions
@@ -29,7 +30,8 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Extensions
             var elisionBuffer = IProjectionBufferFactoryServiceExtensions.CreateElisionBufferWithoutIndentation(
                 exportProvider.GetExportedValue<IProjectionBufferFactoryService>(),
                 exportProvider.GetExportedValue<IEditorOptionsFactoryService>().GlobalOptions,
-                textBuffer.CurrentSnapshot.GetFullSpan());
+                contentType: null,
+                exposedSpans: textBuffer.CurrentSnapshot.GetFullSpan());
 
             var elisionSnapshot = elisionBuffer.CurrentSnapshot;
             Assert.Equal(elisionSnapshot.LineCount, 3);

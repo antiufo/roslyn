@@ -5,7 +5,9 @@ using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CodeActions;
+using Microsoft.CodeAnalysis.Editor.Host;
 using Microsoft.CodeAnalysis.Extensions;
+using Microsoft.CodeAnalysis.Shared.TestHooks;
 using Microsoft.VisualStudio.Language.Intellisense;
 using Microsoft.VisualStudio.Text;
 using Roslyn.Utilities;
@@ -21,8 +23,10 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
             Workspace workspace,
             ITextBuffer subjectBuffer,
             ICodeActionEditHandlerService editHandler,
+            IWaitIndicator waitIndicator,
             CodeAction codeAction,
-            object provider) : base(workspace, subjectBuffer, editHandler, codeAction, provider)
+            object provider,
+            IAsynchronousOperationListener operationListener) : base(workspace, subjectBuffer, editHandler, waitIndicator, codeAction, provider, operationListener)
         {
         }
 
@@ -98,7 +102,8 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
             }
 
             var previewAction = new PreviewChangesCodeAction(Workspace, CodeAction, changeSummary);
-            var previewSuggestedAction = new PreviewChangesSuggestedAction(Workspace, SubjectBuffer, EditHandler, previewAction, Provider);
+            var previewSuggestedAction = new PreviewChangesSuggestedAction(
+                Workspace, SubjectBuffer, EditHandler, WaitIndicator, previewAction, Provider, OperationListener);
             return new SuggestedActionSet(ImmutableArray.Create(previewSuggestedAction));
         }
 

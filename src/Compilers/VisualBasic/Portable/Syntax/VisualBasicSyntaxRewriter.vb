@@ -1,12 +1,6 @@
 ﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
-Imports System
-Imports System.Collections
-Imports System.Collections.Generic
-Imports System.Linq
-Imports System.Text
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
+Imports Microsoft.CodeAnalysis.Syntax
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
 Namespace Microsoft.CodeAnalysis.VisualBasic
@@ -35,9 +29,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             If node IsNot Nothing Then
                 _recursionDepth += 1
 
-                If _recursionDepth > Syntax.InternalSyntax.Parser.MaxUncheckedRecursionDepth Then
-                    PortableShim.RuntimeHelpers.EnsureSufficientExecutionStack()
-                End If
+                StackGuard.EnsureSufficientExecutionStack(_recursionDepth)
 
                 Dim result = DirectCast(node, VisualBasicSyntaxNode).Accept(Me)
 

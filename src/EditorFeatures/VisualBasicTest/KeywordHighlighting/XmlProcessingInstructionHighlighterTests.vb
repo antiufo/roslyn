@@ -11,33 +11,33 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.KeywordHighlightin
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestXmlProcessingInstruction1()
-            Test(<Text><![CDATA[
+        Public Async Function TestXmlProcessingInstruction1() As Task
+            Await TestAsync(<Text><![CDATA[
 Class C
 Sub M()
 Dim q = {|Cursor:[|<?|]|}fogbar[|?>|]
 End Sub
 End Class]]></Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestXmlProcessingInstruction2()
-            Test(<Text><![CDATA[
+        Public Async Function TestXmlProcessingInstruction2() As Task
+            Await TestAsync(<Text><![CDATA[
 Class C
 Sub M()
 Dim q = [|<?|]fogbar{|Cursor:[|?>|]|}
 End Sub
 End Class]]></Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestXmlProcessingInstruction3()
-            Test(<Text><![CDATA[
+        Public Async Function TestXmlProcessingInstruction3() As Task
+            Await TestAsync(<Text><![CDATA[
 Class C
 Sub M()
 Dim q = <?f{|Cursor:ooba|}r?>
 End Sub
 End Class]]></Text>)
-        End Sub
+        End Function
     End Class
 End Namespace

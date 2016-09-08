@@ -40,16 +40,75 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         Public Function GetEnumUnderlyingType(type As TypeSymbol) As TypeSymbol
             Debug.Assert(type IsNot Nothing)
 
-            If type.IsEnumType() Then
-                Return DirectCast(type, NamedTypeSymbol).EnumUnderlyingType
-            End If
-
-            Return Nothing
+            Return TryCast(type, NamedTypeSymbol)?.EnumUnderlyingType
         End Function
 
         <Extension()>
         Public Function GetEnumUnderlyingTypeOrSelf(type As TypeSymbol) As TypeSymbol
             Return If(GetEnumUnderlyingType(type), type)
+        End Function
+
+        <Extension()>
+        Public Function GetTupleUnderlyingType(type As TypeSymbol) As TypeSymbol
+            Debug.Assert(type IsNot Nothing)
+
+            Return TryCast(type, NamedTypeSymbol)?.TupleUnderlyingType
+        End Function
+
+        <Extension()>
+        Public Function GetTupleUnderlyingTypeOrSelf(type As TypeSymbol) As TypeSymbol
+            Return If(GetTupleUnderlyingType(type), type)
+        End Function
+
+        <Extension()>
+        Public Function TryGetElementTypesIfTupleOrCompatible(type As TypeSymbol, <Out> ByRef elementTypes As ImmutableArray(Of TypeSymbol)) As Boolean
+            If type.IsTupleType Then
+                elementTypes = DirectCast(type, TupleTypeSymbol).TupleElementTypes
+                Return True
+            End If
+
+            ' The following codepath should be very uncommon since it would be rare
+            ' to see a tuple underlying type not represented as a tuple.
+            ' It still might happen since tuple underlying types are creatable via public APIs 
+            ' and it is also possible that they would be passed in.
+
+            ' PERF: if allocations here become nuisance, consider caching the results
+            '       in the type symbols that can actually be tuple compatible
+            Dim cardinality As Integer
+            If Not type.IsTupleCompatible(cardinality) Then
+                ' source not a tuple or compatible
+                elementTypes = Nothing
+                Return False
+            End If
+
+            Dim elementTypesBuilder = ArrayBuilder(Of TypeSymbol).GetInstance(cardinality)
+            TupleTypeSymbol.AddElementTypes(DirectCast(type, NamedTypeSymbol), elementTypesBuilder)
+
+            Debug.Assert(elementTypesBuilder.Count = cardinality)
+
+            elementTypes = elementTypesBuilder.ToImmutableAndFree()
+            Return True
+        End Function
+
+        <Extension()>
+        Public Function GetElementTypesOfTupleOrCompatible(Type As TypeSymbol) As ImmutableArray(Of TypeSymbol)
+            If Type.IsTupleType Then
+                Return DirectCast(Type, TupleTypeSymbol).TupleElementTypes
+            End If
+
+            ' The following codepath should be very uncommon since it would be rare
+            ' to see a tuple underlying type not represented as a tuple.
+            ' It still might happen since tuple underlying types are creatable via public APIs 
+            ' and it is also possible that they would be passed in.
+
+            Debug.Assert(Type.IsTupleCompatible())
+
+            ' PERF: if allocations here become nuisance, consider caching the results
+            '       in the type symbols that can actually be tuple compatible
+            Dim elementTypesBuilder = ArrayBuilder(Of TypeSymbol).GetInstance()
+            TupleTypeSymbol.AddElementTypes(DirectCast(Type, NamedTypeSymbol), elementTypesBuilder)
+
+            Return elementTypesBuilder.ToImmutableAndFree()
         End Function
 
         <Extension()>
@@ -105,11 +164,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
         End Function
 
         <Extension()>
-        Friend Function IsCharArrayRankOne(type As TypeSymbol) As Boolean
+        Friend Function IsCharSZArray(type As TypeSymbol) As Boolean
             If type.IsArrayType() Then
                 Dim array = DirectCast(type, ArrayTypeSymbol)
 
-                If array.Rank = 1 AndAlso array.ElementType.SpecialType = SpecialType.System_Char Then
+                If array.IsSZArray AndAlso array.ElementType.SpecialType = SpecialType.System_Char Then
                     Return True
                 End If
             End If
@@ -124,7 +183,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             ' library. It should be acceptable just to check the name of the type to avoid adding
             ' this type into WellKnownTypes and passing compilation into this method.
             ' Note, the comparison should be case-sensitive, similar to metadata resolution.
-            Const [namespace] As String = "System"
+            Const [namespace] As String = MetadataHelpers.SystemString
             Const name As String = "DBNull"
 
             If type.SpecialType = SpecialType.None AndAlso
@@ -173,8 +232,20 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             Return type.TypeKind = TypeKind.Delegate
         End Function
 
+        ''' <summary>
+        ''' Compares types ignoring type modifiers.
+        ''' Also ignores distinctions between tuple types and their underlying types (thus ignoring tuple element names)
+        ''' </summary>
         <Extension()>
         Friend Function IsSameTypeIgnoringCustomModifiers(t1 As TypeSymbol, t2 As TypeSymbol) As Boolean
+
+            If t1.IsTupleType Then
+                t1 = t1.TupleUnderlyingType
+            End If
+
+            If t2.IsTupleType Then
+                t2 = t2.TupleUnderlyingType
+            End If
 
             If t1 Is t2 Then
                 Return True
@@ -191,7 +262,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Dim array1 = DirectCast(t1, ArrayTypeSymbol)
                 Dim array2 = DirectCast(t2, ArrayTypeSymbol)
 
-                Return array1.Rank = array2.Rank AndAlso
+                Return array1.HasSameShapeAs(array2) AndAlso
                        array1.ElementType.IsSameTypeIgnoringCustomModifiers(array2.ElementType)
 
             ElseIf t1.IsAnonymousType AndAlso t2.IsAnonymousType Then
@@ -201,11 +272,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 Dim t1IsDefinition = t1.IsDefinition
                 Dim t2IsDefinition = t2.IsDefinition
 
-                If (t1IsDefinition <> t2IsDefinition) Then
+                If (t1IsDefinition <> t2IsDefinition) AndAlso
+                   Not (DirectCast(t1, NamedTypeSymbol).HasTypeArgumentsCustomModifiers OrElse DirectCast(t2, NamedTypeSymbol).HasTypeArgumentsCustomModifiers) Then
                     Return False
                 End If
 
-                If Not t1IsDefinition Then ' This is a generic instantiation
+                If Not (t1IsDefinition AndAlso t2IsDefinition) Then ' This is a generic instantiation case
 
                     If t1.OriginalDefinition <> t2.OriginalDefinition Then
                         Return False ' different definition
@@ -827,7 +899,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
             If type.IsArrayType Then
                 Dim arrayType = DirectCast(type, ArrayTypeSymbol)
-                If arrayType.Rank <> 1 Then
+                If Not arrayType.IsSZArray Then
                     Return False
                 End If
                 type = arrayType.ElementType
@@ -913,7 +985,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
             ' Check for type arguments equal to type parameters of this type,
             ' but not contained by it ("cross-pollination"). Replace them with 
-            ' this type type parameters.
+            ' this types' type parameters.
             Dim newTypeArguments As TypeSymbol() = Nothing
             Dim i As Integer = 0
             Dim typeArgument As TypeSymbol
@@ -1136,7 +1208,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
                 typeArgumentsCustomModifiers = type.TypeArgumentsCustomModifiers.Concat(typeArgumentsCustomModifiers)
             End While
 
-            Return ImmutableArray.CreateRange(typeArguments.Zip(typeArgumentsCustomModifiers, Function(a, m) New TypeWithModifiers(a, m)))
+            Return typeArguments.ZipAsArray(typeArgumentsCustomModifiers, Function(a, m) New TypeWithModifiers(a, m))
         End Function
 
         ''' <summary>

@@ -22,13 +22,25 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 rewritten = RegisterUnstructuredExceptionHandlingResumeTarget(node.Syntax, rewritten, canThrow:=True)
             End If
 
-            Return MarkStatementWithSequencePoint(rewritten)
+            If Instrument(node, rewritten) Then
+                rewritten = _instrumenter.InstrumentExpressionStatement(node, rewritten)
+            End If
+
+            Return rewritten
         End Function
 
         Private Function IsOmittedBoundCall(expression As BoundExpression) As Boolean
-            Return (Me._flags And RewritingFlags.AllowOmissionOfConditionalCalls) = RewritingFlags.AllowOmissionOfConditionalCalls AndAlso
-                expression.Kind = BoundKind.Call AndAlso
-                DirectCast(expression, BoundCall).Method.CallsAreOmitted(expression.Syntax, expression.SyntaxTree)
+            If (Me._flags And RewritingFlags.AllowOmissionOfConditionalCalls) = RewritingFlags.AllowOmissionOfConditionalCalls Then
+                Select Case expression.Kind
+                    Case BoundKind.ConditionalAccess
+                        Return IsOmittedBoundCall(DirectCast(expression, BoundConditionalAccess).AccessExpression)
+
+                    Case BoundKind.Call
+                        Return DirectCast(expression, BoundCall).Method.CallsAreOmitted(expression.Syntax, expression.SyntaxTree)
+                End Select
+            End If
+
+            Return False
         End Function
     End Class
 End Namespace

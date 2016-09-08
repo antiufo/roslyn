@@ -4,9 +4,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Syntax;
 using Microsoft.CodeAnalysis.Text;
-using System.Diagnostics;
 
 namespace Microsoft.CodeAnalysis.CSharp.Syntax
 {
@@ -110,6 +109,11 @@ namespace Microsoft.CodeAnalysis.CSharp.Syntax
                 }
             }
 
+            /// <summary>
+            /// Returns whether the specified <see cref="SyntaxTrivia"/> token is also the end of the line.  This will
+            /// be true for <see cref="SyntaxKind.EndOfLineTrivia"/>, <see cref="SyntaxKind.SingleLineCommentTrivia"/>,
+            /// and all preprocessor directives.
+            /// </summary>
             private static bool IsEndOfLine(SyntaxTrivia trivia)
             {
                 return trivia.Kind() == SyntaxKind.EndOfLineTrivia

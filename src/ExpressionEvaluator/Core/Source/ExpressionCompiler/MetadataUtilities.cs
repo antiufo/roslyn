@@ -87,6 +87,7 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
             var referencesBuilder = ArrayBuilder<MetadataReference>.GetInstance();
             var identitiesBuilder = (identityComparer == null) ? null : ArrayBuilder<AssemblyIdentity>.GetInstance();
             AssemblyIdentity corLibrary = null;
+            AssemblyIdentity intrinsicsAssembly = null;
 
             foreach (var metadata in metadataBuilder)
             {
@@ -106,6 +107,11 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
                         reader.DeclaresTheObjectClass())
                     {
                         corLibrary = identity;
+                    }
+                    else if ((intrinsicsAssembly == null) &&
+                        reader.DeclaresType((r, t) => r.IsPublicNonInterfaceType(t, ExpressionCompilerConstants.IntrinsicAssemblyNamespace, ExpressionCompilerConstants.IntrinsicAssemblyTypeName)))
+                    {
+                        intrinsicsAssembly = identity;
                     }
                 }
                 var reference = MakeAssemblyMetadata(metadata, modulesByName);
@@ -130,6 +136,11 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
                     if (corLibrary != null)
                     {
                         referencedModules.Add(corLibrary);
+                    }
+                    // Ensure Debugger intrinsic methods assembly is included.
+                    if (intrinsicsAssembly != null)
+                    {
+                        referencedModules.Add(intrinsicsAssembly);
                     }
                     RemoveUnreferencedModules(referencesBuilder, identitiesBuilder, identityComparer, referencedModules);
                     referencedModules.Free();
@@ -349,108 +360,21 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
                 assemblyIdentity.ContentType == System.Reflection.AssemblyContentType.WindowsRuntime;
         }
 
-        internal static LocalInfo<TTypeSymbol> GetLocalInfo<TModuleSymbol, TTypeSymbol, TMethodSymbol, TFieldSymbol, TSymbol>(
-            this MetadataDecoder<TModuleSymbol, TTypeSymbol, TMethodSymbol, TFieldSymbol, TSymbol> metadataDecoder,
-                ImmutableArray<byte> signature)
-            where TModuleSymbol : class
-            where TTypeSymbol : class, TSymbol, ITypeSymbol
-            where TMethodSymbol : class, TSymbol, IMethodSymbol
-            where TFieldSymbol : class, TSymbol, IFieldSymbol
-            where TSymbol : class, ISymbol
-        {
-            unsafe
-            {
-                fixed (byte* ptr = signature.ToArray())
-                {
-                    var blobReader = new BlobReader(ptr, signature.Length);
-                    return metadataDecoder.DecodeLocalVariableOrThrow(ref blobReader);
-                }
-            }
-        }
-
-        /// <summary>
-        /// Returns the local info for all locals indexed by slot.
-        /// </summary>
-        internal static ImmutableArray<LocalInfo<TTypeSymbol>> GetLocalInfo<TModuleSymbol, TTypeSymbol, TMethodSymbol, TFieldSymbol, TSymbol>(
-            this MetadataDecoder<TModuleSymbol, TTypeSymbol, TMethodSymbol, TFieldSymbol, TSymbol> metadataDecoder,
-            int localSignatureToken)
-            where TModuleSymbol : class
-            where TTypeSymbol : class, TSymbol, ITypeSymbol
-            where TMethodSymbol : class, TSymbol, IMethodSymbol
-            where TFieldSymbol : class, TSymbol, IFieldSymbol
-            where TSymbol : class, ISymbol
-        {
-            var handle = MetadataTokens.Handle(localSignatureToken);
-            if (handle.IsNil)
-            {
-                return ImmutableArray<LocalInfo<TTypeSymbol>>.Empty;
-            }
-            var reader = metadataDecoder.Module.MetadataReader;
-            var signature = reader.GetStandaloneSignature((StandaloneSignatureHandle)handle).Signature;
-            var blobReader = reader.GetBlobReader(signature);
-            return metadataDecoder.DecodeLocalSignatureOrThrow(ref blobReader);
-        }
-
-        /// <summary>
-        /// Get the set of nested scopes containing the
-        /// IL offset from outermost scope to innermost.
-        /// </summary>
-        internal static void GetScopes(
-            this ISymUnmanagedReader symReader,
-            int methodToken,
-            int methodVersion,
-            int ilOffset,
-            bool isScopeEndInclusive,
-            ArrayBuilder<ISymUnmanagedScope> allScopes,
-            ArrayBuilder<ISymUnmanagedScope> containingScopes)
-        {
-            if (symReader == null)
-            {
-                return;
-            }
-
-            var symMethod = symReader.GetMethodByVersion(methodToken, methodVersion);
-            if (symMethod == null)
-            {
-                return;
-            }
-
-            symMethod.GetAllScopes(allScopes, containingScopes, ilOffset, isScopeEndInclusive);
-        }
-
-        internal static MethodContextReuseConstraints GetReuseConstraints(this ArrayBuilder<ISymUnmanagedScope> scopes, Guid moduleVersionId, int methodToken, int methodVersion, int ilOffset, bool isEndInclusive)
-        {
-            var builder = new MethodContextReuseConstraints.Builder(moduleVersionId, methodToken, methodVersion, ilOffset, isEndInclusive);
-            foreach (ISymUnmanagedScope scope in scopes)
-            {
-                builder.AddRange((uint)scope.GetStartOffset(), (uint)scope.GetEndOffset());
-            }
-            return builder.Build();
-        }
-
         internal static ImmutableArray<string> GetLocalNames(this ArrayBuilder<ISymUnmanagedScope> scopes)
         {
             var builder = ArrayBuilder<string>.GetInstance();
             foreach (var scope in scopes)
             {
-                var locals = scope.GetLocals();
-                foreach (var local in locals)
+                foreach (var local in scope.GetLocals())
                 {
                     int attributes;
                     local.GetAttributes(out attributes);
-                    if (attributes == Cci.PdbWriter.HiddenLocalAttributesValue)
+                    if (attributes == (int)LocalVariableAttributes.DebuggerHidden)
                     {
                         continue;
                     }
-                    var slot = local.GetSlot();
-                    // Local slot may be less than the current count
-                    // if the array was padded with nulls earlier.
-                    while (builder.Count <= slot)
-                    {
-                        builder.Add(null);
-                    }
-                    Debug.Assert(builder[slot] == null);
-                    builder[slot] = local.GetName();
+
+                    builder.SetItem(local.GetSlot(), local.GetName());
                 }
             }
             return builder.ToImmutableAndFree();

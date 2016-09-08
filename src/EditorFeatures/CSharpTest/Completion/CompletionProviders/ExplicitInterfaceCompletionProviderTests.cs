@@ -1,7 +1,9 @@
 ﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Completion;
 using Microsoft.CodeAnalysis.CSharp.Completion.Providers;
+using Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces;
 using Roslyn.Test.Utilities;
 using Xunit;
 
@@ -9,13 +11,17 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Completion.CompletionPr
 {
     public class ExplicitInterfaceCompletionProviderTests : AbstractCSharpCompletionProviderTests
     {
-        internal override CompletionListProvider CreateCompletionProvider()
+        public ExplicitInterfaceCompletionProviderTests(CSharpTestWorkspaceFixture workspaceFixture) : base(workspaceFixture)
+        {
+        }
+
+        internal override CompletionProvider CreateCompletionProvider()
         {
             return new ExplicitInterfaceCompletionProvider();
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void ExplicitInterfaceMember()
+        public async Task ExplicitInterfaceMember()
         {
             var markup = @"
 interface IFoo
@@ -30,14 +36,14 @@ class Bar : IFoo
      void IFoo.$$
 }";
 
-            VerifyItemExists(markup, "Foo()");
-            VerifyItemExists(markup, "Foo(int x)");
-            VerifyItemExists(markup, "Prop");
+            await VerifyItemExistsAsync(markup, "Foo()");
+            await VerifyItemExistsAsync(markup, "Foo(int x)");
+            await VerifyItemExistsAsync(markup, "Prop");
         }
 
-        [WorkItem(709988)]
+        [WorkItem(709988, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/709988")]
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void CommitOnNotParen()
+        public async Task CommitOnNotParen()
         {
             var markup = @"
 interface IFoo
@@ -61,12 +67,12 @@ class Bar : IFoo
      void IFoo.Foo()
 }";
 
-            VerifyProviderCommit(markup, "Foo()", expected, null, "");
+            await VerifyProviderCommitAsync(markup, "Foo()", expected, null, "");
         }
 
-        [WorkItem(709988)]
+        [WorkItem(709988, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/709988")]
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void CommitOnParen()
+        public async Task CommitOnParen()
         {
             var markup = @"
 interface IFoo
@@ -90,7 +96,7 @@ class Bar : IFoo
      void IFoo.Foo(
 }";
 
-            VerifyProviderCommit(markup, "Foo()", expected, '(', "");
+            await VerifyProviderCommitAsync(markup, "Foo()", expected, '(', "");
         }
     }
 }

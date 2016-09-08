@@ -1,29 +1,24 @@
 ' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
-Imports System.Globalization
 Imports System.Threading
-Imports System.Xml.Linq
+Imports System.Threading.Tasks
 Imports Microsoft.CodeAnalysis
-Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
-Imports Microsoft.CodeAnalysis.LanguageServices
-Imports Microsoft.CodeAnalysis.Shared.Extensions
-Imports Microsoft.CodeAnalysis.Text
-Imports Roslyn.Test.Utilities
 
 Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
 
     Public Class ISymbolExtensionsTests
         Inherits TestBase
 
-        Private Sub TestIsAccessibleWithin(workspaceDefinition As XElement, expectedVisible As Boolean)
-            Using workspace = TestWorkspaceFactory.CreateWorkspace(workspaceDefinition)
+        Private Async Function TestIsAccessibleWithinAsync(workspaceDefinition As XElement, expectedVisible As Boolean) As Tasks.Task
+            Using workspace = Await TestWorkspace.CreateAsync(workspaceDefinition)
                 Dim cursorDocument = workspace.Documents.First(Function(d) d.CursorPosition.HasValue)
                 Dim cursorPosition = cursorDocument.CursorPosition.Value
                 Dim document = workspace.CurrentSolution.GetDocument(cursorDocument.Id)
 
-                Dim commonSyntaxToken = document.GetSyntaxTreeAsync().Result.GetTouchingToken(cursorPosition, Nothing)
+                Dim tree = Await document.GetSyntaxTreeAsync()
+                Dim commonSyntaxToken = Await tree.GetTouchingTokenAsync(cursorPosition, Nothing)
 
-                Dim semanticModel = document.GetSemanticModelAsync().Result
+                Dim semanticModel = Await document.GetSemanticModelAsync()
                 Dim symbol = semanticModel.GetSymbols(commonSyntaxToken, document.Project.Solution.Workspace, bindLiteralsToUnderlyingType:=False, cancellationToken:=Nothing).First()
                 Dim namedTypeSymbol = semanticModel.GetEnclosingNamedType(cursorPosition, CancellationToken.None)
 
@@ -31,10 +26,10 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
 
                 Assert.Equal(expectedVisible, actualVisible)
             End Using
-        End Sub
+        End Function
 
         <Fact>
-        Public Sub TestIsAccessibleWithin_ProtectedInternal()
+        Public Async Function TestIsAccessibleWithin_ProtectedInternal() As Task
             Dim workspace =
 <Workspace>
     <Project Language="C#" AssemblyName="CSharpAssembly" CommonReferences="true">
@@ -49,11 +44,11 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
         </Document>
     </Project>
 </Workspace>
-            TestIsAccessibleWithin(workspace, False)
-        End Sub
+            Await TestIsAccessibleWithinAsync(workspace, False)
+        End Function
 
         <Fact>
-        Public Sub TestIsAccessibleWithin_ProtectedInternal_InternalsVisibleTo()
+        Public Async Function TestIsAccessibleWithin_ProtectedInternal_InternalsVisibleTo() As Task
             Dim workspace =
 <Workspace>
     <Project Language="C#" AssemblyName="CSharpAssembly" CommonReferences="true">
@@ -70,11 +65,11 @@ public class Program { protected internal static int F; }
         </Document>
     </Project>
 </Workspace>
-            TestIsAccessibleWithin(workspace, True)
-        End Sub
+            Await TestIsAccessibleWithinAsync(workspace, True)
+        End Function
 
         <Fact>
-        Public Sub TestIsAccessibleWithin_ProtectedInternal_WrongInternalsVisibleTo()
+        Public Async Function TestIsAccessibleWithin_ProtectedInternal_WrongInternalsVisibleTo() As Task
             Dim workspace =
 <Workspace>
     <Project Language="C#" AssemblyName="CSharpAssembly" CommonReferences="true">
@@ -91,11 +86,11 @@ public class Program { protected internal static int F; }
         </Document>
     </Project>
 </Workspace>
-            TestIsAccessibleWithin(workspace, False)
-        End Sub
+            Await TestIsAccessibleWithinAsync(workspace, False)
+        End Function
 
         <Fact>
-        Public Sub TestIsAccessibleWithin_PrivateInsideNestedType()
+        Public Async Function TestIsAccessibleWithin_PrivateInsideNestedType() As Task
             Dim workspace =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -110,11 +105,11 @@ class Outer
 }        </Document>
     </Project>
 </Workspace>
-            TestIsAccessibleWithin(workspace, True)
-        End Sub
+            Await TestIsAccessibleWithinAsync(workspace, True)
+        End Function
 
         <Fact>
-        Public Sub TestIsAccessibleWithin_ProtectedInsideNestedType()
+        Public Async Function TestIsAccessibleWithin_ProtectedInsideNestedType() As Task
             Dim workspace =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -129,8 +124,8 @@ class Outer
 }        </Document>
     </Project>
 </Workspace>
-            TestIsAccessibleWithin(workspace, True)
-        End Sub
+            Await TestIsAccessibleWithinAsync(workspace, True)
+        End Function
 
     End Class
 End Namespace

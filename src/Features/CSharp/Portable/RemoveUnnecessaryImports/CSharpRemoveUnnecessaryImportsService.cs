@@ -4,20 +4,21 @@ using System.Collections.Generic;
 using System.Composition;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Formatting;
-using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.CodeAnalysis.Internal.Log;
+using Microsoft.CodeAnalysis.Options;
 using Microsoft.CodeAnalysis.RemoveUnnecessaryImports;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
-using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp.RemoveUnnecessaryImports
 {
     [ExportLanguageService(typeof(IRemoveUnnecessaryImportsService), LanguageNames.CSharp), Shared]
-    internal partial class CSharpRemoveUnnecessaryImportsService : IRemoveUnnecessaryImportsService
+    internal partial class CSharpRemoveUnnecessaryImportsService :
+        AbstractRemoveUnnecessaryImportsService<UsingDirectiveSyntax>, IRemoveUnnecessaryImportsService
     {
         public static IEnumerable<SyntaxNode> GetUnnecessaryImports(SemanticModel semanticModel, SyntaxNode root, CancellationToken cancellationToken)
         {
@@ -50,37 +51,41 @@ namespace Microsoft.CodeAnalysis.CSharp.RemoveUnnecessaryImports
             return unnecessaryImports;
         }
 
-        public Document RemoveUnnecessaryImports(Document document, SemanticModel model, SyntaxNode root, CancellationToken cancellationToken)
+        public async Task<Document> RemoveUnnecessaryImportsAsync(Document document, CancellationToken cancellationToken)
         {
             using (Logger.LogBlock(FunctionId.Refactoring_RemoveUnnecessaryImports_CSharp, cancellationToken))
             {
-                var unnecessaryImports = GetUnnecessaryImports(model, root, cancellationToken) as ISet<UsingDirectiveSyntax>;
-                if (unnecessaryImports == null)
+                var unnecessaryImports = await GetCommonUnnecessaryImportsOfAllContextAsync(document, cancellationToken).ConfigureAwait(false);
+                if (unnecessaryImports == null || unnecessaryImports.Any(import => import.OverlapsHiddenPosition(cancellationToken)))
                 {
                     return document;
                 }
+
+                var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
 
                 var oldRoot = (CompilationUnitSyntax)root;
-                if (unnecessaryImports.Any(import => oldRoot.OverlapsHiddenPosition(cancellationToken)))
-                {
-                    return document;
-                }
-
                 var newRoot = (CompilationUnitSyntax)new Rewriter(unnecessaryImports, cancellationToken).Visit(oldRoot);
+
                 if (cancellationToken.IsCancellationRequested)
                 {
                     return null;
                 }
 
-                return document.WithSyntaxRoot(FormatResult(document, newRoot, cancellationToken));
+                return document.WithSyntaxRoot(await FormatResultAsync(document, newRoot, cancellationToken).ConfigureAwait(false));
             }
         }
 
-        private SyntaxNode FormatResult(Document document, CompilationUnitSyntax newRoot, CancellationToken cancellationToken)
+        protected override IEnumerable<UsingDirectiveSyntax> GetUnusedUsings(SemanticModel model, SyntaxNode root, CancellationToken cancellationToken)
+        {
+            return GetUnnecessaryImports(model, root, cancellationToken) as IEnumerable<UsingDirectiveSyntax>;
+        }
+
+        private async Task<SyntaxNode> FormatResultAsync(Document document, CompilationUnitSyntax newRoot, CancellationToken cancellationToken)
         {
             var spans = new List<TextSpan>();
             AddFormattingSpans(newRoot, spans, cancellationToken);
-            return Formatter.Format(newRoot, spans, document.Project.Solution.Workspace, document.Project.Solution.Workspace.Options, cancellationToken: cancellationToken);
+            var options = await document.GetOptionsAsync(cancellationToken).ConfigureAwait(false);
+            return await Formatter.FormatAsync(newRoot, spans, document.Project.Solution.Workspace, options, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 
         private void AddFormattingSpans(

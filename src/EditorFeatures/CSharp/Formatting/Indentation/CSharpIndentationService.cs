@@ -2,9 +2,7 @@
 
 using System.Collections.Generic;
 using System.Composition;
-using System.Linq;
 using System.Threading;
-using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Extensions;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -12,17 +10,17 @@ using Microsoft.CodeAnalysis.Editor.Implementation.Formatting.Indentation;
 using Microsoft.CodeAnalysis.Editor.Implementation.SmartIndent;
 using Microsoft.CodeAnalysis.Formatting;
 using Microsoft.CodeAnalysis.Formatting.Rules;
-using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.Host.Mef;
+using Microsoft.CodeAnalysis.LanguageServices;
 using Microsoft.CodeAnalysis.Options;
 using Microsoft.CodeAnalysis.Shared.Extensions;
+using Microsoft.CodeAnalysis.Text;
 using Microsoft.CodeAnalysis.Text.Shared.Extensions;
-using Microsoft.VisualStudio.Text;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Editor.CSharp.Formatting.Indentation
 {
-    [ExportLanguageService(typeof(IIndentationService), LanguageNames.CSharp), Shared]
+    [ExportLanguageService(typeof(ISynchronousIndentationService), LanguageNames.CSharp), Shared]
     internal partial class CSharpIndentationService : AbstractIndentationService
     {
         private static readonly IFormattingRule s_instance = new FormattingRule();
@@ -32,31 +30,34 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.Formatting.Indentation
             return s_instance;
         }
 
-        protected override AbstractIndenter GetIndenter(Document document, ITextSnapshotLine lineToBeIndented, IEnumerable<IFormattingRule> formattingRules, OptionSet optionSet, CancellationToken cancellationToken)
+        protected override AbstractIndenter GetIndenter(
+            ISyntaxFactsService syntaxFacts, SyntaxTree syntaxTree, TextLine lineToBeIndented, IEnumerable<IFormattingRule> formattingRules, OptionSet optionSet, CancellationToken cancellationToken)
         {
-            return new Indenter(document, formattingRules, optionSet, lineToBeIndented, cancellationToken);
+            return new Indenter(
+                syntaxFacts, syntaxTree, formattingRules,
+                optionSet, lineToBeIndented, cancellationToken);
         }
 
         protected override bool ShouldUseSmartTokenFormatterInsteadOfIndenter(
             IEnumerable<IFormattingRule> formattingRules,
             SyntaxNode root,
-            ITextSnapshotLine line,
+            TextLine line,
             OptionSet optionSet,
             CancellationToken cancellationToken)
         {
-            return ShouldUseSmartTokenFormatterInsteadOfIndenter(formattingRules, (CompilationUnitSyntax)root, line, optionSet, cancellationToken);
+            return ShouldUseSmartTokenFormatterInsteadOfIndenter(
+                formattingRules, (CompilationUnitSyntax)root, line, optionSet, cancellationToken);
         }
 
         public static bool ShouldUseSmartTokenFormatterInsteadOfIndenter(
             IEnumerable<IFormattingRule> formattingRules,
             CompilationUnitSyntax root,
-            ITextSnapshotLine line,
+            TextLine line,
             OptionSet optionSet,
             CancellationToken cancellationToken)
         {
             Contract.ThrowIfNull(formattingRules);
             Contract.ThrowIfNull(root);
-            Contract.ThrowIfNull(line);
 
             if (optionSet.GetOption(FormattingOptions.SmartIndent, LanguageNames.CSharp) != FormattingOptions.IndentStyle.Smart)
             {
@@ -117,14 +118,19 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.Formatting.Indentation
                 }
 
                 var argument = node as BaseArgumentListSyntax;
-                if (argument != null && argument.Parent.Kind() != SyntaxKind.ThisConstructorInitializer)
+                if (argument != null &&
+                    argument.Parent.Kind() != SyntaxKind.ThisConstructorInitializer &&
+                    !IsBracketedArgumentListMissingBrackets(argument as BracketedArgumentListSyntax))
                 {
                     AddIndentBlockOperations(list, argument);
                     return;
                 }
 
+                // only valid if the user has started to actually type a constructor initializer
                 var constructorInitializer = node as ConstructorInitializerSyntax;
-                if (constructorInitializer != null && constructorInitializer.ArgumentList.OpenParenToken.Kind() != SyntaxKind.None)
+                if (constructorInitializer != null &&
+                    constructorInitializer.ArgumentList.OpenParenToken.Kind() != SyntaxKind.None &&
+                    !constructorInitializer.ThisOrBaseKeyword.IsMissing)
                 {
                     var text = node.SyntaxTree.GetText();
 
@@ -149,6 +155,11 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.Formatting.Indentation
                         AddIndentBlockOperations(list, constructorInitializer.ArgumentList);
                     }
                 }
+            }
+
+            private bool IsBracketedArgumentListMissingBrackets(BracketedArgumentListSyntax node)
+            {
+                return node != null && node.OpenBracketToken.IsMissing && node.CloseBracketToken.IsMissing;
             }
 
             private void ReplaceCaseIndentationRules(List<IndentBlockOperation> list, SyntaxNode node)

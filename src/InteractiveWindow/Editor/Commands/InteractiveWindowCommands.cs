@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.Language.StandardClassification;
 using Microsoft.VisualStudio.Text;
@@ -14,7 +15,7 @@ namespace Microsoft.VisualStudio.InteractiveWindow.Commands
 {
     internal sealed class Commands : IInteractiveWindowCommands
     {
-        private const string _commandSeparator = ",";
+        private const string _commandSeparator = ", ";
 
         private readonly Dictionary<string, IInteractiveWindowCommand> _commands;
         private readonly int _maxCommandNameLength;
@@ -47,13 +48,14 @@ namespace Microsoft.VisualStudio.InteractiveWindow.Commands
                 {
                     if (commandsDict.ContainsKey(name))
                     {
-                        throw new InvalidOperationException(string.Format(InteractiveWindowResources.DuplicateCommand, string.Join(", ", command.Names)));
+                        throw new InvalidOperationException(string.Format(InteractiveWindowResources.DuplicateCommand, string.Join(_commandSeparator, command.Names)));
                     }
                     if (length != 0)
                     {
                         length += _commandSeparator.Length;
                     }
-                    length += name.Length;
+                    // plus the length of `#` for display purpose
+                    length += name.Length + 1;
 
                     commandsDict[name] = command;
                 }
@@ -165,8 +167,12 @@ namespace Microsoft.VisualStudio.InteractiveWindow.Commands
 
         internal IEnumerable<string> Help()
         {
-            string format = "{0,-" + _maxCommandNameLength + "}  {1}";
-            return _commands.OrderBy(entry => entry.Key).Select(cmd => string.Format(format, cmd.Key, cmd.Value.Description));
+            // The magic number `19` here is calculated based on how the description is dispayed for other help entries to keep the texts aligned
+            // (As of now other help entries include REPL commands and script derectives, both have manually formatted help description strings.
+            string format = "{0,-" + Math.Max(19, _maxCommandNameLength) + "}  {1}";
+            return _commands.GroupBy(entry => entry.Value).
+                Select(group => string.Format(format, string.Join(_commandSeparator, group.Key.Names.Select(s => CommandPrefix + s)), group.Key.Description)).
+                OrderBy(line => line);
         }
 
         public IEnumerable<ClassificationSpan> Classify(SnapshotSpan span)
@@ -227,43 +233,88 @@ namespace Microsoft.VisualStudio.InteractiveWindow.Commands
             }
             catch (Exception e)
             {
-                _window.ErrorOutputWriter.WriteLine($"Command '{command.Names.First()}' failed: {e.Message}");
+                _window.ErrorOutputWriter.WriteLine(InteractiveWindowResources.CommandFailed, command.Names.First(), e.Message);
                 return ExecutionResult.Failure;
             }
         }
 
         private const string HelpIndent = "  ";
 
+        private static readonly string[] s_CSVBScriptDirectives = new[]
+        {
+            "#r                   " + InteractiveWindowResources.RefHelp,
+            "#load                " + InteractiveWindowResources.LoadHelp
+        };
+
         private static readonly string[] s_shortcutDescriptions = new[]
         {
-"Enter                Evaluate the current input if it appears to be complete.",
-"Ctrl-Enter           If the caret is in current pending input submission, evaluate the entire submission.",
-"                     If the caret is in a previous input block, copy that input text to the end of the buffer.",
-"Shift-Enter          If the caret is in the current pending input submission, insert a new line.",
-"Escape               If the caret is in the current pending input submission, delete the entire submission.",
-"Alt-UpArrow          Paste previous input at end of buffer, rotate through history.",
-"Alt-DownArrow        Paste next input at end of buffer, rotate through history.",
-"UpArrow              Normal editor buffer navigation.",
-"DownArrow            Normal editor buffer navigation.",
-"Ctrl-K, Ctrl-Enter   Paste the selection at the end of interactive buffer, leave caret at the end of input.",
-"Ctrl-E, Ctrl-Enter   Paste and execute the selection before any pending input in the interactive buffer.",
-"Ctrl-A               Alternatively select the input block containing the caret, or whole buffer.",
+            "Enter                " + InteractiveWindowResources.EnterHelp,
+            "Ctrl-Enter           " + InteractiveWindowResources.CtrlEnterHelp1,
+            "                     " + InteractiveWindowResources.CtrlEnterHelp2,
+            "Shift-Enter          " + InteractiveWindowResources.ShiftEnterHelp,
+            "Escape               " + InteractiveWindowResources.EscapeHelp,
+            "Alt-UpArrow          " + InteractiveWindowResources.AltUpArrowHelp,
+            "Alt-DownArrow        " + InteractiveWindowResources.AltDownArrowHelp,
+            "Ctrl-Alt-UpArrow     " + InteractiveWindowResources.CtrlAltUpArrowHelp,
+            "Ctrl-Alt-DownArrow   " + InteractiveWindowResources.CtrlAltDownArrowHelp,
+            "Ctrl-K, Ctrl-Enter   " + InteractiveWindowResources.CtrlKCtrlEnterHelp,
+            "Ctrl-E, Ctrl-Enter   " + InteractiveWindowResources.CtrlECtrlEnterHelp,
+            "Ctrl-A               " + InteractiveWindowResources.CtrlAHelp
         };
+
+        private static readonly string[] s_shortcutDescriptionsSmartUpDown = new[]
+        {
+            "UpArrow              " + InteractiveWindowResources.UpArrowHelp1,
+            "                     " + InteractiveWindowResources.UpArrowHelp2,
+            "DownArrow            " + InteractiveWindowResources.DownArrowHelp1,
+            "                     " + InteractiveWindowResources.DownArrowHelp2
+        };
+
+
+        internal string ShortcutDescriptions
+        {
+            get
+            {
+                var sb = new StringBuilder();
+                foreach (var line in s_shortcutDescriptions)
+                {
+                    sb.Append(HelpIndent + line + "\r\n");
+                }
+                if (UseSmartUpDown)
+                {
+                    foreach (var line in s_shortcutDescriptionsSmartUpDown)
+                    {
+                        sb.Append(HelpIndent + line + "\r\n");
+                    }
+                }
+                return sb.ToString();
+            }
+        }
 
         public void DisplayHelp()
         {
-            _window.WriteLine("Keyboard shortcuts:");
-            foreach (var line in s_shortcutDescriptions)
+            _window.WriteLine(InteractiveWindowResources.KeyboardShortcuts);
+            _window.Write(ShortcutDescriptions);
+
+            _window.WriteLine(InteractiveWindowResources.ReplCommands);
+            foreach (var line in Help())
             {
                 _window.Write(HelpIndent);
                 _window.WriteLine(line);
             }
 
-            _window.WriteLine("REPL commands:");
-            foreach (var line in Help())
+            // Hack: Display script directives only in CS/VB interactive window
+            // TODO: https://github.com/dotnet/roslyn/issues/6441
+            var evaluatorTypeName = _window.Evaluator.GetType().Name;
+            if (evaluatorTypeName == "CSharpInteractiveEvaluator" ||
+                evaluatorTypeName == "VisualBasicInteractiveEvaluator")
             {
-                _window.Write(HelpIndent);
-                _window.WriteLine(line);
+                _window.WriteLine(InteractiveWindowResources.CSVBScriptDirectives);
+                foreach (var line in s_CSVBScriptDirectives)
+                {
+                    _window.Write(HelpIndent);
+                    _window.WriteLine(line);
+                }
             }
         }
 
@@ -275,10 +326,10 @@ namespace Microsoft.VisualStudio.InteractiveWindow.Commands
                 writer.WriteLine(string.Empty);
             }
 
-            writer.WriteLine("Usage:");
+            writer.WriteLine(InteractiveWindowResources.Usage);
             writer.Write(HelpIndent);
             writer.Write(CommandPrefix);
-            writer.Write(string.Join(_commandSeparator, command.Names));
+            writer.Write(string.Join(_commandSeparator + CommandPrefix, command.Names));
 
             string commandLine = command.CommandLine;
             if (commandLine != null)
@@ -295,7 +346,7 @@ namespace Microsoft.VisualStudio.InteractiveWindow.Commands
                 if (paramsDesc != null && paramsDesc.Any())
                 {
                     writer.WriteLine(string.Empty);
-                    writer.WriteLine("Parameters:");
+                    writer.WriteLine(InteractiveWindowResources.Parameters);
 
                     int maxParamNameLength = paramsDesc.Max(entry => entry.Key.Length);
                     string paramHelpLineFormat = HelpIndent + "{0,-" + maxParamNameLength + "}  {1}";
@@ -322,5 +373,7 @@ namespace Microsoft.VisualStudio.InteractiveWindow.Commands
         {
             DisplayCommandUsage(command, _window.OutputWriter, displayDetails: true);
         }
+
+        private bool UseSmartUpDown => _window.TextView.Options.GetOptionValue(InteractiveWindowOptions.SmartUpDown);
     }
 }

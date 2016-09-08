@@ -13,6 +13,7 @@ Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 Imports TypeKind = Microsoft.CodeAnalysis.TypeKind
 Imports Display = Microsoft.CodeAnalysis.VisualBasic.SymbolDisplay
+Imports Microsoft.CodeAnalysis.Diagnostics
 
 Namespace Microsoft.CodeAnalysis.VisualBasic
 
@@ -116,7 +117,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     ' this should be relatively uncommon
                     ' most symbols that may be contained in a type
                     ' know their containing type and can override ContainingType
-                    ' with a more precicse implementation
+                    ' with a more precise implementation
                     Return containerAsType
                 End If
 
@@ -185,11 +186,11 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                         Debug.Assert(Not (TypeOf Me Is SourceAssemblySymbol), "SourceAssemblySymbol must override DeclaringCompilation")
                         Return Nothing
                     Case SymbolKind.NetModule
-                        Debug.Assert(Not (TypeOf Me Is sourceModuleSymbol), "SourceModuleSymbol must override DeclaringCompilation")
+                        Debug.Assert(Not (TypeOf Me Is SourceModuleSymbol), "SourceModuleSymbol must override DeclaringCompilation")
                         Return Nothing
                 End Select
 
-                Dim sourceModuleSymbol = TryCast(Me.ContainingModule, sourceModuleSymbol)
+                Dim sourceModuleSymbol = TryCast(Me.ContainingModule, SourceModuleSymbol)
                 Return If(sourceModuleSymbol Is Nothing, Nothing, sourceModuleSymbol.DeclaringCompilation)
             End Get
         End Property
@@ -874,10 +875,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             If errorInfo IsNot Nothing Then
                 Select Case errorInfo.Code
-                    Case ERRID.ERR_UnreferencedAssemblyBase3,
-                         ERRID.ERR_UnreferencedAssemblyImplements3
-                        errorInfo = ErrorFactory.ErrorInfo(ERRID.ERR_UnreferencedAssembly3, errorInfo.Arguments(0), errorInfo.Arguments(1))
-
                     Case ERRID.ERR_UnreferencedModuleBase3,
                          ERRID.ERR_UnreferencedModuleImplements3
                         errorInfo = ErrorFactory.ErrorInfo(ERRID.ERR_UnreferencedModule3, errorInfo.Arguments(0), errorInfo.Arguments(1))

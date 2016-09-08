@@ -5,7 +5,6 @@ using System.Collections.Immutable;
 using System.Threading;
 using Microsoft.CodeAnalysis.ErrorReporting;
 using Microsoft.CodeAnalysis.FindSymbols;
-using Microsoft.CodeAnalysis.LanguageServices;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
@@ -16,54 +15,63 @@ namespace Microsoft.CodeAnalysis.Editor.Navigation
     {
         internal class DeclaredSymbolNavigableItem : INavigableItem
         {
-            public string DisplayName => _lazyDisplayName.Value;
+            public ImmutableArray<TaggedText> DisplayTaggedParts => _lazyDisplayTaggedParts.Value; 
+
             public Document Document { get; }
-            public Glyph Glyph => _lazySymbol.Value?.GetGlyph() ?? Glyph.Error;
+            public Glyph Glyph => Symbol?.GetGlyph() ?? Glyph.Error;
             public TextSpan SourceSpan => _declaredSymbolInfo.Span;
             public ISymbol Symbol => _lazySymbol.Value;
             public ImmutableArray<INavigableItem> ChildItems => ImmutableArray<INavigableItem>.Empty;
 
+            public bool DisplayFileLocation => false;
+
             private readonly DeclaredSymbolInfo _declaredSymbolInfo;
-            private readonly Lazy<string> _lazyDisplayName;
+            private readonly Lazy<ImmutableArray<TaggedText>> _lazyDisplayTaggedParts;
             private readonly Lazy<ISymbol> _lazySymbol;
+
+            /// <summary>
+            /// DeclaredSymbolInfos always come from some actual declaration in source.  So they're
+            /// never implicitly declared.
+            /// </summary>
+            public bool IsImplicitlyDeclared => false;
 
             public DeclaredSymbolNavigableItem(Document document, DeclaredSymbolInfo declaredSymbolInfo)
             {
                 Document = document;
                 _declaredSymbolInfo = declaredSymbolInfo;
 
-                // Cancellation isn't supported when computing the various properties that depend on the symbol, hence
-                // CancellationToken.None.
-                _lazySymbol = new Lazy<ISymbol>(() => declaredSymbolInfo.GetSymbolAsync(document, CancellationToken.None).ConfigureAwait(false).GetAwaiter().GetResult());
-                _lazyDisplayName = new Lazy<string>(() =>
+                _lazySymbol = new Lazy<ISymbol>(FindSymbol);
+
+                _lazyDisplayTaggedParts = new Lazy<ImmutableArray<TaggedText>>(() =>
                 {
                     try
                     {
                         if (Symbol == null)
                         {
-                            return null;
+                            return default(ImmutableArray<TaggedText>);
                         }
 
-                        var symbolDisplayService = Document.GetLanguageService<ISymbolDisplayService>();
-                        switch (Symbol.Kind)
-                        {
-                            case SymbolKind.NamedType:
-                                return symbolDisplayService.ToDisplayString(Symbol, s_shortFormatWithModifiers);
-
-                            case SymbolKind.Method:
-                                return Symbol.IsStaticConstructor()
-                                    ? symbolDisplayService.ToDisplayString(Symbol, s_shortFormatWithModifiers)
-                                    : symbolDisplayService.ToDisplayString(Symbol, s_shortFormat);
-
-                            default:
-                                return symbolDisplayService.ToDisplayString(Symbol, s_shortFormat);
-                        }
+                        return GetSymbolDisplayTaggedParts(Document.Project, Symbol);
                     }
                     catch (Exception e) when (FatalError.Report(e))
                     {
                         throw ExceptionUtilities.Unreachable;
                     }
                 });
+            }
+
+            private ISymbol FindSymbol()
+            {
+                // Here, we will use partial semantics. We are going to use this symbol to get a glyph, display string,
+                // and potentially documentation comments. The first two should work fine even if we don't have full
+                // references, and the latter will probably be fine. (It wouldn't be if you have a partial type
+                // and we didn't get all the trees parsed yet to know that. In other words, an edge case we don't care about.)
+
+                // Cancellation isn't supported when computing the various properties that depend on the symbol, hence
+                // CancellationToken.None.
+                var semanticModel = Document.GetPartialSemanticModelAsync(CancellationToken.None).GetAwaiter().GetResult();
+
+                return _declaredSymbolInfo.Resolve(semanticModel, CancellationToken.None);
             }
         }
     }

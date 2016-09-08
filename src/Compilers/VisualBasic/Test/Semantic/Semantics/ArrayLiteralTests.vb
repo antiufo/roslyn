@@ -246,20 +246,45 @@ End Module
 ]]></file>
 </compilation>
             Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=_strictOff)
-            comp.VerifyDiagnostics(
-                    Diagnostic(ERRID.ERR_TypeInferenceArrayRankMismatch1, "a1()").WithArguments("a1"),
-                    Diagnostic(ERRID.ERR_ConvertObjectArrayMismatch3, "{{1}}").WithArguments("Integer(*,*)", "Object()", "Integer"),
-                    Diagnostic(ERRID.ERR_ArrayInitializerTooManyDimensions, "{2}"),
-                    Diagnostic(ERRID.ERR_ArrayInitializerTooFewDimensions, "2"),
-                    Diagnostic(ERRID.ERR_TypeMismatch2, "{{1}}").WithArguments("Integer(*,*)", "System.Collections.Generic.IEnumerable(Of Double)"))
-
+            comp.AssertTheseDiagnostics(
+<expected>
+BC36909: Cannot infer a data type for 'a1' because the array dimensions do not match.
+        dim a1() = {{1}}
+            ~~~~
+BC30414: Value of type 'Integer(*,*)' cannot be converted to 'Object()' because the array types have different numbers of dimensions.
+        dim a1() = {{1}}
+                   ~~~~~
+BC30566: Array initializer has too many dimensions.
+        dim a2 = {1, {2}}
+                     ~~~
+BC30565: Array initializer has too few dimensions.
+        dim a3(,) = {{{1}}, 2}
+                            ~
+BC30311: Value of type 'Integer(*,*)' cannot be converted to 'IEnumerable(Of Double)'.
+        dim i2 as IEnumerable(of Double) = {{1}}
+                                           ~~~~~
+</expected>
+            )
             comp = comp.WithOptions(_strictOn)
-            comp.VerifyDiagnostics(
-                     Diagnostic(ERRID.ERR_TypeInferenceArrayRankMismatch1, "a1()").WithArguments("a1"),
-                     Diagnostic(ERRID.ERR_ConvertObjectArrayMismatch3, "{{1}}").WithArguments("Integer(*,*)", "Object()", "Integer"),
-                     Diagnostic(ERRID.ERR_ArrayInitializerTooManyDimensions, "{2}"),
-                     Diagnostic(ERRID.ERR_ArrayInitializerTooFewDimensions, "2"),
-                     Diagnostic(ERRID.ERR_TypeMismatch2, "{{1}}").WithArguments("Integer(*,*)", "System.Collections.Generic.IEnumerable(Of Double)"))
+            comp.AssertTheseDiagnostics(
+<expected>
+BC36909: Cannot infer a data type for 'a1' because the array dimensions do not match.
+        dim a1() = {{1}}
+            ~~~~
+BC30414: Value of type 'Integer(*,*)' cannot be converted to 'Object()' because the array types have different numbers of dimensions.
+        dim a1() = {{1}}
+                   ~~~~~
+BC30566: Array initializer has too many dimensions.
+        dim a2 = {1, {2}}
+                     ~~~
+BC30565: Array initializer has too few dimensions.
+        dim a3(,) = {{{1}}, 2}
+                            ~
+BC30311: Value of type 'Integer(*,*)' cannot be converted to 'IEnumerable(Of Double)'.
+        dim i2 as IEnumerable(of Double) = {{1}}
+                                           ~~~~~
+</expected>
+            )
 
         End Sub
 
@@ -513,14 +538,13 @@ End Module
                 Diagnostic(ERRID.WRN_ObjectAssumed1, "{""a"", New c}").WithArguments("Cannot infer an element type; 'Object' assumed."))
         End Sub
 
-        <Fact(Skip:="529377")>
-        Public Sub TestArrayLiteralInferredElementArgIterator()
+        <Fact>
+        Public Sub TestArrayLiteralInferredElementArgIterator_1()
             Dim source =
 <compilation name="TestArrayLiteralInferredElementTypeDiagnostics">
     <file name="a.vb">
         <![CDATA[
-        Imports System
-Imports System.Collections.Generic
+Imports System
 
 Module Program
     Class c
@@ -528,7 +552,7 @@ Module Program
 
     Sub Main(args As String())
         Dim a As ArgIterator = Nothing
-        Dim x as ArgIterator= {a} ' Error should be reported on ArgIterator not the array literal
+        Dim x as ArgIterator= {a} 
     End Sub
 End Module
 ]]>
@@ -536,12 +560,57 @@ End Module
 </compilation>
             Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=_strictOff)
 
+            Dim expected =
+<expected>
+	BC30311: Value of type 'ArgIterator()' cannot be converted to 'ArgIterator'.
+        Dim x as ArgIterator= {a} 
+                              ~~~
+</expected>
+            comp.AssertTheseDiagnostics(expected)
+
             comp = comp.WithOptions(_strictOn)
-            comp.VerifyDiagnostics() ' Error should be reported on ArgIterator not the array literal
+            comp.AssertTheseDiagnostics(expected)
 
             comp = comp.WithOptions(_strictCustom)
-            comp.VerifyDiagnostics() ' Error should be reported on ArgIterator not the array literal
+            comp.AssertTheseDiagnostics(expected)
+        End Sub
 
+        <Fact>
+        <WorkItem(529377, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529377")>
+        Public Sub TestArrayLiteralInferredElementArgIterator_2()
+            Dim source =
+<compilation name="TestArrayLiteralInferredElementTypeDiagnostics">
+    <file name="a.vb">
+        <![CDATA[
+Imports System
+
+Module Program
+    Class c
+    End Class
+
+    Sub Main(args As String())
+        Dim a As ArgIterator = Nothing
+        Dim x as ArgIterator() = {a} 
+    End Sub
+End Module
+]]>
+    </file>
+</compilation>
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntimeAndReferences(source, options:=_strictOff)
+
+            Dim expected =
+<expected>
+BC31396: 'ArgIterator' cannot be made nullable, and cannot be used as the data type of an array element, field, anonymous type member, type argument, 'ByRef' parameter, or return statement.
+        Dim x as ArgIterator() = {a} 
+                 ~~~~~~~~~~~~~
+</expected>
+            comp.AssertTheseDiagnostics(expected)
+
+            comp = comp.WithOptions(_strictOn)
+            comp.AssertTheseDiagnostics(expected)
+
+            comp = comp.WithOptions(_strictCustom)
+            comp.AssertTheseDiagnostics(expected)
         End Sub
 
         <Fact()>
@@ -1286,7 +1355,7 @@ m+C[]
 
         End Sub
 
-        <WorkItem(544203, "DevDiv")>
+        <WorkItem(544203, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544203")>
         <Fact()>
         Public Sub ArrayLiteralInferenceBug12426()
             Dim source =
@@ -1345,7 +1414,7 @@ ImmutableArray`1[BoundStatement]
 
         End Sub
 
-        <WorkItem(544381, "DevDiv")>
+        <WorkItem(544381, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544381")>
         <Fact()>
         Public Sub ArrayLiteralInferenceBug12679()
             Dim source =
@@ -1426,7 +1495,7 @@ End Module
             Assert.False(semanticSummary.ConstantValue.HasValue)
         End Sub
 
-        <WorkItem(544363, "DevDiv")>
+        <WorkItem(544363, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544363")>
         <Fact()>
         Public Sub TestArrayLiteralWithAmbiguousOverloadWithParamArray()
             Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
@@ -1450,7 +1519,7 @@ End Module
             compilation.VerifyDiagnostics(Diagnostic(ERRID.ERR_TypeInferenceFailureAmbiguous2, "fooModules").WithArguments("Public Sub fooModules(Of T)(ParamArray z As T())"))
         End Sub
 
-        <WorkItem(544352, "DevDiv")>
+        <WorkItem(544352, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544352")>
         <Fact()>
         Public Sub TestArrayLiteralErrorMsgArrayOfDelegate()
             Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
@@ -1475,7 +1544,7 @@ End Module
         End Sub
 
 
-        <WorkItem(544566, "DevDiv")>
+        <WorkItem(544566, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544566")>
         <Fact()>
         Public Sub TestArrayLiteralInTernaryIf()
             Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(
@@ -1514,7 +1583,7 @@ System.Int64[]
                         ]]>)
         End Sub
 
-        <WorkItem(529543, "DevDiv")>
+        <WorkItem(529543, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529543")>
         <Fact()>
         Public Sub TestArrayLiteralSemanticModelCTypeLongConversion()
             Dim compilation = CreateCompilationWithMscorlib(
@@ -1641,7 +1710,7 @@ End Module
             Assert.False(semanticSummary.ConstantValue.HasValue)
         End Sub
 
-        <WorkItem(545375, "DevDiv")>
+        <WorkItem(545375, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545375")>
         <Fact()>
         Public Sub TestArrayLiteralInferTypeInIf()
             Dim source =
@@ -1673,7 +1742,7 @@ End Module
                         ]]>)
         End Sub
 
-        <WorkItem(545517, "DevDiv")>
+        <WorkItem(545517, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545517")>
         <Fact()>
         Public Sub TestArrayLiteralInferTypeInWithinParens1()
             Dim source =
@@ -1708,7 +1777,7 @@ Sub Foo(Of T)(x As IList(Of T)())
                         ]]>)
         End Sub
 
-        <WorkItem(545517, "DevDiv")>
+        <WorkItem(545517, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545517")>
         <Fact()>
         Public Sub TestArrayLiteralInferTypeInWithinParens2()
             Dim source =
@@ -1731,7 +1800,7 @@ End Module
 
         End Sub
 
-        <WorkItem(530876, "DevDiv")>
+        <WorkItem(530876, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530876")>
         <Fact()>
         Public Sub Bug17124()
             Dim source =
@@ -1749,7 +1818,7 @@ End Module
             CompileAndVerify(comp)
         End Sub
 
-        <WorkItem(796610, "DevDiv")>
+        <WorkItem(796610, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/796610")>
         <Fact()>
         Public Sub Bug796610_1()
             Dim source =
@@ -1912,7 +1981,7 @@ Static=System.Object[,], Runtime x=System.Object[,], Runtime y=Nothing
 ]]>)
         End Sub
 
-        <WorkItem(796610, "DevDiv")>
+        <WorkItem(796610, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/796610")>
         <Fact()>
         Public Sub Bug796610_2()
             Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
@@ -1937,7 +2006,7 @@ End Module
             CompileAndVerify(compilation, <![CDATA[System.String[]]]>)
         End Sub
 
-        <WorkItem(116)>
+        <WorkItem(116, "https://github.com/dotnet/roslyn/issues/116")>
         <Fact()>
         Public Sub TestArrayLiteralSemanticModelImplicitConversion()
             Dim compilation = CreateCompilationWithMscorlib(
@@ -1970,7 +2039,7 @@ End Module
             Assert.False(semanticSummary.ConstantValue.HasValue)
         End Sub
 
-        <WorkItem(799045)>
+        <WorkItem(799045, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/799045")>
         <Fact()>
         Public Sub TestArrayLiteralSemanticModelImplicitConversionParenthesized()
             Dim compilation = CreateCompilationWithMscorlib(

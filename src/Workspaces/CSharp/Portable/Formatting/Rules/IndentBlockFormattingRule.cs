@@ -245,7 +245,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Formatting
                 return;
             }
 
-            var foreachStatement = node as ForEachStatementSyntax;
+            var foreachStatement = node as CommonForEachStatementSyntax;
             if (foreachStatement != null && foreachStatement.Statement != null && !(foreachStatement.Statement is BlockSyntax))
             {
                 AddEmbeddedStatementsIndentationOperation(list, foreachStatement.Statement);
@@ -256,6 +256,13 @@ namespace Microsoft.CodeAnalysis.CSharp.Formatting
             if (usingStatement != null && usingStatement.Statement != null && !(usingStatement.Statement is BlockSyntax || usingStatement.Statement is UsingStatementSyntax))
             {
                 AddEmbeddedStatementsIndentationOperation(list, usingStatement.Statement);
+                return;
+            }
+
+            var fixedStatement = node as FixedStatementSyntax;
+            if (fixedStatement != null && fixedStatement.Statement != null && !(fixedStatement.Statement is BlockSyntax || fixedStatement.Statement is FixedStatementSyntax))
+            {
+                AddEmbeddedStatementsIndentationOperation(list, fixedStatement.Statement);
                 return;
             }
 
@@ -281,7 +288,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Formatting
 
             if (lastToken.IsMissing)
             {
-                // embedded statement is not done, consider following as part of embeded statement
+                // embedded statement is not done, consider following as part of embedded statement
                 AddIndentBlockOperation(list, firstToken, lastToken);
             }
             else

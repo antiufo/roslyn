@@ -2,6 +2,7 @@
 
 Imports System.Collections.Immutable
 Imports System.Globalization
+Imports System.Reflection
 Imports System.Runtime.InteropServices
 Imports System.Threading
 Imports Microsoft.Cci
@@ -269,7 +270,7 @@ lReportErrorOnTwoTokens:
                 End If
             Else
                 ' If alias syntax not specified use Nothing - the emitter will fill in the metadata method name and 
-                ' the users can determine wheter or not it was specified.
+                ' the users can determine whether or not it was specified.
                 entryPointName = Nothing
             End If
 
@@ -277,20 +278,20 @@ lReportErrorOnTwoTokens:
             Return New SourceDeclareMethodSymbol(container, name, flags, binder, syntax, importData)
         End Function
 
-        Private Shared Function GetPInvokeAttributes(syntax As DeclareStatementSyntax) As PInvokeAttributes
-            Dim result As PInvokeAttributes
+        Private Shared Function GetPInvokeAttributes(syntax As DeclareStatementSyntax) As MethodImportAttributes
+            Dim result As MethodImportAttributes
             Select Case syntax.CharsetKeyword.Kind
                 Case SyntaxKind.None, SyntaxKind.AnsiKeyword
-                    result = PInvokeAttributes.CharSetAnsi Or PInvokeAttributes.NoMangle
+                    result = MethodImportAttributes.CharSetAnsi Or MethodImportAttributes.ExactSpelling
 
                 Case SyntaxKind.UnicodeKeyword
-                    result = PInvokeAttributes.CharSetUnicode Or PInvokeAttributes.NoMangle
+                    result = MethodImportAttributes.CharSetUnicode Or MethodImportAttributes.ExactSpelling
 
                 Case SyntaxKind.AutoKeyword
-                    result = PInvokeAttributes.CharSetAuto
+                    result = MethodImportAttributes.CharSetAuto
             End Select
 
-            Return result Or PInvokeAttributes.CallConvWinapi Or PInvokeAttributes.SupportsLastError
+            Return result Or MethodImportAttributes.CallingConventionWinApi Or MethodImportAttributes.SetLastError
         End Function
 
         Friend Shared Function CreateOperator(
@@ -752,7 +753,7 @@ lReportErrorOnTwoTokens:
             End Get
         End Property
 
-        Friend Overrides ReadOnly Property Syntax As VisualBasicSyntaxNode
+        Friend Overrides ReadOnly Property Syntax As SyntaxNode
             Get
                 If m_syntaxReferenceOpt Is Nothing Then
                     Return Nothing
@@ -902,7 +903,7 @@ lReportErrorOnTwoTokens:
 
             ' Wrap constraints binder in a location-specific binder to
             ' avoid checking constraints when binding type names.
-            binder = New LocationSpecificBinder(BindingLocation.GenericConstraintsClause, binder)
+            binder = New LocationSpecificBinder(BindingLocation.GenericConstraintsClause, Me, binder)
             Return binder.BindTypeParameterConstraintClause(Me, syntax.TypeParameterConstraintClause, diagnostics)
         End Function
 
@@ -1174,7 +1175,7 @@ lReportErrorOnTwoTokens:
             Return If(Locations.FirstOrDefault(), NoLocation.Singleton)
         End Function
 
-        Friend Overrides Function GetBoundMethodBody(diagnostics As DiagnosticBag, Optional ByRef methodBodyBinder As Binder = Nothing) As BoundBlock
+        Friend Overrides Function GetBoundMethodBody(compilationState As TypeCompilationState, diagnostics As DiagnosticBag, Optional ByRef methodBodyBinder As Binder = Nothing) As BoundBlock
 
             Dim syntaxTree As SyntaxTree = Me.SyntaxTree
 
@@ -1254,6 +1255,13 @@ lReportErrorOnTwoTokens:
         Public Overrides ReadOnly Property Arity As Integer
             Get
                 Return TypeParameters.Length
+            End Get
+        End Property
+
+        Public NotOverridable Overrides ReadOnly Property ReturnsByRef As Boolean
+            Get
+                ' It is not possible to define ref-returning methods in source.
+                Return False
             End Get
         End Property
 
@@ -2080,12 +2088,14 @@ lReportErrorOnTwoTokens:
                                                                             Me.CallingConvention,
                                                                             fakeTypeParameters,
                                                                             fakeParamsBuilder.ToImmutableAndFree(),
-                                                                            retType.InternalSubstituteTypeParameters(replaceMethodTypeParametersWithFakeTypeParameters).AsTypeSymbolOnly(),
-                                                                            ImmutableArray(Of CustomModifier).Empty,
-                                                                            ImmutableArray(Of MethodSymbol).Empty,
+                                                                            returnsByRef:=False,
+                                                                            returnType:=retType.InternalSubstituteTypeParameters(replaceMethodTypeParametersWithFakeTypeParameters).AsTypeSymbolOnly(),
+                                                                            returnTypeCustomModifiers:=ImmutableArray(Of CustomModifier).Empty,
+                                                                            explicitInterfaceImplementations:=ImmutableArray(Of MethodSymbol).Empty,
                                                                             isOverrides:=True))
                 End If
 
+                Debug.Assert(IsDefinition)
                 Dim overridden = overriddenMembers.OverriddenMember
 
                 If overridden IsNot Nothing Then
@@ -2248,7 +2258,7 @@ lReportErrorOnTwoTokens:
                             SyntaxKind.DeclareSubStatement
 
                             Debug.Assert(Me.IsSub)
-                            binder.DisallowTypeCharacter(GetNameToken(methodStatement), diagBag, ERRID.ERR_TypeCharOnSub)
+                            Binder.DisallowTypeCharacter(GetNameToken(methodStatement), diagBag, ERRID.ERR_TypeCharOnSub)
                             retType = binder.GetSpecialType(SpecialType.System_Void, Syntax, diagBag)
                             errorLocation = methodStatement.DeclarationKeyword
 

@@ -1,13 +1,10 @@
 ﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Reflection;
-using System.Runtime.ExceptionServices;
 using System.Xml.Linq;
 
 namespace Roslyn.Utilities
@@ -45,6 +42,7 @@ namespace Roslyn.Utilities
             Touch(Directory.Type);
             Touch(Encoding.Type);
             Touch(Environment.Type);
+            Touch(FileAttributes.Type);
             Touch(File.Type);
             Touch(FileAccess.Type);
             Touch(FileMode.Type);
@@ -59,7 +57,6 @@ namespace Roslyn.Utilities
             Touch(StackTrace.Type);
             Touch(Thread.Type);
             Touch(XPath.Extensions.Type);
-            Touch(HashAlgorithm.Type);
             Touch(SHA1.Type);
             Touch(SHA256.Type);
             Touch(SHA512.Type);
@@ -76,6 +73,7 @@ namespace Roslyn.Utilities
         {
             internal const string System_Diagnostics_FileVersionInfo = "System.Diagnostics.FileVersionInfo, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a";
             internal const string System_Diagnostics_StackTrace = "System.Diagnostics.StackTrace, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a";
+            internal const string System_Diagnostics_Process = "System.Diagnostics.Process, Version=4.1.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a";
             internal const string System_IO_FileSystem = "System.IO.FileSystem, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a";
             internal const string System_IO_FileSystem_Primitives = "System.IO.FileSystem.Primitives, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a";
             internal const string System_Reflection = "System.Reflection, Version=4.0.10.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a";
@@ -140,6 +138,17 @@ namespace Roslyn.Utilities
                 .CreateDelegate(typeof(Func<string>));
         }
 
+        internal static class FileAttributes
+        {
+            private const string TypeName = "System.IO.FileAttributes";
+
+            internal static readonly Type Type = ReflectionUtilities.GetTypeFromEither(
+               contractName: $"{TypeName}, {CoreNames.System_IO_FileSystem_Primitives}",
+               desktopName: TypeName);
+
+            public static object Hidden = Enum.ToObject(Type, 2);
+        }
+
         internal static class File
         {
             internal const string TypeName = "System.IO.File";
@@ -173,6 +182,11 @@ namespace Roslyn.Utilities
                 .GetDeclaredMethod(nameof(Delete), new[] { typeof(string) })
                 .CreateDelegate<Action<string>>();
 
+            internal static readonly Action<string, string> Move = Type
+                .GetTypeInfo()
+                .GetDeclaredMethod(nameof(Move), new[] { typeof(string), typeof(string) })
+                .CreateDelegate<Action<string, string>>();
+
             internal static readonly Func<string, byte[]> ReadAllBytes = Type
                 .GetTypeInfo()
                 .GetDeclaredMethod(nameof(ReadAllBytes), paramTypes: new[] { typeof(string) })
@@ -182,6 +196,25 @@ namespace Roslyn.Utilities
                 .GetTypeInfo()
                 .GetDeclaredMethod(nameof(WriteAllBytes), paramTypes: new[] { typeof(string), typeof(byte[]) })
                 .CreateDelegate<Action<string, byte[]>>();
+
+            internal static readonly Action<string, string, System.Text.Encoding> WriteAllText = Type
+                .GetTypeInfo()
+                .GetDeclaredMethod(nameof(WriteAllText), paramTypes: new[] { typeof(string), typeof(string), typeof(System.Text.Encoding) })
+                .CreateDelegate<Action<string, string, System.Text.Encoding>>();
+
+            internal static readonly Action<string, string> AppendAllText = Type
+                .GetTypeInfo()
+                .GetDeclaredMethod(nameof(AppendAllText), paramTypes: new[] { typeof(string), typeof(string), })
+                .CreateDelegate<Action<string, string>>();
+
+            private static readonly MethodInfo SetAttributesMethod = Type
+                .GetTypeInfo()
+                .GetDeclaredMethod(nameof(SetAttributes), paramTypes: new[] { typeof(string), FileAttributes.Type });
+
+            public static void SetAttributes(string path, object attributes)
+            {
+                SetAttributesMethod.Invoke(null, new[] { path, attributes });
+            }
         }
 
         internal static class Directory
@@ -390,6 +423,28 @@ namespace Roslyn.Utilities
             internal static readonly PropertyInfo CurrentUICulture = Type
                 .GetTypeInfo()
                 .GetDeclaredProperty(nameof(CurrentUICulture));
+
+            internal static readonly PropertyInfo ManagedThreadId = Type
+                .GetTypeInfo()
+                .GetDeclaredProperty(nameof(ManagedThreadId));
+        }
+
+        internal static class Process
+        {
+            internal const string TypeName = "System.Diagnostics.Process";
+
+            internal static readonly Type Type = ReflectionUtilities.GetTypeFromEither(
+                contractName: $"{TypeName}, {CoreNames.System_Diagnostics_Process}",
+                desktopName: TypeName);
+
+            internal static readonly PropertyInfo Id = Type
+                .GetTypeInfo()
+                .GetDeclaredProperty(nameof(Id));
+
+            internal static readonly Func<object> GetCurrentProcess = Type
+                .GetTypeInfo()
+                .GetDeclaredMethod(nameof(GetCurrentProcess), paramTypes: new Type[] { })
+                .CreateDelegate<Func<object>>();
         }
 
         internal static class RuntimeHelpers
@@ -456,7 +511,7 @@ namespace Roslyn.Utilities
                 internal const string TypeName = "System.Xml.XPath.Extensions";
 
                 internal static readonly Type Type = ReflectionUtilities.GetTypeFromEither(
-                    contractName: $"{TypeName}, {CoreNames.System_Runtime}",
+                    contractName: $"{TypeName}, {CoreNames.System_Xml_XPath_XDocument}",
                     desktopName: $"{TypeName}, {DesktopNames.System_Xml_Linq}");
 
                 internal static readonly Func<XNode, string, IEnumerable<XElement>> XPathSelectElements = Type
@@ -508,36 +563,129 @@ namespace Roslyn.Utilities
         {
             private const string TypeName = "System.Security.Cryptography.HashAlgorithm";
 
-            internal static readonly Type Type = ReflectionUtilities.GetTypeFromEither(
-                contractName: $"{TypeName}, {CoreNames.System_Security_Cryptography_Primitives}",
+            private static Type s_lazyType;
+
+            internal static Type TypeOpt => ReflectionUtilities.GetTypeFromEither(ref s_lazyType,
+                contractName: TypeName + ", " + CoreNames.System_Security_Cryptography_Primitives,
                 desktopName: TypeName);
 
-            private static readonly MethodInfo s_computeHash_byte = Type
-                .GetTypeInfo()
-                .GetDeclaredMethod(nameof(ComputeHash), new[] { typeof(byte[]) });
+            private static MethodInfo s_lazyTransformBlock, s_lazyTransformFinalBlock, s_lazyComputeHashByte, s_lazyComputeHashByteIntInt, s_lazyComputeHashStream;
+            private static PropertyInfo s_lazyHash;
+            
+            internal static int TransformBlock(object hashAlgorithm, byte[] inputBuffer, int inputOffset, int inputCount, byte[] outputBuffer, int outputOffset)
+            {
+                if (s_lazyTransformBlock == null)
+                {
+                    s_lazyTransformBlock = TypeOpt.GetTypeInfo().GetDeclaredMethod(nameof(TransformBlock), new[] { typeof(byte[]), typeof(int), typeof(int), typeof(byte[]), typeof(int) });
+                }
 
-            private static readonly MethodInfo s_computeHash_byte_int_int = Type
-                .GetTypeInfo()
-                .GetDeclaredMethod(nameof(ComputeHash), new[] { typeof(byte[]), typeof(int), typeof(int) });
+                return (int)s_lazyTransformBlock.Invoke(hashAlgorithm, new object[] { inputBuffer, inputOffset, inputCount, outputBuffer, outputOffset });
+            }
 
-            private static readonly MethodInfo s_computeHash_stream = Type
-                .GetTypeInfo()
-                .GetDeclaredMethod(nameof(ComputeHash), new[] { typeof(Stream) });
+            internal static byte[] TransformFinalBlock(object hashAlgorithm, byte[] inputBuffer, int inputOffset, int inputCount)
+            {
+                if (s_lazyTransformFinalBlock == null)
+                {
+                    s_lazyTransformFinalBlock = TypeOpt.GetTypeInfo().GetDeclaredMethod(nameof(TransformFinalBlock), new[] { typeof(byte[]), typeof(int), typeof(int) });
+                }
+
+                return (byte[])s_lazyTransformFinalBlock.Invoke(hashAlgorithm, new object[] { inputBuffer, inputOffset, inputCount });
+            }
+
+            internal static byte[] Hash(object hashAlgorithm)
+            {
+                if (s_lazyHash == null)
+                {
+                    s_lazyHash = TypeOpt.GetTypeInfo().GetDeclaredProperty(nameof(Hash));
+                }
+
+                return (byte[])s_lazyHash.GetValue(hashAlgorithm);
+            }
 
             internal static byte[] ComputeHash(object hashInstance, byte[] buffer)
             {
-                return (byte[])s_computeHash_byte.Invoke(hashInstance, new object[] { buffer });
+                if (s_lazyComputeHashByte == null)
+                {
+                    s_lazyComputeHashByte = TypeOpt.GetTypeInfo().GetDeclaredMethod(nameof(ComputeHash), new[] { typeof(byte[]) });
+                }
+
+                return (byte[])s_lazyComputeHashByte.Invoke(hashInstance, new object[] { buffer });
             }
 
             internal static byte[] ComputeHash(object hashInstance, byte[] buffer, int offset, int count)
             {
-                return (byte[])s_computeHash_byte_int_int.Invoke(hashInstance, new object[] { buffer, offset, count });
+                if (s_lazyComputeHashByteIntInt == null)
+                {
+                    s_lazyComputeHashByteIntInt = TypeOpt.GetTypeInfo().GetDeclaredMethod(nameof(ComputeHash), new[] { typeof(byte[]), typeof(int), typeof(int) });
+                }
+
+                return (byte[])s_lazyComputeHashByteIntInt.Invoke(hashInstance, new object[] { buffer, offset, count });
             }
 
             internal static byte[] ComputeHash(object hashInstance, Stream inputStream)
             {
-                return (byte[])s_computeHash_stream.Invoke(hashInstance, new object[] { inputStream });
+                if (s_lazyComputeHashStream == null)
+                {
+                    s_lazyComputeHashStream = TypeOpt.GetTypeInfo().GetDeclaredMethod(nameof(ComputeHash), new[] { typeof(Stream) });
+                }
+
+                return (byte[])s_lazyComputeHashStream.Invoke(hashInstance, new object[] { inputStream });
             }
+        }
+
+        internal static class IncrementalHash
+        {
+            private const string TypeName = "System.Security.Cryptography.IncrementalHash";
+
+            private static Type s_lazyType;
+            private static MethodInfo s_lazyCreateHash, s_lazyAppendData, s_lazyHashAndReset;
+
+            internal static Type TypeOpt => ReflectionUtilities.TryGetType(ref s_lazyType,
+                TypeName + ", " + CoreNames.System_Security_Cryptography_Algorithms);
+
+            internal static IDisposable CreateHash(object hashAlgorithmName)
+            {
+                if (s_lazyCreateHash == null)
+                {
+                    s_lazyCreateHash = TypeOpt.GetTypeInfo().GetDeclaredMethod(nameof(CreateHash), new[] { HashAlgorithmName.TypeOpt });
+                }
+
+                return (IDisposable)s_lazyCreateHash.Invoke(null, new[] { hashAlgorithmName });
+            }
+
+            internal static void AppendData(object incrementalHash, byte[] data, int offset, int count)
+            {
+                if (s_lazyAppendData == null)
+                {
+                    s_lazyAppendData = TypeOpt.GetTypeInfo().GetDeclaredMethod(nameof(AppendData), new[] { typeof(byte[]), typeof(int), typeof(int) });
+                }
+
+                s_lazyAppendData.Invoke(incrementalHash, new object[] { data, offset, count });
+            }
+
+            internal static byte[] GetHashAndReset(object incrementalHash)
+            {
+                if (s_lazyHashAndReset == null)
+                {
+                    s_lazyHashAndReset = TypeOpt.GetTypeInfo().GetDeclaredMethod(nameof(GetHashAndReset), new Type[0]);
+                }
+
+                return (byte[])s_lazyHashAndReset.Invoke(incrementalHash, new object[0]);
+            }
+        }
+
+        internal static class HashAlgorithmName
+        {
+            private const string TypeName = "System.Security.Cryptography.HashAlgorithmName";
+
+            private static Type s_lazyType;
+            private static object s_lazySHA1;
+            
+            internal static Type TypeOpt => ReflectionUtilities.GetTypeFromEither(ref s_lazyType,
+                contractName: TypeName + ", " + CoreNames.System_Security_Cryptography_Primitives,
+                desktopName: TypeName);
+
+            internal static object SHA1 => s_lazySHA1 ?? (s_lazySHA1 = TypeOpt.GetTypeInfo().GetDeclaredProperty("SHA1").GetValue(null));
         }
 
         internal static class SHA1

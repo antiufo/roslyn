@@ -1,12 +1,12 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System;
 using System.Threading;
 using Microsoft.CodeAnalysis.ChangeSignature;
 using Microsoft.CodeAnalysis.Editor.Commands;
 using Microsoft.CodeAnalysis.Editor.Host;
+using Microsoft.CodeAnalysis.Editor.Shared;
 using Microsoft.CodeAnalysis.Editor.Shared.Extensions;
-using Microsoft.CodeAnalysis.Editor.Shared.SuggestionSupport;
 using Microsoft.CodeAnalysis.Editor.Undo;
 using Microsoft.CodeAnalysis.Notification;
 using Microsoft.CodeAnalysis.Shared.Extensions;
@@ -37,8 +37,8 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.ChangeSignature
                 return nextHandler();
             }
 
-            var supportSuggestionService = document.Project.Solution.Workspace.Services.GetService<IDocumentSupportsSuggestionService>();
-            if (!supportSuggestionService.SupportsRefactorings(document))
+            var supportsFeatureService = document.Project.Solution.Workspace.Services.GetService<IDocumentSupportsFeatureService>();
+            if (!supportsFeatureService.SupportsRefactorings(document))
             {
                 return nextHandler();
             }
@@ -73,8 +73,8 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.ChangeSignature
                 return;
             }
 
-            var supportSuggestionService = document.Project.Solution.Workspace.Services.GetService<IDocumentSupportsSuggestionService>();
-            if (!supportSuggestionService.SupportsRefactorings(document))
+            var supportsFeatureService = document.Project.Solution.Workspace.Services.GetService<IDocumentSupportsFeatureService>();
+            if (!supportsFeatureService.SupportsRefactorings(document))
             {
                 nextHandler();
                 return;
@@ -106,9 +106,9 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.ChangeSignature
             if (previewService != null && result.PreviewChanges)
             {
                 finalSolution = previewService.PreviewChanges(
-                    string.Format(EditorFeaturesResources.PreviewChangesOf, EditorFeaturesResources.ChangeSignature),
+                    string.Format(EditorFeaturesResources.Preview_Changes_0, EditorFeaturesResources.Change_Signature),
                     "vs.csharp.refactoring.preview",
-                    EditorFeaturesResources.ChangeSignatureTitle,
+                    EditorFeaturesResources.Change_Signature_colon,
                     result.Name,
                     result.Glyph.GetValueOrDefault(),
                     result.UpdatedSolution,
@@ -121,7 +121,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.ChangeSignature
                 return;
             }
 
-            using (var workspaceUndoTransaction = workspace.OpenGlobalUndoTransaction(FeaturesResources.ChangeSignature))
+            using (var workspaceUndoTransaction = workspace.OpenGlobalUndoTransaction(FeaturesResources.Change_signature))
             {
                 if (!workspace.TryApplyChanges(finalSolution))
                 {

@@ -119,8 +119,21 @@ namespace Microsoft.CodeAnalysis
                 params DiagnosticDescription[] expected)
             where TCompilation : Compilation
         {
+            return VerifyAnalyzerDiagnostics(c, analyzers, reportSuppressedDiagnostics: false, options: options, onAnalyzerException: onAnalyzerException, logAnalyzerExceptionAsDiagnostics: logAnalyzerExceptionAsDiagnostics, expected: expected);
+        }
+
+        public static TCompilation VerifyAnalyzerDiagnostics<TCompilation>(
+                this TCompilation c,
+                DiagnosticAnalyzer[] analyzers,
+                bool reportSuppressedDiagnostics,
+                AnalyzerOptions options = null,
+                Action<Exception, DiagnosticAnalyzer, Diagnostic> onAnalyzerException = null,
+                bool logAnalyzerExceptionAsDiagnostics = true,
+                params DiagnosticDescription[] expected)
+            where TCompilation : Compilation
+        {
             ImmutableArray<Diagnostic> diagnostics;
-            c = c.GetAnalyzerDiagnostics(analyzers, options, onAnalyzerException, logAnalyzerExceptionAsDiagnostics, diagnostics: out diagnostics);
+            c = c.GetAnalyzerDiagnostics(analyzers, options, onAnalyzerException, logAnalyzerExceptionAsDiagnostics, reportSuppressedDiagnostics, diagnostics: out diagnostics);
             diagnostics.Verify(expected);
             return c; // note this is a new compilation
         }
@@ -133,8 +146,20 @@ namespace Microsoft.CodeAnalysis
             bool logAnalyzerExceptionAsDiagnostics = true)
             where TCompilation : Compilation
         {
+            return GetAnalyzerDiagnostics(c, analyzers, reportSuppressedDiagnostics: false, options: options, onAnalyzerException: onAnalyzerException, logAnalyzerExceptionAsDiagnostics: logAnalyzerExceptionAsDiagnostics);
+        }
+
+        public static ImmutableArray<Diagnostic> GetAnalyzerDiagnostics<TCompilation>(
+            this TCompilation c,
+            DiagnosticAnalyzer[] analyzers,
+            bool reportSuppressedDiagnostics,
+            AnalyzerOptions options = null,
+            Action<Exception, DiagnosticAnalyzer, Diagnostic> onAnalyzerException = null,
+            bool logAnalyzerExceptionAsDiagnostics = true)
+            where TCompilation : Compilation
+        {
             ImmutableArray<Diagnostic> diagnostics;
-            c = GetAnalyzerDiagnostics(c, analyzers, options, onAnalyzerException, logAnalyzerExceptionAsDiagnostics, out diagnostics);
+            c = GetAnalyzerDiagnostics(c, analyzers, options, onAnalyzerException, logAnalyzerExceptionAsDiagnostics, reportSuppressedDiagnostics, out diagnostics);
             return diagnostics;
         }
 
@@ -144,6 +169,7 @@ namespace Microsoft.CodeAnalysis
                 AnalyzerOptions options,
                 Action<Exception, DiagnosticAnalyzer, Diagnostic> onAnalyzerException,
                 bool logAnalyzerExceptionAsDiagnostics,
+                bool reportSuppressedDiagnostics,
                 out ImmutableArray<Diagnostic> diagnostics)
             where TCompilation : Compilation
         {
@@ -167,10 +193,20 @@ namespace Microsoft.CodeAnalysis
                 }
             }
 
+            if (reportSuppressedDiagnostics != c.Options.ReportSuppressedDiagnostics)
+            {
+                c = (TCompilation)c.WithOptions(c.Options.WithReportSuppressedDiagnostics(reportSuppressedDiagnostics));
+            }
+
             Compilation newCompilation;
-            var driver = AnalyzerDriver.CreateAndAttachToCompilation(c, analyzersArray, options, AnalyzerManager.Instance, onAnalyzerException, false, out newCompilation, CancellationToken.None);
+            var driver = AnalyzerDriver.CreateAndAttachToCompilation(c, analyzersArray, options, AnalyzerManager.Instance, onAnalyzerException, null, false, out newCompilation, CancellationToken.None);
             var discarded = newCompilation.GetDiagnostics();
-            diagnostics = driver.GetDiagnosticsAsync().Result.AddRange(exceptionDiagnostics);
+            diagnostics = driver.GetDiagnosticsAsync(newCompilation).Result.AddRange(exceptionDiagnostics);
+
+            if (!reportSuppressedDiagnostics)
+            {
+                Assert.True(diagnostics.All(d => !d.IsSuppressed));
+            }
 
             return (TCompilation)newCompilation; // note this is a new compilation
         }
@@ -199,9 +235,18 @@ namespace Microsoft.CodeAnalysis
         public static TCompilation VerifyEmitDiagnostics<TCompilation>(this TCompilation c, EmitOptions options, params DiagnosticDescription[] expected)
             where TCompilation : Compilation
         {
-            var pdbStream = MonoHelpers.IsRunningOnMono() ? null : new MemoryStream();
-            c.Emit(new MemoryStream(), pdbStream: pdbStream, options: options).Diagnostics.Verify(expected);
+            c.GetEmitDiagnostics(options: options).Verify(expected);
             return c;
+        }
+
+        public static ImmutableArray<Diagnostic> GetEmitDiagnostics<TCompilation>(
+            this TCompilation c,
+            EmitOptions options = null,
+            IEnumerable<ResourceDescription> manifestResources = null)
+            where TCompilation : Compilation
+        {
+            var pdbStream = MonoHelpers.IsRunningOnMono() ? null : new MemoryStream();
+            return c.Emit(new MemoryStream(), pdbStream: pdbStream, options: options, manifestResources: manifestResources).Diagnostics;
         }
 
         public static TCompilation VerifyEmitDiagnostics<TCompilation>(this TCompilation c, params DiagnosticDescription[] expected)
@@ -210,11 +255,16 @@ namespace Microsoft.CodeAnalysis
             return VerifyEmitDiagnostics(c, EmitOptions.Default, expected);
         }
 
+        public static ImmutableArray<Diagnostic> GetEmitDiagnostics<TCompilation>(this TCompilation c)
+            where TCompilation : Compilation
+        {
+            return GetEmitDiagnostics(c, EmitOptions.Default);
+        }
+
         public static TCompilation VerifyEmitDiagnostics<TCompilation>(this TCompilation c, IEnumerable<ResourceDescription> manifestResources, params DiagnosticDescription[] expected)
             where TCompilation : Compilation
         {
-            var pdbStream = MonoHelpers.IsRunningOnMono() ? null : new MemoryStream();
-            c.Emit(new MemoryStream(), pdbStream: pdbStream, manifestResources: manifestResources).Diagnostics.Verify(expected);
+            c.GetEmitDiagnostics(manifestResources: manifestResources).Verify(expected);
             return c;
         }
 
@@ -255,17 +305,23 @@ namespace Microsoft.CodeAnalysis
         internal static string GetExpectedErrorLogHeader(string actualOutput, CommonCompiler compiler)
         {
             var expectedToolName = compiler.GetToolName();
-            var expectedProductVersion = compiler.GetAssemblyVersion().ToString(fieldCount: 3);
-            var fileVersion = compiler.GetAssemblyFileVersion();
-            var expectedFileVersion = fileVersion.Substring(0, fileVersion.LastIndexOf('.'));
+            var expectedVersion = compiler.GetAssemblyVersion();
+            var expectedSemanticVersion = compiler.GetAssemblyVersion().ToString(fieldCount: 3);
+            var expectedFileVersion = compiler.GetAssemblyFileVersion();
+            var expectedLanguage = compiler.GetCultureName();
 
             return string.Format(@"{{
-  ""version"": ""{0}"",
-  ""toolInfo"": {{
-    ""toolName"": ""{1}"",
-    ""productVersion"": ""{2}"",
-    ""fileVersion"": ""{3}""
-  }},", ErrorLogger.OutputFormatVersion, expectedToolName, expectedProductVersion, expectedFileVersion);
+  ""$schema"": ""http://json.schemastore.org/sarif-1.0.0"",
+  ""version"": ""1.0.0"",
+  ""runs"": [
+    {{
+      ""tool"": {{
+        ""name"": ""{0}"",
+        ""version"": ""{1}"",
+        ""fileVersion"": ""{2}"",
+        ""semanticVersion"": ""{3}"",
+        ""language"": ""{4}""
+      }},", expectedToolName, expectedVersion, expectedFileVersion, expectedSemanticVersion, expectedLanguage);
         }
 
         public static string Stringize(this Diagnostic e)

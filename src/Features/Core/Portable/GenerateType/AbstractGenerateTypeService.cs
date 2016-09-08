@@ -2,18 +2,19 @@
 
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeGeneration;
-using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.Internal.Log;
 using Microsoft.CodeAnalysis.LanguageServices;
 using Microsoft.CodeAnalysis.LanguageServices.ProjectInfoService;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Shared.Utilities;
+using Microsoft.CodeAnalysis.Utilities;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.GenerateType
@@ -38,7 +39,7 @@ namespace Microsoft.CodeAnalysis.GenerateType
         protected abstract string DefaultFileExtension { get; }
         protected abstract IList<ITypeParameterSymbol> GetTypeParameters(State state, SemanticModel semanticModel, CancellationToken cancellationToken);
         protected abstract Accessibility GetAccessibility(State state, SemanticModel semanticModel, bool intoNamespace, CancellationToken cancellationToken);
-        protected abstract IList<string> GenerateParameterNames(SemanticModel semanticModel, IList<TArgumentSyntax> arguments);
+        protected abstract IList<ParameterName> GenerateParameterNames(SemanticModel semanticModel, IList<TArgumentSyntax> arguments);
 
         protected abstract INamedTypeSymbol DetermineTypeToGenerateIn(SemanticModel semanticModel, TSimpleNameSyntax simpleName, CancellationToken cancellationToken);
         protected abstract ITypeSymbol DetermineArgumentType(SemanticModel semanticModel, TArgumentSyntax argument, CancellationToken cancellationToken);
@@ -52,13 +53,13 @@ namespace Microsoft.CodeAnalysis.GenerateType
         internal abstract bool IsPublicOnlyAccessibility(TExpressionSyntax expression, Project project);
         internal abstract bool IsGenericName(TSimpleNameSyntax simpleName);
         internal abstract bool IsSimpleName(TExpressionSyntax expression);
-        internal abstract Solution TryAddUsingsOrImportToDocument(Solution updatedSolution, SyntaxNode modifiedRoot, Document document, TSimpleNameSyntax simpleName, string includeUsingsOrImports, CancellationToken cancellationToken);
+        internal abstract Task<Solution> TryAddUsingsOrImportToDocumentAsync(Solution updatedSolution, SyntaxNode modifiedRoot, Document document, TSimpleNameSyntax simpleName, string includeUsingsOrImports, CancellationToken cancellationToken);
 
         protected abstract bool TryGetNameParts(TExpressionSyntax expression, out IList<string> nameParts);
 
         public abstract string GetRootNamespace(CompilationOptions options);
 
-        public abstract Task<Tuple<INamespaceSymbol, INamespaceOrTypeSymbol, Location>> GetOrGenerateEnclosingNamespaceSymbol(INamedTypeSymbol namedTypeSymbol, string[] containers, Document selectedDocument, SyntaxNode selectedDocumentRoot, CancellationToken cancellationToken);
+        public abstract Task<Tuple<INamespaceSymbol, INamespaceOrTypeSymbol, Location>> GetOrGenerateEnclosingNamespaceSymbolAsync(INamedTypeSymbol namedTypeSymbol, string[] containers, Document selectedDocument, SyntaxNode selectedDocumentRoot, CancellationToken cancellationToken);
 
         public async Task<IEnumerable<CodeAction>> GenerateTypeAsync(
             Document document,
@@ -69,10 +70,21 @@ namespace Microsoft.CodeAnalysis.GenerateType
             {
                 var semanticDocument = await SemanticDocument.CreateAsync(document, cancellationToken).ConfigureAwait(false);
 
-                var state = State.Generate((TService)this, semanticDocument, node, cancellationToken);
+                var state = await State.GenerateAsync((TService)this, semanticDocument, node, cancellationToken).ConfigureAwait(false);
                 if (state != null)
                 {
-                    return GetActions(semanticDocument, node, state, cancellationToken);
+                    var actions = GetActions(semanticDocument, node, state, cancellationToken).ToList();
+                    if (actions.Count > 1)
+                    {
+                        // Wrap the generate type actions into a single top level suggestion
+                        // so as to not clutter the list.
+                        return SpecializedCollections.SingletonEnumerable(
+                            new MyCodeAction(FeaturesResources.Generate_type, actions.AsImmutable()));
+                    }
+                    else
+                    {
+                        return actions;
+                    }
                 }
 
                 return SpecializedCollections.EmptyEnumerable<CodeAction>();
@@ -255,9 +267,9 @@ namespace Microsoft.CodeAnalysis.GenerateType
             return availableOuterTypeParameters.Concat(availableInnerTypeParameters).ToList();
         }
 
-        protected bool IsWithinTheImportingNamespace(Document document, int triggeringPosition, string includeUsingsOrImports, CancellationToken cancellationToken)
+        protected async Task<bool> IsWithinTheImportingNamespaceAsync(Document document, int triggeringPosition, string includeUsingsOrImports, CancellationToken cancellationToken)
         {
-            var semanticModel = document.GetSemanticModelAsync(cancellationToken).WaitAndGetResult(cancellationToken);
+            var semanticModel = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
             if (semanticModel != null)
             {
                 var namespaceSymbol = semanticModel.GetEnclosingNamespace(triggeringPosition, cancellationToken);
@@ -279,6 +291,14 @@ namespace Microsoft.CodeAnalysis.GenerateType
             }
 
             return false;
+        }
+
+        private class MyCodeAction : CodeAction.SimpleCodeAction
+        {
+            public MyCodeAction(string title, ImmutableArray<CodeAction> nestedActions)
+                : base(title, nestedActions)
+            {
+            }
         }
     }
 }

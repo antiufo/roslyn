@@ -1,16 +1,23 @@
 // Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System.Collections.Generic;
-using Microsoft.CodeAnalysis.Editor.CSharp.SignatureHelp;
+using System.Threading.Tasks;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.SignatureHelp;
 using Microsoft.CodeAnalysis.Editor.UnitTests.SignatureHelp;
+using Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces;
+using Microsoft.CodeAnalysis.SignatureHelp;
 using Roslyn.Test.Utilities;
 using Xunit;
-using Microsoft.CodeAnalysis.CSharp;
 
 namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.SignatureHelp
 {
     public class GenericNameSignatureHelpProviderTests : AbstractCSharpSignatureHelpProviderTests
     {
+        public GenericNameSignatureHelpProviderTests(CSharpTestWorkspaceFixture workspaceFixture) : base(workspaceFixture)
+        {
+        }
+
         internal override ISignatureHelpProvider CreateSignatureHelpProvider()
         {
             return new GenericNameSignatureHelpProvider();
@@ -19,7 +26,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.SignatureHelp
         #region "Declaring generic type objects"
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void NestedGenericTerminated()
+        public async Task NestedGenericTerminated()
         {
             var markup = @"
 class G<T> { };
@@ -35,11 +42,11 @@ class C
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("G<T>", string.Empty, string.Empty, currentParameterIndex: 0));
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void DeclaringGenericTypeWith1ParameterTerminated()
+        public async Task DeclaringGenericTypeWith1ParameterTerminated()
         {
             var markup = @"
 class G<T> { };
@@ -55,11 +62,11 @@ class C
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("G<T>", string.Empty, string.Empty, currentParameterIndex: 0));
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void DeclaringGenericTypeWith2ParametersOn1()
+        public async Task DeclaringGenericTypeWith2ParametersOn1()
         {
             var markup = @"
 class G<S, T> { };
@@ -75,11 +82,11 @@ class C
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("G<S, T>", string.Empty, string.Empty, currentParameterIndex: 0));
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void DeclaringGenericTypeWith2ParametersOn2()
+        public async Task DeclaringGenericTypeWith2ParametersOn2()
         {
             var markup = @"
 class G<S, T> { };
@@ -95,11 +102,11 @@ class C
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("G<S, T>", string.Empty, string.Empty, currentParameterIndex: 1));
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void DeclaringGenericTypeWith2ParametersOn1XmlDoc()
+        public async Task DeclaringGenericTypeWith2ParametersOn1XmlDoc()
         {
             var markup = @"
 /// <summary>
@@ -123,11 +130,11 @@ class C
                     "TypeParamS. Also see T",
                     currentParameterIndex: 0));
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void DeclaringGenericTypeWith2ParametersOn2XmlDoc()
+        public async Task DeclaringGenericTypeWith2ParametersOn2XmlDoc()
         {
             var markup = @"
 /// <summary>
@@ -148,7 +155,7 @@ class C
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("G<S, T>", "Summary for G", "TypeParamT. Also see S", currentParameterIndex: 1));
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
         #endregion
@@ -156,7 +163,7 @@ class C
         #region "Constraints on generic types"
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void DeclaringGenericTypeWithConstraintsStruct()
+        public async Task DeclaringGenericTypeWithConstraintsStruct()
         {
             var markup = @"
 class G<S> where S : struct
@@ -173,11 +180,11 @@ class C
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("G<S> where S : struct", string.Empty, string.Empty, currentParameterIndex: 0));
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void DeclaringGenericTypeWithConstraintsClass()
+        public async Task DeclaringGenericTypeWithConstraintsClass()
         {
             var markup = @"
 class G<S> where S : class
@@ -194,11 +201,11 @@ class C
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("G<S> where S : class", string.Empty, string.Empty, currentParameterIndex: 0));
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void DeclaringGenericTypeWithConstraintsNew()
+        public async Task DeclaringGenericTypeWithConstraintsNew()
         {
             var markup = @"
 class G<S> where S : new()
@@ -215,11 +222,11 @@ class C
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("G<S> where S : new()", string.Empty, string.Empty, currentParameterIndex: 0));
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void DeclaringGenericTypeWithConstraintsBase()
+        public async Task DeclaringGenericTypeWithConstraintsBase()
         {
             var markup = @"
 class Base { }
@@ -238,11 +245,11 @@ class C
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("G<S> where S : Base", string.Empty, string.Empty, currentParameterIndex: 0));
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void DeclaringGenericTypeWithConstraintsBaseGenericWithGeneric()
+        public async Task DeclaringGenericTypeWithConstraintsBaseGenericWithGeneric()
         {
             var markup = @"
 class Base<T> { }
@@ -261,11 +268,11 @@ class C
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("G<S> where S : Base<S>", string.Empty, string.Empty, currentParameterIndex: 0));
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void DeclaringGenericTypeWithConstraintsBaseGenericWithNonGeneric()
+        public async Task DeclaringGenericTypeWithConstraintsBaseGenericWithNonGeneric()
         {
             var markup = @"
 class Base<T> { }
@@ -284,11 +291,11 @@ class C
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("G<S> where S : Base<int>", string.Empty, string.Empty, currentParameterIndex: 0));
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void DeclaringGenericTypeWithConstraintsBaseGenericNested()
+        public async Task DeclaringGenericTypeWithConstraintsBaseGenericNested()
         {
             var markup = @"
 class Base<T> { }
@@ -307,11 +314,11 @@ class C
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("G<S> where S : Base<Base<int>>", string.Empty, string.Empty, currentParameterIndex: 0));
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void DeclaringGenericTypeWithConstraintsDeriveFromAnotherGenericParameter()
+        public async Task DeclaringGenericTypeWithConstraintsDeriveFromAnotherGenericParameter()
         {
             var markup = @"
 class G<S, T> where S : T
@@ -328,11 +335,11 @@ class C
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("G<S, T> where S : T", string.Empty, string.Empty, currentParameterIndex: 0));
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void DeclaringGenericTypeWithConstraintsMixed1()
+        public async Task DeclaringGenericTypeWithConstraintsMixed1()
         {
             var markup = @"
 /// <summary>
@@ -360,11 +367,11 @@ class C
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("G<S, T> where S : Base, new()", "Summary1", "SummaryS", currentParameterIndex: 0));
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void DeclaringGenericTypeWithConstraintsMixed2()
+        public async Task DeclaringGenericTypeWithConstraintsMixed2()
         {
             var markup = @"
 /// <summary>
@@ -392,7 +399,7 @@ class C
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("G<S, T> where T : class, S, IFoo, new()", "Summary1", "SummaryT", currentParameterIndex: 1));
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
         #endregion
@@ -400,7 +407,7 @@ class C
         #region "Generic member invocation"
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void InvokingGenericMethodWith1ParameterTerminated()
+        public async Task InvokingGenericMethodWith1ParameterTerminated()
         {
             var markup = @"
 class C
@@ -416,12 +423,12 @@ class C
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("void C.Foo<T>()", string.Empty, string.Empty, currentParameterIndex: 0));
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
-        [WorkItem(544091)]
+        [WorkItem(544091, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544091")]
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void InvokingGenericMethodWith2ParametersOn1()
+        public async Task InvokingGenericMethodWith2ParametersOn1()
         {
             var markup = @"
 class C
@@ -445,12 +452,12 @@ class C
             expectedOrderedItems.Add(new SignatureHelpTestItem("void C.Foo<S, T>(S s, T t)",
                     "Method summary", "type param S. see T", currentParameterIndex: 0));
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
-        [WorkItem(544091)]
+        [WorkItem(544091, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544091")]
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void InvokingGenericMethodWith2ParametersOn2()
+        public async Task InvokingGenericMethodWith2ParametersOn2()
         {
             var markup = @"
 class C
@@ -466,12 +473,12 @@ class C
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("void C.Foo<S, T>(S s, T t)", string.Empty, string.Empty, currentParameterIndex: 1));
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
-        [WorkItem(544091)]
+        [WorkItem(544091, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544091")]
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void InvokingGenericMethodWith2ParametersOn1XmlDoc()
+        public async Task InvokingGenericMethodWith2ParametersOn1XmlDoc()
         {
             var markup = @"
 class C
@@ -492,12 +499,12 @@ class C
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("void C.Foo<S, T>(S s, T t)", "SummaryForFoo", "SummaryForS", currentParameterIndex: 0));
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
-        [WorkItem(544091)]
+        [WorkItem(544091, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544091")]
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void InvokingGenericMethodWith2ParametersOn2XmlDoc()
+        public async Task InvokingGenericMethodWith2ParametersOn2XmlDoc()
         {
             var markup = @"
 class C
@@ -518,11 +525,11 @@ class C
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("void C.Foo<S, T>(S s, T t)", "SummaryForFoo", "SummaryForT", currentParameterIndex: 1));
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void CallingGenericExtensionMethod()
+        public async Task CallingGenericExtensionMethod()
         {
             var markup = @"
 class G
@@ -543,19 +550,19 @@ static class FooClass
 }";
 
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
-            expectedOrderedItems.Add(new SignatureHelpTestItem($"({CSharpFeaturesResources.Extension}) void G.Foo<T>()", string.Empty, string.Empty, currentParameterIndex: 0));
+            expectedOrderedItems.Add(new SignatureHelpTestItem($"({CSharpFeaturesResources.extension}) void G.Foo<T>()", string.Empty, string.Empty, currentParameterIndex: 0));
 
             // TODO: Enable the script case when we have support for extension methods in scripts
-            Test(markup, expectedOrderedItems, usePreviousCharAsTrigger: false, sourceCodeKind: Microsoft.CodeAnalysis.SourceCodeKind.Regular);
+            await TestAsync(markup, expectedOrderedItems, usePreviousCharAsTrigger: false, sourceCodeKind: Microsoft.CodeAnalysis.SourceCodeKind.Regular);
         }
 
         #endregion
 
         #region "Constraints on generic methods"
 
-        [WorkItem(544091)]
+        [WorkItem(544091, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544091")]
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void InvokingGenericMethodWithConstraintsMixed1()
+        public async Task InvokingGenericMethodWithConstraintsMixed1()
         {
             var markup = @"
 class Base { }
@@ -582,12 +589,12 @@ class C
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("S C.Foo<S, T>(S s, T t) where S : Base, new()", "FooSummary", "ParamS", currentParameterIndex: 0));
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
-        [WorkItem(544091)]
+        [WorkItem(544091, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544091")]
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void InvokingGenericMethodWithConstraintsMixed2()
+        public async Task InvokingGenericMethodWithConstraintsMixed2()
         {
             var markup = @"
 class Base { }
@@ -614,7 +621,7 @@ class C
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("S C.Foo<S, T>(S s, T t) where T : class, S, IFoo, new()", "FooSummary", "ParamT", currentParameterIndex: 1));
 
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
 
         #endregion
@@ -631,7 +638,7 @@ class C
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void FieldUnavailableInOneLinkedFile()
+        public async Task FieldUnavailableInOneLinkedFile()
         {
             var markup = @"<Workspace>
     <Project Language=""C#"" CommonReferences=""true"" AssemblyName=""Proj1"" PreprocessorSymbols=""FOO"">
@@ -655,12 +662,12 @@ class C
         <Document IsLinkFile=""true"" LinkAssemblyName=""Proj1"" LinkFilePath=""SourceDocument""/>
     </Project>
 </Workspace>";
-            var expectedDescription = new SignatureHelpTestItem($"D<T>\r\n\r\n{string.Format(FeaturesResources.ProjectAvailability, "Proj1", FeaturesResources.Available)}\r\n{string.Format(FeaturesResources.ProjectAvailability, "Proj2", FeaturesResources.NotAvailable)}\r\n\r\n{FeaturesResources.UseTheNavigationBarToSwitchContext}", currentParameterIndex: 0);
-            VerifyItemWithReferenceWorker(markup, new[] { expectedDescription }, false);
+            var expectedDescription = new SignatureHelpTestItem($"D<T>\r\n\r\n{string.Format(FeaturesResources._0_1, "Proj1", FeaturesResources.Available)}\r\n{string.Format(FeaturesResources._0_1, "Proj2", FeaturesResources.Not_Available)}\r\n\r\n{FeaturesResources.You_can_use_the_navigation_bar_to_switch_context}", currentParameterIndex: 0);
+            await VerifyItemWithReferenceWorkerAsync(markup, new[] { expectedDescription }, false);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void ExcludeFilesWithInactiveRegions()
+        public async Task ExcludeFilesWithInactiveRegions()
         {
             var markup = @"<Workspace>
     <Project Language=""C#"" CommonReferences=""true"" AssemblyName=""Proj1"" PreprocessorSymbols=""FOO,BAR"">
@@ -691,8 +698,8 @@ class C
     </Project>
 </Workspace>";
 
-            var expectedDescription = new SignatureHelpTestItem($"D<T>\r\n\r\n{string.Format(FeaturesResources.ProjectAvailability, "Proj1", FeaturesResources.Available)}\r\n{string.Format(FeaturesResources.ProjectAvailability, "Proj3", FeaturesResources.NotAvailable)}\r\n\r\n{FeaturesResources.UseTheNavigationBarToSwitchContext}", currentParameterIndex: 0);
-            VerifyItemWithReferenceWorker(markup, new[] { expectedDescription }, false);
+            var expectedDescription = new SignatureHelpTestItem($"D<T>\r\n\r\n{string.Format(FeaturesResources._0_1, "Proj1", FeaturesResources.Available)}\r\n{string.Format(FeaturesResources._0_1, "Proj3", FeaturesResources.Not_Available)}\r\n\r\n{FeaturesResources.You_can_use_the_navigation_bar_to_switch_context}", currentParameterIndex: 0);
+            await VerifyItemWithReferenceWorkerAsync(markup, new[] { expectedDescription }, false);
         }
 
         #endregion
@@ -701,7 +708,7 @@ class C
 
         [WorkItem(7336, "DevDiv_Projects/Roslyn")]
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void EditorBrowsable_GenericType_BrowsableAlways()
+        public async Task EditorBrowsable_GenericType_BrowsableAlways()
         {
             var markup = @"
 class Program
@@ -721,7 +728,7 @@ public class C<T>
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("C<T>", string.Empty, string.Empty, currentParameterIndex: 0));
 
-            TestSignatureHelpInEditorBrowsableContexts(markup: markup,
+            await TestSignatureHelpInEditorBrowsableContextsAsync(markup: markup,
                                                        referencedCode: referencedCode,
                                                        expectedOrderedItemsMetadataReference: expectedOrderedItems,
                                                        expectedOrderedItemsSameSolution: expectedOrderedItems,
@@ -731,7 +738,7 @@ public class C<T>
 
         [WorkItem(7336, "DevDiv_Projects/Roslyn")]
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void EditorBrowsable_GenericType_BrowsableNever()
+        public async Task EditorBrowsable_GenericType_BrowsableNever()
         {
             var markup = @"
 class Program
@@ -751,7 +758,7 @@ public class C<T>
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("C<T>", string.Empty, string.Empty, currentParameterIndex: 0));
 
-            TestSignatureHelpInEditorBrowsableContexts(markup: markup,
+            await TestSignatureHelpInEditorBrowsableContextsAsync(markup: markup,
                                                        referencedCode: referencedCode,
                                                        expectedOrderedItemsMetadataReference: new List<SignatureHelpTestItem>(),
                                                        expectedOrderedItemsSameSolution: expectedOrderedItems,
@@ -761,7 +768,7 @@ public class C<T>
 
         [WorkItem(7336, "DevDiv_Projects/Roslyn")]
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void EditorBrowsable_GenericType_BrowsableAdvanced()
+        public async Task EditorBrowsable_GenericType_BrowsableAdvanced()
         {
             var markup = @"
 class Program
@@ -781,7 +788,7 @@ public class C<T>
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
             expectedOrderedItems.Add(new SignatureHelpTestItem("C<T>", string.Empty, string.Empty, currentParameterIndex: 0));
 
-            TestSignatureHelpInEditorBrowsableContexts(markup: markup,
+            await TestSignatureHelpInEditorBrowsableContextsAsync(markup: markup,
                                                        referencedCode: referencedCode,
                                                        expectedOrderedItemsMetadataReference: new List<SignatureHelpTestItem>(),
                                                        expectedOrderedItemsSameSolution: expectedOrderedItems,
@@ -789,7 +796,7 @@ public class C<T>
                                                        referencedLanguage: LanguageNames.CSharp,
                                                        hideAdvancedMembers: true);
 
-            TestSignatureHelpInEditorBrowsableContexts(markup: markup,
+            await TestSignatureHelpInEditorBrowsableContextsAsync(markup: markup,
                                                        referencedCode: referencedCode,
                                                        expectedOrderedItemsMetadataReference: expectedOrderedItems,
                                                        expectedOrderedItemsSameSolution: expectedOrderedItems,
@@ -799,9 +806,9 @@ public class C<T>
         }
         #endregion
 
-        [WorkItem(1083601)]
+        [WorkItem(1083601, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1083601")]
         [Fact, Trait(Traits.Feature, Traits.Features.SignatureHelp)]
-        public void DeclaringGenericTypeWithBadTypeArgumentList()
+        public async Task DeclaringGenericTypeWithBadTypeArgumentList()
         {
             var markup = @"
 class G<T> { };
@@ -815,7 +822,7 @@ class C
 }";
 
             var expectedOrderedItems = new List<SignatureHelpTestItem>();
-            Test(markup, expectedOrderedItems);
+            await TestAsync(markup, expectedOrderedItems);
         }
     }
 }

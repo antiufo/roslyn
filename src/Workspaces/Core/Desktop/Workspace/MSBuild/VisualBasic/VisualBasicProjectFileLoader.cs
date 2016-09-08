@@ -46,30 +46,18 @@ namespace Microsoft.CodeAnalysis.VisualBasic
 
             public override SourceCodeKind GetSourceCodeKind(string documentFileName)
             {
-                SourceCodeKind result;
-                if (documentFileName.EndsWith(".vbx", StringComparison.OrdinalIgnoreCase))
-                {
-                    result = SourceCodeKind.Script;
-                }
-                else
-                {
-                    result = SourceCodeKind.Regular;
-                }
-                return result;
+                // TODO: uncomment when fixing https://github.com/dotnet/roslyn/issues/5325
+                //return documentFileName.EndsWith(".vbx", StringComparison.OrdinalIgnoreCase)
+                //    ? SourceCodeKind.Script
+                //    : SourceCodeKind.Regular;
+                return SourceCodeKind.Regular;
             }
 
             public override string GetDocumentExtension(SourceCodeKind sourceCodeKind)
             {
-                string result;
-                if (sourceCodeKind != SourceCodeKind.Script)
-                {
-                    result = ".vb";
-                }
-                else
-                {
-                    result = ".vbx";
-                }
-                return result;
+                // TODO: uncomment when fixing https://github.com/dotnet/roslyn/issues/5325
+                //return (sourceCodeKind != SourceCodeKind.Script) ? ".vb" : ".vbx";
+                return ".vb";
             }
 
             public override async Task<ProjectFileInfo> GetProjectFileInfoAsync(CancellationToken cancellationToken)
@@ -91,11 +79,11 @@ namespace Microsoft.CodeAnalysis.VisualBasic
                 string assemblyName = this.GetAssemblyName();
 
                 return new ProjectFileInfo(
-                    outputPath, 
-                    assemblyName, 
+                    outputPath,
+                    assemblyName,
                     compilerInputs.CommandLineArgs,
                     this.GetDocuments(compilerInputs.Sources, executedProject),
-                    this.GetDocuments(compilerInputs.AdditionalFiles, executedProject), 
+                    this.GetDocuments(compilerInputs.AdditionalFiles, executedProject),
                     base.GetProjectReferences(executedProject));
             }
 
@@ -201,10 +189,8 @@ namespace Microsoft.CodeAnalysis.VisualBasic
 
             private class VisualBasicCompilerInputs :
                 MSB.Tasks.Hosting.IVbcHostObject5,
-                MSB.Tasks.Hosting.IVbcHostObjectFreeThreaded
-#if !MSBUILD12
-                , IAnalyzerHostObject
-#endif
+                MSB.Tasks.Hosting.IVbcHostObjectFreeThreaded,
+                MSB.Tasks.Hosting.IAnalyzerHostObject
             {
                 private readonly VisualBasicProjectFile _projectFile;
                 private bool _initialized;
@@ -406,6 +392,16 @@ namespace Microsoft.CodeAnalysis.VisualBasic
                         else if (string.Equals(debugType, "full", StringComparison.OrdinalIgnoreCase))
                         {
                             this.CommandLineArgs.Add("/debug:full");
+                            return true;
+                        }
+                        else if (string.Equals(debugType, "portable", StringComparison.OrdinalIgnoreCase))
+                        {
+                            this.CommandLineArgs.Add("/debug:portable");
+                            return true;
+                        }
+                        else if (string.Equals(debugType, "embedded", StringComparison.OrdinalIgnoreCase))
+                        {
+                            this.CommandLineArgs.Add("/debug:embedded");
                             return true;
                         }
                     }
@@ -695,7 +691,7 @@ namespace Microsoft.CodeAnalysis.VisualBasic
                             _commandLineArgs.Add("/additionalfile:\"" + _projectFile.GetDocumentFilePath(af) + "\"");
                         }
                     }
-                        
+
                     return true;
                 }
 

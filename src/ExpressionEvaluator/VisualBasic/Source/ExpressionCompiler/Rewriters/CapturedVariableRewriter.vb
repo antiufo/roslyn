@@ -5,7 +5,7 @@ Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
     Friend NotInheritable Class CapturedVariableRewriter
-        Inherits BoundTreeRewriter
+        Inherits BoundTreeRewriterWithStackGuardWithoutRecursionOnTheLeftOfBinaryOperator
 
         Friend Shared Function Rewrite(
             targetMethodMeParameter As ParameterSymbol,
@@ -30,6 +30,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             _displayClassVariables = displayClassVariables
             _diagnostics = diagnostics
         End Sub
+
+        Public Overrides Function Visit(node As BoundNode) As BoundNode
+            ' Ignore nodes that will be rewritten to literals in the LocalRewriter.
+            If TryCast(node, BoundExpression)?.ConstantValueOpt IsNot Nothing Then
+                Return node
+            End If
+
+            Return MyBase.Visit(node)
+        End Function
 
         Public Overrides Function VisitBlock(node As BoundBlock) As BoundNode
             Dim rewrittenLocals = node.Locals.WhereAsArray(AddressOf IncludeLocal)
@@ -110,7 +119,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             Return Me.GetRewrittenMeParameter(node.Syntax, node)
         End Function
 
-        Private Function GetRewrittenMeParameter(syntax As VisualBasicSyntaxNode, node As BoundExpression) As BoundExpression
+        Private Function GetRewrittenMeParameter(syntax As SyntaxNode, node As BoundExpression) As BoundExpression
             If _targetMethodMeParameter Is Nothing Then
                 ReportMissingMe(node.Syntax)
                 Return node
@@ -121,7 +130,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             Return result
         End Function
 
-        Private Function RewriteParameter(syntax As VisualBasicSyntaxNode, symbol As ParameterSymbol, node As BoundExpression) As BoundExpression
+        Private Function RewriteParameter(syntax As SyntaxNode, symbol As ParameterSymbol, node As BoundExpression) As BoundExpression
             Dim name As String = symbol.Name
             Dim variable = Me.GetVariable(name)
             If variable Is Nothing Then
@@ -142,7 +151,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.ExpressionEvaluator
             Return result
         End Function
 
-        Private Sub ReportMissingMe(syntax As VisualBasicSyntaxNode)
+        Private Sub ReportMissingMe(syntax As SyntaxNode)
             _diagnostics.Add(New VBDiagnostic(ErrorFactory.ErrorInfo(ERRID.ERR_UseOfKeywordNotInInstanceMethod1, syntax.ToString()), syntax.GetLocation()))
         End Sub
 

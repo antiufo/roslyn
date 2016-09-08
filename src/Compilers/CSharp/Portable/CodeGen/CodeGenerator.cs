@@ -1,19 +1,14 @@
 ﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
-using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
-using System.Linq;
+using System.Reflection.Metadata;
 using Microsoft.CodeAnalysis.CodeGen;
-using Microsoft.CodeAnalysis.Collections;
 using Microsoft.CodeAnalysis.CSharp.Emit;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.Emit;
-using Microsoft.CodeAnalysis.Symbols;
 using Microsoft.CodeAnalysis.Text;
-using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp.CodeGen
 {
@@ -30,7 +25,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
         private readonly ILBuilder _builder;
         private readonly PEModuleBuilder _module;
         private readonly DiagnosticBag _diagnostics;
-        private readonly OptimizationLevel _optimizations;
+        private readonly ILEmitStyle _ilEmitStyle;
         private readonly bool _emitPdbSequencePoints;
 
         private readonly HashSet<LocalSymbol> _stackLocals;
@@ -84,13 +79,28 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
             _module = moduleBuilder;
             _diagnostics = diagnostics;
 
-            // Always optimize synthesized methods that don't contain user code.
-            // 
-            // Specifically, always optimize synthesized explicit interface implementation methods
-            // (aka bridge methods) with by-ref returns because peverify produces errors if we
-            // return a ref local (which the return local will be in such cases).
-
-            _optimizations = method.GenerateDebugInfo ? optimizations : OptimizationLevel.Release;
+            if (!method.GenerateDebugInfo)
+            {
+                // Always optimize synthesized methods that don't contain user code.
+                // 
+                // Specifically, always optimize synthesized explicit interface implementation methods
+                // (aka bridge methods) with by-ref returns because peverify produces errors if we
+                // return a ref local (which the return local will be in such cases).
+                _ilEmitStyle = ILEmitStyle.Release;
+            }
+            else
+            {
+                if (optimizations == OptimizationLevel.Debug)
+                {
+                    _ilEmitStyle = ILEmitStyle.Debug;
+                }
+                else
+                {
+                    _ilEmitStyle = IsDebugPlus() ?
+                        ILEmitStyle.DebugFriendlyRelease :
+                        ILEmitStyle.Release;
+                }
+            }
 
             // Emit sequence points unless
             // - the PDBs are not being generated
@@ -100,12 +110,25 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
             // This setting only affects generating PDB sequence points, it shall not affect generated IL in any way.
             _emitPdbSequencePoints = emittingPdb && method.GenerateDebugInfo;
 
-            if (_optimizations == OptimizationLevel.Release)
+            try
             {
-                _boundBody = Optimizer.Optimize(boundBody, out _stackLocals);
+                _boundBody = Optimizer.Optimize(
+                    boundBody,
+                    debugFriendly: _ilEmitStyle != ILEmitStyle.Release,
+                    stackLocals: out _stackLocals);
+            }
+            catch (BoundTreeVisitor.CancelledByStackGuardException ex)
+            {
+                ex.AddAnError(diagnostics);
+                _boundBody = boundBody;
             }
 
             _methodBodySyntaxOpt = (method as SourceMethodSymbol)?.BodySyntax;
+        }
+
+        private bool IsDebugPlus()
+        {
+            return _module.Compilation.Options.DebugPlusMode;
         }
 
         private LocalDefinition LazyReturnTemp
@@ -116,9 +139,13 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
                 if (result == null)
                 {
                     Debug.Assert(!_method.ReturnsVoid, "returning something from void method?");
+                    var slotConstraints = _method.RefKind == RefKind.None
+                        ? LocalSlotConstraints.None
+                        : LocalSlotConstraints.ByRef;
+
 
                     var bodySyntax = _methodBodySyntaxOpt;
-                    if (_optimizations == OptimizationLevel.Debug && bodySyntax != null)
+                    if (_ilEmitStyle == ILEmitStyle.Debug && bodySyntax != null)
                     {
                         int syntaxOffset = _method.CalculateLocalSyntaxOffset(bodySyntax.SpanStart, bodySyntax.SyntaxTree);
                         var localSymbol = new SynthesizedLocal(_method, _method.ReturnType, SynthesizedLocalKind.FunctionReturnValue, bodySyntax);
@@ -130,14 +157,14 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
                             kind: localSymbol.SynthesizedKind,
                             id: new LocalDebugId(syntaxOffset, ordinal: 0),
                             pdbAttributes: localSymbol.SynthesizedKind.PdbAttributes(),
-                            constraints: LocalSlotConstraints.None,
+                            constraints: slotConstraints,
                             isDynamic: false,
                             dynamicTransformFlags: ImmutableArray<TypedConstant>.Empty,
-                            isSlotReusable: localSymbol.SynthesizedKind.IsSlotReusable(_optimizations));
+                            isSlotReusable: false);
                     }
                     else
                     {
-                        result = AllocateTemp(_method.ReturnType, _boundBody.Syntax);
+                        result = AllocateTemp(_method.ReturnType, _boundBody.Syntax, slotConstraints);
                     }
 
                     _returnTemp = result;
@@ -216,19 +243,26 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
                 _builder.DefineInitialHiddenSequencePoint();
             }
 
-            EmitStatement(_boundBody);
-
-            if (_indirectReturnState == IndirectReturnState.Needed)
+            try
             {
-                // it is unfortunate that return was not handled while we were in scope of the method
-                // it can happen in rare cases involving exception handling (for example all returns were from a try)
-                // in such case we can still handle return here.
-                HandleReturn();
+                EmitStatement(_boundBody);
+
+                if (_indirectReturnState == IndirectReturnState.Needed)
+                {
+                    // it is unfortunate that return was not handled while we were in scope of the method
+                    // it can happen in rare cases involving exception handling (for example all returns were from a try)
+                    // in such case we can still handle return here.
+                    HandleReturn();
+                }
+
+                if (!_diagnostics.HasAnyErrors())
+                {
+                    _builder.Realize();
+                }
             }
-
-            if (!_diagnostics.HasAnyErrors())
+            catch (EmitCancelledException)
             {
-                _builder.Realize();
+                Debug.Assert(_diagnostics.HasAnyErrors());
             }
 
             _synthesizedLocalOrdinals.Free();
@@ -266,24 +300,29 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
             _indirectReturnState = IndirectReturnState.Emitted;
         }
 
-        private void EmitSymbolToken(TypeSymbol symbol, CSharpSyntaxNode syntaxNode)
+        private void EmitTypeReferenceToken(Cci.ITypeReference symbol, SyntaxNode syntaxNode)
         {
-            _builder.EmitToken(_module.Translate(symbol, syntaxNode, _diagnostics), syntaxNode, _diagnostics);
+            _builder.EmitToken(symbol, syntaxNode, _diagnostics);
         }
 
-        private void EmitSymbolToken(MethodSymbol method, CSharpSyntaxNode syntaxNode, BoundArgListOperator optArgList)
+        private void EmitSymbolToken(TypeSymbol symbol, SyntaxNode syntaxNode)
         {
-            _builder.EmitToken(_module.Translate(method, syntaxNode, _diagnostics, optArgList), syntaxNode, _diagnostics);
+            EmitTypeReferenceToken(_module.Translate(symbol, syntaxNode, _diagnostics), syntaxNode);
         }
 
-        private void EmitSymbolToken(FieldSymbol symbol, CSharpSyntaxNode syntaxNode)
+        private void EmitSymbolToken(MethodSymbol method, SyntaxNode syntaxNode, BoundArgListOperator optArgList, bool encodeAsRawDefinitionToken = false)
+        {
+            _builder.EmitToken(_module.Translate(method, syntaxNode, _diagnostics, optArgList, needDeclaration: encodeAsRawDefinitionToken), syntaxNode, _diagnostics, encodeAsRawDefinitionToken);
+        }
+
+        private void EmitSymbolToken(FieldSymbol symbol, SyntaxNode syntaxNode)
         {
             _builder.EmitToken(_module.Translate(symbol, syntaxNode, _diagnostics), syntaxNode, _diagnostics);
         }
 
         private void EmitSequencePointStatement(BoundSequencePoint node)
         {
-            CSharpSyntaxNode syntax = node.Syntax;
+            SyntaxNode syntax = node.Syntax;
             if (_emitPdbSequencePoints)
             {
                 if (syntax == null) //Null syntax indicates hidden sequence point (not equivalent to WasCompilerGenerated)
@@ -303,7 +342,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
                 instructionsEmitted = this.EmitStatementAndCountInstructions(statement);
             }
 
-            if (instructionsEmitted == 0 && syntax != null && _optimizations == OptimizationLevel.Debug)
+            if (instructionsEmitted == 0 && syntax != null && _ilEmitStyle == ILEmitStyle.Debug)
             {
                 // if there was no code emitted, then emit nop 
                 // otherwise this point could get associated with some random statement, possibly in a wrong scope
@@ -326,7 +365,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
                 instructionsEmitted = this.EmitStatementAndCountInstructions(statement);
             }
 
-            if (instructionsEmitted == 0 && span != default(TextSpan) && _optimizations == OptimizationLevel.Debug)
+            if (instructionsEmitted == 0 && span != default(TextSpan) && _ilEmitStyle == ILEmitStyle.Debug)
             {
                 // if there was no code emitted, then emit nop 
                 // otherwise this point could get associated with some random statement, possibly in a wrong scope
@@ -354,7 +393,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGen
             _builder.DefineHiddenSequencePoint();
         }
 
-        private void EmitSequencePoint(CSharpSyntaxNode syntax)
+        private void EmitSequencePoint(SyntaxNode syntax)
         {
             EmitSequencePoint(syntax.SyntaxTree, syntax.Span);
         }

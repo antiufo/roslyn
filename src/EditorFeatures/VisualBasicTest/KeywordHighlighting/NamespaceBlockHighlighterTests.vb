@@ -11,17 +11,17 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.KeywordHighlightin
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestNamespace1()
-            Test(<Text>
+        Public Async Function TestNamespace1() As Task
+            Await TestAsync(<Text>
 {|Cursor:[|Namespace|]|} N1
 [|End Namespace|]</Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestNamespace2()
-            Test(<Text>
+        Public Async Function TestNamespace2() As Task
+            Await TestAsync(<Text>
 [|Namespace|] N1
 {|Cursor:[|End Namespace|]|}</Text>)
-        End Sub
+        End Function
     End Class
 End Namespace

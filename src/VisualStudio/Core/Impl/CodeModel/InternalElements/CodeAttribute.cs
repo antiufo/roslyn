@@ -10,7 +10,7 @@ using Microsoft.VisualStudio.LanguageServices.Implementation.Utilities;
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.InternalElements
 {
     [ComVisible(true)]
-    [ComDefaultInterface(typeof(EnvDTE.CodeAttribute))]
+    [ComDefaultInterface(typeof(EnvDTE80.CodeAttribute2))]
     public sealed class CodeAttribute : AbstractCodeElement, ICodeElementContainer<CodeAttributeArgument>, EnvDTE.CodeAttribute, EnvDTE80.CodeAttribute2
     {
         internal static EnvDTE.CodeAttribute Create(
@@ -47,24 +47,27 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
             return GetCollection<CodeAttribute>(Parent);
         }
 
-        internal override SyntaxNode LookupNode()
+        internal override bool TryLookupNode(out SyntaxNode node)
         {
+            node = null;
+
             var parentNode = _parent != null
                 ? _parent.LookupNode()
                 : FileCodeModel.GetSyntaxRoot();
 
             if (parentNode == null)
             {
-                throw Exceptions.ThrowEFail();
+                return false;
             }
 
             SyntaxNode attributeNode;
             if (!CodeModelService.TryGetAttributeNode(parentNode, _name, _ordinal, out attributeNode))
             {
-                throw Exceptions.ThrowEFail();
+                return false;
             }
 
-            return attributeNode;
+            node = attributeNode;
+            return node != null;
         }
 
         public override EnvDTE.vsCMElement Kind

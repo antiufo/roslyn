@@ -2,6 +2,7 @@
 
 Imports Microsoft.CodeAnalysis.EditAndContinue
 Imports Microsoft.CodeAnalysis.EditAndContinue.UnitTests
+Imports Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.EditAndContinue
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.EditAndContinue.UnitTests
@@ -2611,17 +2612,17 @@ End Class"
 
             Dim insert = GetTopEdits(src1, src2)
             insert.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.InsertLambdaWithMultiScopeCapture, "x1", VBFeaturesResources.LambdaExpression, "y0", "x1"),
-                Diagnostic(RudeEditKind.InsertLambdaWithMultiScopeCapture, "x3", VBFeaturesResources.LambdaExpression, "x1", "x3"),
-                Diagnostic(RudeEditKind.InsertLambdaWithMultiScopeCapture, "y0", VBFeaturesResources.LambdaExpression, "Me", "y0"),
-                Diagnostic(RudeEditKind.InsertLambdaWithMultiScopeCapture, "x3", VBFeaturesResources.LambdaExpression, "Me", "x3"))
+                Diagnostic(RudeEditKind.InsertLambdaWithMultiScopeCapture, "x1", VBFeaturesResources.Lambda, "y0", "x1"),
+                Diagnostic(RudeEditKind.InsertLambdaWithMultiScopeCapture, "x3", VBFeaturesResources.Lambda, "x1", "x3"),
+                Diagnostic(RudeEditKind.InsertLambdaWithMultiScopeCapture, "y0", VBFeaturesResources.Lambda, "Me", "y0"),
+                Diagnostic(RudeEditKind.InsertLambdaWithMultiScopeCapture, "x3", VBFeaturesResources.Lambda, "Me", "x3"))
 
             Dim delete = GetTopEdits(src2, src1)
             delete.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.DeleteLambdaWithMultiScopeCapture, "x1", VBFeaturesResources.LambdaExpression, "y0", "x1"),
-                Diagnostic(RudeEditKind.DeleteLambdaWithMultiScopeCapture, "x3", VBFeaturesResources.LambdaExpression, "x1", "x3"),
-                Diagnostic(RudeEditKind.DeleteLambdaWithMultiScopeCapture, "y0", VBFeaturesResources.LambdaExpression, "Me", "y0"),
-                Diagnostic(RudeEditKind.DeleteLambdaWithMultiScopeCapture, "x3", VBFeaturesResources.LambdaExpression, "Me", "x3"))
+                Diagnostic(RudeEditKind.DeleteLambdaWithMultiScopeCapture, "x1", VBFeaturesResources.Lambda, "y0", "x1"),
+                Diagnostic(RudeEditKind.DeleteLambdaWithMultiScopeCapture, "x3", VBFeaturesResources.Lambda, "x1", "x3"),
+                Diagnostic(RudeEditKind.DeleteLambdaWithMultiScopeCapture, "y0", VBFeaturesResources.Lambda, "Me", "y0"),
+                Diagnostic(RudeEditKind.DeleteLambdaWithMultiScopeCapture, "x3", VBFeaturesResources.Lambda, "Me", "x3"))
         End Sub
 
         <Fact>
@@ -2653,7 +2654,7 @@ End Class
                 Diagnostic(RudeEditKind.NotCapturingVariable, "F", "Me"))
         End Sub
 
-        <Fact, WorkItem(1290)>
+        <Fact, WorkItem(1290, "https://github.com/dotnet/roslyn/issues/1290")>
         Public Sub Lambdas_Update_Signature1()
             Dim src1 = "
 Imports System
@@ -2687,10 +2688,10 @@ End Class
 "
             Dim edits = GetTopEdits(src1, src2)
             edits.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.ChangingLambdaParameters, "Function(a)", VBFeaturesResources.LambdaExpression))
+                Diagnostic(RudeEditKind.ChangingLambdaParameters, "Function(a)", VBFeaturesResources.Lambda))
         End Sub
 
-        <Fact, WorkItem(1290)>
+        <Fact, WorkItem(1290, "https://github.com/dotnet/roslyn/issues/1290")>
         Public Sub Lambdas_Update_Signature2()
             Dim src1 = "
 Imports System
@@ -2724,10 +2725,10 @@ End Class
 "
             Dim edits = GetTopEdits(src1, src2)
             edits.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.ChangingLambdaParameters, "Function(a, b)", VBFeaturesResources.LambdaExpression))
+                Diagnostic(RudeEditKind.ChangingLambdaParameters, "Function(a, b)", VBFeaturesResources.Lambda))
         End Sub
 
-        <Fact, WorkItem(1290)>
+        <Fact, WorkItem(1290, "https://github.com/dotnet/roslyn/issues/1290")>
         Public Sub Lambdas_Update_Signature3()
             Dim src1 = "
 Imports System
@@ -2761,10 +2762,10 @@ End Class
 "
             Dim edits = GetTopEdits(src1, src2)
             edits.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.ChangingLambdaReturnType, "Function(a)", VBFeaturesResources.LambdaExpression))
+                Diagnostic(RudeEditKind.ChangingLambdaReturnType, "Function(a)", VBFeaturesResources.Lambda))
         End Sub
 
-        <Fact, WorkItem(1290)>
+        <Fact, WorkItem(1290, "https://github.com/dotnet/roslyn/issues/1290")>
         Public Sub Lambdas_Update_Signature_EmptyBody1()
             Dim src1 = "
 Imports System
@@ -2802,10 +2803,10 @@ End Class
 "
             Dim edits = GetTopEdits(src1, src2)
             edits.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.ChangingLambdaParameters, "Sub(a)", VBFeaturesResources.LambdaExpression))
+                Diagnostic(RudeEditKind.ChangingLambdaParameters, "Sub(a)", VBFeaturesResources.Lambda))
         End Sub
 
-        <Fact, WorkItem(1290)>
+        <Fact, WorkItem(1290, "https://github.com/dotnet/roslyn/issues/1290")>
         Public Sub Lambdas_Update_Signature_EmptyBody2()
             Dim src1 = "
 Imports System
@@ -2843,7 +2844,7 @@ End Class
 "
             Dim edits = GetTopEdits(src1, src2)
             edits.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.ChangingLambdaReturnType, "Function()", VBFeaturesResources.LambdaExpression))
+                Diagnostic(RudeEditKind.ChangingLambdaReturnType, "Function()", VBFeaturesResources.Lambda))
         End Sub
 
         <Fact>
@@ -2882,7 +2883,7 @@ End Class
             edits.VerifySemanticDiagnostics()
         End Sub
 
-        <Fact, WorkItem(1290)>
+        <Fact, WorkItem(1290, "https://github.com/dotnet/roslyn/issues/1290")>
         Public Sub Lambdas_Update_Signature_ReturnType1()
             Dim src1 = "
 Imports System
@@ -2919,7 +2920,7 @@ End Class
 "
             Dim edits = GetTopEdits(src1, src2)
             edits.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.ChangingLambdaReturnType, "Sub(a)", VBFeaturesResources.LambdaExpression))
+                Diagnostic(RudeEditKind.ChangingLambdaReturnType, "Sub(a)", VBFeaturesResources.Lambda))
         End Sub
 
         <Fact>
@@ -2996,7 +2997,7 @@ End Class
             edits.VerifySemanticDiagnostics()
         End Sub
 
-        <Fact, WorkItem(1290)>
+        <Fact, WorkItem(1290, "https://github.com/dotnet/roslyn/issues/1290")>
         Public Sub Lambdas_Update_Signature_ParameterRefness1()
             Dim src1 = "
 Imports System
@@ -3036,7 +3037,7 @@ End Class
 "
             Dim edits = GetTopEdits(src1, src2)
             edits.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.ChangingLambdaParameters, "Function(a As Integer)", VBFeaturesResources.LambdaExpression))
+                Diagnostic(RudeEditKind.ChangingLambdaParameters, "Function(a As Integer)", VBFeaturesResources.Lambda))
         End Sub
 
         <Fact>
@@ -3125,7 +3126,7 @@ End Class
             edits.VerifySemanticDiagnostics()
         End Sub
 
-        <Fact, WorkItem(1290)>
+        <Fact, WorkItem(1290, "https://github.com/dotnet/roslyn/issues/1290")>
         Public Sub Lambdas_Update_SourceType2()
             Dim src1 = "
 Imports System
@@ -3171,10 +3172,10 @@ End Class
 "
             Dim edits = GetTopEdits(src1, src2)
             edits.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.ChangingLambdaParameters, "Function(a)", VBFeaturesResources.LambdaExpression))
+                Diagnostic(RudeEditKind.ChangingLambdaParameters, "Function(a)", VBFeaturesResources.Lambda))
         End Sub
 
-        <Fact, WorkItem(1290)>
+        <Fact, WorkItem(1290, "https://github.com/dotnet/roslyn/issues/1290")>
         Public Sub Lambdas_Update_SourceTypeAndMetadataType1()
             Dim src1 = "
 Namespace [System]
@@ -3223,7 +3224,7 @@ End Namespace
 "
             Dim edits = GetTopEdits(src1, src2)
             edits.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.ChangingLambdaParameters, "Function(a)", VBFeaturesResources.LambdaExpression))
+                Diagnostic(RudeEditKind.ChangingLambdaParameters, "Function(a)", VBFeaturesResources.Lambda))
         End Sub
 
         <Fact>
@@ -3265,7 +3266,7 @@ End Class
             edits.VerifySemanticDiagnostics()
         End Sub
 
-        <Fact, WorkItem(1290)>
+        <Fact, WorkItem(1290, "https://github.com/dotnet/roslyn/issues/1290")>
         Public Sub Lambdas_Update_Generic2()
             Dim src1 = "
 Delegate Function D1(Of S, T)(a As S, b As T) As Integer
@@ -3301,7 +3302,7 @@ End Class
 "
             Dim edits = GetTopEdits(src1, src2)
             edits.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.ChangingLambdaParameters, "Function(a, b)", VBFeaturesResources.LambdaExpression))
+                Diagnostic(RudeEditKind.ChangingLambdaParameters, "Function(a, b)", VBFeaturesResources.Lambda))
         End Sub
 
         <Fact>
@@ -3409,7 +3410,7 @@ End Class
 
             ' TODO: better location
             edits.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.NotAccessingCapturedVariableInLambda, "Function(a2)", "y", VBFeaturesResources.LambdaExpression))
+                Diagnostic(RudeEditKind.NotAccessingCapturedVariableInLambda, "Function(a2)", "y", VBFeaturesResources.Lambda))
         End Sub
 
         <Fact>
@@ -3462,7 +3463,7 @@ End Class
                 Diagnostic(RudeEditKind.NotCapturingVariable, "a2", "a2"))
         End Sub
 
-        <Fact, WorkItem(1290)>
+        <Fact, WorkItem(1290, "https://github.com/dotnet/roslyn/issues/1290")>
         Public Sub Lambdas_Update_CeaseCapture_LambdaParameter1()
             Dim src1 = "
 Imports System
@@ -3730,7 +3731,7 @@ End Class
 "
             Dim edits = GetTopEdits(src1, src2)
             edits.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.AccessingCapturedVariableInLambda, "Function(a1)", "Me", VBFeaturesResources.LambdaExpression))
+                Diagnostic(RudeEditKind.AccessingCapturedVariableInLambda, "Function(a1)", "Me", VBFeaturesResources.Lambda))
         End Sub
 
         <Fact>
@@ -3763,8 +3764,8 @@ End Class
 "
             Dim edits = GetTopEdits(src1, src2)
             edits.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.AccessingCapturedVariableInLambda, "x", "x", VBFeaturesResources.LambdaExpression).WithFirstLine("x + ' 1"),
-                Diagnostic(RudeEditKind.AccessingCapturedVariableInLambda, "x", "x", VBFeaturesResources.LambdaExpression).WithFirstLine("x   ' 2"))
+                Diagnostic(RudeEditKind.AccessingCapturedVariableInLambda, "x", "x", VBFeaturesResources.Lambda).WithFirstLine("x + ' 1"),
+                Diagnostic(RudeEditKind.AccessingCapturedVariableInLambda, "x", "x", VBFeaturesResources.Lambda).WithFirstLine("x   ' 2"))
         End Sub
 
         <Fact>
@@ -3795,7 +3796,7 @@ End Class
 "
             Dim edits = GetTopEdits(src1, src2)
             edits.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.AccessingCapturedVariableInLambda, "y", "y", VBFeaturesResources.LambdaExpression))
+                Diagnostic(RudeEditKind.AccessingCapturedVariableInLambda, "y", "y", VBFeaturesResources.Lambda))
         End Sub
 
         <Fact>
@@ -3895,7 +3896,7 @@ End Class
 "
             Dim edits = GetTopEdits(src1, src2)
             edits.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.AccessingCapturedVariableInLambda, "x0", "x0", VBFeaturesResources.LambdaExpression))
+                Diagnostic(RudeEditKind.AccessingCapturedVariableInLambda, "x0", "x0", VBFeaturesResources.Lambda))
         End Sub
 
         <Fact>
@@ -3947,7 +3948,7 @@ Class C
 End Class"
             Dim edits = GetTopEdits(src1, src2)
             edits.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.NotAccessingCapturedVariableInLambda, "Function(a)", "x0", VBFeaturesResources.LambdaExpression))
+                Diagnostic(RudeEditKind.NotAccessingCapturedVariableInLambda, "Function(a)", "x0", VBFeaturesResources.Lambda))
         End Sub
 
         <Fact>
@@ -4001,7 +4002,7 @@ Class C
 End Class"
             Dim edits = GetTopEdits(src1, src2)
             edits.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.AccessingCapturedVariableInLambda, "x0", "x0", VBFeaturesResources.LambdaExpression))
+                Diagnostic(RudeEditKind.AccessingCapturedVariableInLambda, "x0", "x0", VBFeaturesResources.Lambda))
         End Sub
 
         <Fact>
@@ -4060,10 +4061,10 @@ End Class
             ' Including statement distance when matching would help.
 
             edits.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.NotAccessingCapturedVariableInLambda, "Function(a)", "Me", VBFeaturesResources.LambdaExpression).WithFirstLine("G(Function(a) y1 + x0) ' error: connecting previously disconnected closures"),
-                Diagnostic(RudeEditKind.AccessingCapturedVariableInLambda, "y1", "y1", VBFeaturesResources.LambdaExpression).WithFirstLine("G(Function(a) y1 + x0) ' error: connecting previously disconnected closures"),
-                Diagnostic(RudeEditKind.AccessingCapturedVariableInLambda, "Function(a)", "Me", VBFeaturesResources.LambdaExpression).WithFirstLine("G(Function(a) x)       ' error: disconnecting previously connected closures"),
-                Diagnostic(RudeEditKind.NotAccessingCapturedVariableInLambda, "Function(a)", "y1", VBFeaturesResources.LambdaExpression).WithFirstLine("G(Function(a) x)       ' error: disconnecting previously connected closures"))
+                Diagnostic(RudeEditKind.NotAccessingCapturedVariableInLambda, "Function(a)", "Me", VBFeaturesResources.Lambda).WithFirstLine("G(Function(a) y1 + x0) ' error: connecting previously disconnected closures"),
+                Diagnostic(RudeEditKind.AccessingCapturedVariableInLambda, "y1", "y1", VBFeaturesResources.Lambda).WithFirstLine("G(Function(a) y1 + x0) ' error: connecting previously disconnected closures"),
+                Diagnostic(RudeEditKind.AccessingCapturedVariableInLambda, "Function(a)", "Me", VBFeaturesResources.Lambda).WithFirstLine("G(Function(a) x)       ' error: disconnecting previously connected closures"),
+                Diagnostic(RudeEditKind.NotAccessingCapturedVariableInLambda, "Function(a)", "y1", VBFeaturesResources.Lambda).WithFirstLine("G(Function(a) x)       ' error: disconnecting previously connected closures"))
         End Sub
 
         <Fact>
@@ -4157,7 +4158,7 @@ End Class
 "
             Dim edits = GetTopEdits(src1, src2)
             edits.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.ChangingQueryLambdaType, "Select", VBFeaturesResources.SelectClause))
+                Diagnostic(RudeEditKind.ChangingQueryLambdaType, "Select", VBFeaturesResources.Select_clause))
         End Sub
 
         <Fact>
@@ -4184,7 +4185,7 @@ End Class
 "
             Dim edits = GetTopEdits(src1, src2)
             edits.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.ChangingQueryLambdaType, "Select", VBFeaturesResources.SelectClause))
+                Diagnostic(RudeEditKind.ChangingQueryLambdaType, "Select", VBFeaturesResources.Select_clause))
         End Sub
 
         <Fact>
@@ -4211,7 +4212,7 @@ End Class
 "
             Dim edits = GetTopEdits(src1, src2)
             edits.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.ChangingQueryLambdaType, "Select", VBFeaturesResources.SelectClause))
+                Diagnostic(RudeEditKind.ChangingQueryLambdaType, "Select", VBFeaturesResources.Select_clause))
         End Sub
 
         <Fact>
@@ -4238,7 +4239,7 @@ End Class
 "
             Dim edits = GetTopEdits(src1, src2)
             edits.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.ChangingQueryLambdaType, "From", VBFeaturesResources.FromClause))
+                Diagnostic(RudeEditKind.ChangingQueryLambdaType, "From", VBFeaturesResources.From_clause))
         End Sub
 
         <Fact>
@@ -4295,7 +4296,7 @@ End Class
             edits.VerifySemanticDiagnostics()
         End Sub
 
-        <Fact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212)>
+        <WpfFact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212, "https://github.com/dotnet/roslyn/issues/1212")>
         Public Sub Queries_Update_Signature_FromInAggregate1()
             Dim src1 = "
 Imports System
@@ -4326,7 +4327,7 @@ End Class
                 Diagnostic(RudeEditKind.ChangingQueryLambdaType, "From", "From clause"))
         End Sub
 
-        <Fact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212)>
+        <WpfFact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212, "https://github.com/dotnet/roslyn/issues/1212")>
         Public Sub Queries_Update_Signature_FromInAggregate2()
             Dim src1 = "
 Imports System
@@ -4357,7 +4358,7 @@ End Class
                 Diagnostic(RudeEditKind.ChangingQueryLambdaType, "From", "From clause"))
         End Sub
 
-        <Fact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212)>
+        <WpfFact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212, "https://github.com/dotnet/roslyn/issues/1212")>
         Public Sub Queries_Update_Signature_FromInAggregate3()
             Dim src1 = "
 Imports System
@@ -4414,7 +4415,7 @@ End Class
 "
             Dim edits = GetTopEdits(src1, src2)
             edits.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.ChangingQueryLambdaType, "Let", VBFeaturesResources.LetClause))
+                Diagnostic(RudeEditKind.ChangingQueryLambdaType, "Let", VBFeaturesResources.Let_clause))
         End Sub
 
         <Fact>
@@ -4443,7 +4444,7 @@ End Class
 "
             Dim edits = GetTopEdits(src1, src2)
             edits.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.ChangingQueryLambdaType, "a + 1.0 Descending", VBFeaturesResources.OrderingClause))
+                Diagnostic(RudeEditKind.ChangingQueryLambdaType, "a + 1.0 Descending", VBFeaturesResources.Ordering_clause))
         End Sub
 
         <Fact>
@@ -4472,10 +4473,10 @@ End Class
 "
             Dim edits = GetTopEdits(src1, src2)
             edits.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.ChangingQueryLambdaType, "a + 2.0 Ascending", VBFeaturesResources.OrderingClause))
+                Diagnostic(RudeEditKind.ChangingQueryLambdaType, "a + 2.0 Ascending", VBFeaturesResources.Ordering_clause))
         End Sub
 
-        <Fact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212)>
+        <WpfFact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212, "https://github.com/dotnet/roslyn/issues/1212")>
         Public Sub Queries_Update_Signature_Join1()
             Dim src1 = "
 Imports System
@@ -4504,7 +4505,7 @@ End Class
                 Diagnostic(RudeEditKind.ChangingQueryLambdaType, "Join", "Join clause"))
         End Sub
 
-        <Fact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212)>
+        <WpfFact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212, "https://github.com/dotnet/roslyn/issues/1212")>
         Public Sub Queries_Update_Signature_Join2()
             Dim src1 = "
 Imports System
@@ -4533,7 +4534,7 @@ End Class
                 Diagnostic(RudeEditKind.ChangingQueryLambdaType, "Join", "Join clause"))
         End Sub
 
-        <Fact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212)>
+        <WpfFact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212, "https://github.com/dotnet/roslyn/issues/1212")>
         Public Sub Queries_Update_Signature_Join3()
             Dim src1 = "
 Imports System
@@ -4562,7 +4563,7 @@ End Class
                 Diagnostic(RudeEditKind.ChangingQueryLambdaType, "Join", "Join clause"))
         End Sub
 
-        <Fact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212)>
+        <WpfFact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212, "https://github.com/dotnet/roslyn/issues/1212")>
         Public Sub Queries_Update_Signature_Join4()
             Dim src1 = "
 Imports System
@@ -4591,7 +4592,7 @@ End Class
                 Diagnostic(RudeEditKind.ChangingQueryLambdaType, "Join", "Join clause"))
         End Sub
 
-        <Fact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212)>
+        <WpfFact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212, "https://github.com/dotnet/roslyn/issues/1212")>
         Public Sub Queries_Update_Signature_Join5()
             Dim src1 = "
 Imports System
@@ -4620,7 +4621,7 @@ End Class
                 Diagnostic(RudeEditKind.ChangingQueryLambdaType, "Join", "Join clause"))
         End Sub
 
-        <Fact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212)>
+        <WpfFact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212, "https://github.com/dotnet/roslyn/issues/1212")>
         Public Sub Queries_Update_Signature_Join()
             Dim src1 = "
 Imports System
@@ -4649,7 +4650,7 @@ End Class
                 Diagnostic(RudeEditKind.ChangingQueryLambdaType, "Join", "Join clause"))
         End Sub
 
-        <Fact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212)>
+        <WpfFact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212, "https://github.com/dotnet/roslyn/issues/1212")>
         Public Sub Queries_Update_Signature_GroupJoin1()
             Dim src1 = "
 Imports System
@@ -4678,7 +4679,7 @@ End Class
                 Diagnostic(RudeEditKind.ChangingQueryLambdaType, "Group Join", "Group Join clause"))
         End Sub
 
-        <Fact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212)>
+        <WpfFact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212, "https://github.com/dotnet/roslyn/issues/1212")>
         Public Sub Queries_Update_Signature_GroupJoin2()
             Dim src1 = "
 Imports System
@@ -4707,7 +4708,7 @@ End Class
                 Diagnostic(RudeEditKind.ChangingQueryLambdaType, "Group Join", "Group Join clause"))
         End Sub
 
-        <Fact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212)>
+        <WpfFact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212, "https://github.com/dotnet/roslyn/issues/1212")>
         Public Sub Queries_Update_Signature_GroupJoin3()
             Dim src1 = "
 Imports System
@@ -4736,7 +4737,7 @@ End Class
                 Diagnostic(RudeEditKind.ChangingQueryLambdaType, "Group Join", "Group Join clause"))
         End Sub
 
-        <Fact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212)>
+        <WpfFact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212, "https://github.com/dotnet/roslyn/issues/1212")>
         Public Sub Queries_Update_Signature_GroupJoin4()
             Dim src1 = "
 Imports System
@@ -4766,7 +4767,7 @@ End Class
             edits.VerifySemanticDiagnostics()
         End Sub
 
-        <Fact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212)>
+        <WpfFact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212, "https://github.com/dotnet/roslyn/issues/1212")>
         Public Sub Queries_Update_Signature_GroupBy1()
             Dim src1 = "
 Imports System
@@ -4840,7 +4841,7 @@ End Class
             edits.VerifySemanticDiagnostics()
         End Sub
 
-        <Fact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212)>
+        <WpfFact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212, "https://github.com/dotnet/roslyn/issues/1212")>
         Public Sub Queries_Update_Signature_Aggregate1()
             Dim src1 = "
 Imports System
@@ -4870,7 +4871,7 @@ End Class
             edits.VerifySemanticDiagnostics()
         End Sub
 
-        <Fact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212)>
+        <WpfFact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212, "https://github.com/dotnet/roslyn/issues/1212")>
         Public Sub Queries_Update_Signature_Aggregate2()
             Dim src1 = "
 Imports System
@@ -4900,7 +4901,7 @@ End Class
             edits.VerifySemanticDiagnostics()
         End Sub
 
-        <Fact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212)>
+        <WpfFact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212, "https://github.com/dotnet/roslyn/issues/1212")>
         Public Sub Queries_Update_Signature_Aggregate3()
             Dim src1 = "
 Imports System
@@ -4930,7 +4931,7 @@ End Class
                 Diagnostic(RudeEditKind.ChangingQueryLambdaType, "Aggregate", "Aggregate clause"))
         End Sub
 
-        <Fact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212)>
+        <WpfFact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212, "https://github.com/dotnet/roslyn/issues/1212")>
         Public Sub Queries_Update_Signature_Aggregate4()
             Dim src1 = "
 Imports System
@@ -4960,7 +4961,7 @@ End Class
                 Diagnostic(RudeEditKind.ChangingQueryLambdaType, "Join", "Join clause"))
         End Sub
 
-        <Fact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212)>
+        <WpfFact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212, "https://github.com/dotnet/roslyn/issues/1212")>
         Public Sub Queries_Update_Signature_Aggregate5()
             Dim src1 = "
 Imports System
@@ -5164,7 +5165,7 @@ End Class"
             edits.VerifySemanticDiagnostics()
         End Sub
 
-        <Fact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212)>
+        <WpfFact(Skip:="https://github.com/dotnet/roslyn/issues/1212"), WorkItem(1212, "https://github.com/dotnet/roslyn/issues/1212")>
         Public Sub Queries_CapturedTransparentIdentifiers_JoinClause1()
             Dim src1 As String = "
 Imports System
@@ -5204,7 +5205,7 @@ End Class"
                 Diagnostic(RudeEditKind.RUDE_EDIT_COMPLEX_QUERY_EXPRESSION, "Group Join", "method"))
         End Sub
 
-        <Fact, WorkItem(1312)>
+        <Fact, WorkItem(1312, "https://github.com/dotnet/roslyn/issues/1312")>
         Public Sub Queries_CeaseCapturingTransparentIdentifiers1()
             Dim src1 As String = "
 Imports System
@@ -5247,7 +5248,7 @@ End Class"
                 Diagnostic(RudeEditKind.NotCapturingVariable, "b In {2}", "b"))
         End Sub
 
-        <Fact, WorkItem(1312)>
+        <Fact, WorkItem(1312, "https://github.com/dotnet/roslyn/issues/1312")>
         Public Sub Queries_CapturingTransparentIdentifiers1()
             Dim src1 As String = "
 Imports System
@@ -5326,7 +5327,7 @@ End Class
             Dim edits = GetTopEdits(src1, src2)
 
             edits.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.AccessingCapturedVariableInLambda, "a", "a", VBFeaturesResources.SelectClause))
+                Diagnostic(RudeEditKind.AccessingCapturedVariableInLambda, "a", "a", VBFeaturesResources.Select_clause))
         End Sub
 
         <Fact>
@@ -5367,7 +5368,7 @@ End Class
 "
             Dim edits = GetTopEdits(src1, src2)
             edits.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.AccessingCapturedVariableInLambda, "a", "a", VBFeaturesResources.SelectClause))
+                Diagnostic(RudeEditKind.AccessingCapturedVariableInLambda, "a", "a", VBFeaturesResources.Select_clause))
         End Sub
 
         <Fact>
@@ -5406,8 +5407,8 @@ End Class
 "
             Dim edits = GetTopEdits(src1, src2)
             edits.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.AccessingCapturedVariableInLambda, "a", "a", VBFeaturesResources.SelectClause),
-                Diagnostic(RudeEditKind.AccessingCapturedVariableInLambda, "a", "a", VBFeaturesResources.LambdaExpression))
+                Diagnostic(RudeEditKind.AccessingCapturedVariableInLambda, "a", "a", VBFeaturesResources.Select_clause),
+                Diagnostic(RudeEditKind.AccessingCapturedVariableInLambda, "a", "a", VBFeaturesResources.Lambda))
         End Sub
 
         <Fact>
@@ -5448,7 +5449,7 @@ End Class
 "
             Dim edits = GetTopEdits(src1, src2)
             edits.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.NotAccessingCapturedVariableInLambda, "Select", "a", VBFeaturesResources.SelectClause))
+                Diagnostic(RudeEditKind.NotAccessingCapturedVariableInLambda, "Select", "a", VBFeaturesResources.Select_clause))
         End Sub
 
         <Fact>
@@ -5487,8 +5488,8 @@ End Class
 "
             Dim edits = GetTopEdits(src1, src2)
             edits.VerifySemanticDiagnostics(
-                Diagnostic(RudeEditKind.NotAccessingCapturedVariableInLambda, "Select", "a", VBFeaturesResources.SelectClause),
-                Diagnostic(RudeEditKind.NotAccessingCapturedVariableInLambda, "Function()", "a", VBFeaturesResources.LambdaExpression))
+                Diagnostic(RudeEditKind.NotAccessingCapturedVariableInLambda, "Select", "a", VBFeaturesResources.Select_clause),
+                Diagnostic(RudeEditKind.NotAccessingCapturedVariableInLambda, "Function()", "a", VBFeaturesResources.Lambda))
         End Sub
 
         <Fact>
@@ -5586,6 +5587,67 @@ Yield 2
             edits.VerifyEdits(
                 "Delete [Yield 3]@66")
         End Sub
+
+        <Fact>
+        Public Sub MissingIteratorStateMachineAttribute()
+            Dim src1 = "
+Imports System.Collections.Generic
+
+Class C
+    Shared Iterator Function F() As IEnumerable(Of Integer)
+        Yield 1
+    End Function
+End Class
+"
+            Dim src2 = "
+Imports System.Collections.Generic
+
+Class C
+    Shared Iterator Function F() As IEnumerable(Of Integer)
+        Yield 2
+    End Function
+End Class
+"
+            Dim edits = GetTopEdits(src1, src2)
+            VisualBasicEditAndContinueTestHelpers.Instance40.VerifySemantics(
+                edits,
+                ActiveStatementsDescription.Empty,
+                Nothing,
+                Nothing,
+                Nothing,
+                {Diagnostic(RudeEditKind.UpdatingStateMachineMethodMissingAttribute, "Shared Iterator Function F()", "System.Runtime.CompilerServices.IteratorStateMachineAttribute")})
+        End Sub
+
+        <Fact>
+        Public Sub MissingIteratorStateMachineAttribute2()
+            Dim src1 = "
+Imports System.Collections.Generic
+
+Class C
+    Shared Function F() As IEnumerable(Of Integer)
+        Return Nothing
+    End Function
+End Class
+"
+            Dim src2 = "
+Imports System.Collections.Generic
+
+Class C
+    Shared Iterator Function F() As IEnumerable(Of Integer)
+        Yield 2
+    End Function
+End Class
+"
+            Dim edits = GetTopEdits(src1, src2)
+            VisualBasicEditAndContinueTestHelpers.Instance40.VerifySemantics(
+                edits,
+                ActiveStatementsDescription.Empty,
+                Nothing,
+                Nothing,
+                Nothing,
+                Nothing)
+        End Sub
+
 #End Region
 
 #Region "Await"
@@ -5638,6 +5700,69 @@ Await F(3)
 
             edits.VerifyEdits(
                 "Delete [Await F(2)]@51")
+        End Sub
+
+        <Fact>
+        Public Sub MissingAsyncStateMachineAttribute1()
+            Dim src1 = "
+Imports System.Threading.Tasks
+
+Class C
+    Shared Async Function F() As Task(Of Integer)
+        Await New Task()
+        Return 1
+    End Function
+End Class
+"
+            Dim src2 = "
+Imports System.Threading.Tasks
+
+Class C
+    Shared Async Function F() As Task(Of Integer)
+        Await New Task()
+        Return 2
+    End Function
+End Class
+"
+            Dim edits = GetTopEdits(src1, src2)
+            VisualBasicEditAndContinueTestHelpers.InstanceMinAsync.VerifySemantics(
+                edits,
+                ActiveStatementsDescription.Empty,
+                Nothing,
+                Nothing,
+                Nothing,
+                {Diagnostic(RudeEditKind.UpdatingStateMachineMethodMissingAttribute, "Shared Async Function F()", "System.Runtime.CompilerServices.AsyncStateMachineAttribute")})
+        End Sub
+
+        <Fact>
+        Public Sub MissingAsyncStateMachineAttribute2()
+            Dim src1 = "
+Imports System.Threading.Tasks
+
+Class C
+    Shared Function F() As Task(Of Integer)
+        Return Nothing
+    End Function
+End Class
+"
+            Dim src2 = "
+Imports System.Threading.Tasks
+
+Class C
+    Shared Async Function F() As Task(Of Integer)
+        Await New Task()
+        Return 2
+    End Function
+End Class
+"
+            Dim edits = GetTopEdits(src1, src2)
+            VisualBasicEditAndContinueTestHelpers.InstanceMinAsync.VerifySemantics(
+                edits,
+                ActiveStatementsDescription.Empty,
+                Nothing,
+                Nothing,
+                Nothing,
+                Nothing)
         End Sub
 #End Region
     End Class

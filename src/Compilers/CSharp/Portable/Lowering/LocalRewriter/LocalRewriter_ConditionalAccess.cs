@@ -31,7 +31,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         // IL gen can generate more compact code for certain conditional accesses 
         // by utilizing stack dup/pop instructions 
-        internal BoundExpression RewriteConditionalAccess(BoundConditionalAccess node, bool used, BoundExpression rewrittenWhenNull = null)
+        internal BoundExpression RewriteConditionalAccess(BoundConditionalAccess node, bool used)
         {
             Debug.Assert(!_inExpressionLambda);
 
@@ -41,7 +41,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             // Check trivial case
             if (loweredReceiver.IsDefaultValue())
             {
-                return rewrittenWhenNull ?? _factory.Default(node.Type);
+                return _factory.Default(node.Type);
             }
 
             ConditionalAccessLoweringKind loweringKind;
@@ -97,10 +97,22 @@ namespace Microsoft.CodeAnalysis.CSharp
                     throw ExceptionUtilities.UnexpectedValue(loweringKind);
             }
 
-            BoundExpression loweredAccessExpression = used ?
-                        this.VisitExpression(node.AccessExpression) :
-                        this.VisitUnusedExpression(node.AccessExpression);
+            BoundExpression loweredAccessExpression;
 
+            if (used)
+            {
+                loweredAccessExpression = this.VisitExpression(node.AccessExpression);
+            }
+            else
+            {
+                loweredAccessExpression = this.VisitUnusedExpression(node.AccessExpression);
+                if (loweredAccessExpression == null)
+                {
+                    return null;
+                }
+            }
+
+            Debug.Assert(loweredAccessExpression != null);
             _currentConditionalAccessTarget = previousConditionalAccessTarget;
 
             TypeSymbol type = this.VisitType(node.Type);
@@ -142,7 +154,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                                  GetNullableMethod(node.Syntax, loweredReceiver.Type, SpecialMember.System_Nullable_T_get_HasValue) :
                                  null,
                         loweredAccessExpression,
-                        rewrittenWhenNull,
+                        null,
                         currentConditionalAccessID,
                         type);
 
@@ -150,7 +162,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                 case ConditionalAccessLoweringKind.TernaryCaptureReceiverByVal:
                     // capture the receiver into a temp
-                    loweredReceiver = _factory.Sequence(
+                    loweredReceiver = _factory.MakeSequence(
                                             _factory.AssignmentExpression(_factory.Local(temp), loweredReceiver),
                                             _factory.Local(temp));
 
@@ -168,13 +180,13 @@ namespace Microsoft.CodeAnalysis.CSharp
                         result = RewriteConditionalOperator(node.Syntax,
                             condition,
                             consequence,
-                            rewrittenWhenNull ?? _factory.Default(nodeType),
+                            _factory.Default(nodeType),
                             null,
                             nodeType);
 
                         if (temp != null)
                         {
-                            result = _factory.Sequence(temp, result);
+                            result = _factory.MakeSequence(temp, result);
                         }
                     }
                     break;

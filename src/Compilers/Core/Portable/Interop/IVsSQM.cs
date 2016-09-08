@@ -6,6 +6,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #pragma warning disable 3001
+
 using System;
 using System.Runtime.InteropServices;
 
@@ -143,15 +144,18 @@ namespace Microsoft.VisualStudio.Shell.Interop
     {
         [return: MarshalAs(UnmanagedType.VariantBool)]
         bool GetOptInStatus();
+
         void UnloadSessions(
             );
         void EndAllSessionsAndAbortUploads(
             );
+
         void BeginSession(
             [In, MarshalAs(UnmanagedType.U4)] System.UInt32 sessionType,
             [In, MarshalAs(UnmanagedType.VariantBool)] System.Boolean alwaysSend,
             [Out, MarshalAs(UnmanagedType.U4)] out System.UInt32 sessionHandle
             );
+
         void EndSession(
             [In, MarshalAs(UnmanagedType.U4)] System.UInt32 sessionHandle
             );

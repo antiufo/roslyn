@@ -82,39 +82,43 @@ namespace Microsoft.CodeAnalysis.CSharp
         {
             get
             {
-                return _syntaxTree.Options.Kind == SourceCodeKind.Interactive || _syntaxTree.Options.Kind == SourceCodeKind.Script;
+                return _syntaxTree.Options.Kind == SourceCodeKind.Script;
             }
         }
 
         /// <summary>
-        /// Note, there is no guarantee that the factory always gives back the same binder instance for the same <param name="node"/>.
+        /// Return binder for binding at node.
+        /// <paramref name="memberDeclarationOpt"/> and <paramref name="memberOpt"/>
+        /// are optional syntax and symbol for the member containing <paramref name="node"/>.
+        /// If provided, the <see cref="BinderFactoryVisitor"/> will use the member symbol rather
+        /// than looking up the member in the containing type, allowing this method to be called
+        /// while calculating the member list.
         /// </summary>
-        internal Binder GetBinder(CSharpSyntaxNode node)
+        /// <remarks>
+        /// Note, there is no guarantee that the factory always gives back the same binder instance for the same node.
+        /// </remarks>
+        internal Binder GetBinder(SyntaxNode node, CSharpSyntaxNode memberDeclarationOpt = null, Symbol memberOpt = null)
         {
             int position = node.SpanStart;
 
-            // Special case: In interactive code, we may be trying to retrieve a binder for global statements
-            // at the *very* top-level (i.e. in a completely empty file). In this case, we use the compilation unit
-            // directly since it's parent would be null.
-            if (InScript && node.Kind() == SyntaxKind.CompilationUnit)
+            // Unless this is interactive retrieving a binder for global statements
+            // at the very top-level (i.e. in a completely empty file) use
+            // node.Parent to maintain existing behavior.
+            if (!InScript || node.Kind() != SyntaxKind.CompilationUnit)
             {
-                return GetBinder(node, position);
+                node = node.Parent;
             }
 
-            // ACASEY: Using node.Parent here to maintain existing behavior,
-            // but I have no idea why.
-            return GetBinder(node.Parent, position);
+            return GetBinder(node, position, memberDeclarationOpt, memberOpt);
         }
 
-        internal Binder GetBinder(CSharpSyntaxNode node, int position)
+        internal Binder GetBinder(SyntaxNode node, int position, CSharpSyntaxNode memberDeclarationOpt = null, Symbol memberOpt = null)
         {
             Debug.Assert(node != null);
 
-            Binder result = null;
-
             BinderFactoryVisitor visitor = _binderFactoryVisitorPool.Allocate();
-            visitor.Position = position;
-            result = node.Accept(visitor);
+            visitor.Initialize(position, memberDeclarationOpt, memberOpt);
+            Binder result = visitor.Visit(node);
             _binderFactoryVisitorPool.Free(visitor);
 
             return result;
@@ -127,15 +131,16 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// Specify <see cref="NamespaceDeclarationSyntax"/> imports in the corresponding namespace, or
         /// <see cref="CompilationUnitSyntax"/> for top-level imports.
         /// </param>
-        internal InContainerBinder GetImportsBinder(CSharpSyntaxNode unit)
+        /// <param name="inUsing">True if the binder will be used to bind a using directive.</param>
+        internal InContainerBinder GetImportsBinder(CSharpSyntaxNode unit, bool inUsing = false)
         {
             switch (unit.Kind())
             {
                 case SyntaxKind.NamespaceDeclaration:
                     {
                         BinderFactoryVisitor visitor = _binderFactoryVisitorPool.Allocate();
-                        visitor.Position = 0;
-                        var result = visitor.VisitNamespaceDeclaration((NamespaceDeclarationSyntax)unit, unit.SpanStart, inBody: true, inUsing: false);
+                        visitor.Initialize(0, null, null);
+                        var result = visitor.VisitNamespaceDeclaration((NamespaceDeclarationSyntax)unit, unit.SpanStart, inBody: true, inUsing: inUsing);
                         _binderFactoryVisitorPool.Free(visitor);
                         return result;
                     }
@@ -144,8 +149,8 @@ namespace Microsoft.CodeAnalysis.CSharp
                     // imports are bound by the Script class binder:
                     {
                         BinderFactoryVisitor visitor = _binderFactoryVisitorPool.Allocate();
-                        visitor.Position = 0;
-                        var result = visitor.VisitCompilationUnit((CompilationUnitSyntax)unit, inUsing: false, inScript: InScript);
+                        visitor.Initialize(0, null, null);
+                        var result = visitor.VisitCompilationUnit((CompilationUnitSyntax)unit, inUsing: inUsing, inScript: InScript);
                         _binderFactoryVisitorPool.Free(visitor);
                         return result;
                     }
@@ -153,27 +158,6 @@ namespace Microsoft.CodeAnalysis.CSharp
                 default:
                     return null;
             }
-        }
-
-        internal InteractiveUsingsBinder GetInteractiveUsingsBinder()
-        {
-            Debug.Assert(_compilation.IsSubmission);
-
-            BinderFactoryVisitor visitor = _binderFactoryVisitorPool.Allocate();
-            visitor.Position = 0;
-
-            Binder binder = visitor.VisitCompilationUnit(_syntaxTree.GetCompilationUnitRoot(), inUsing: false, inScript: true);
-            _binderFactoryVisitorPool.Free(visitor);
-
-            if (_compilation.HostObjectType != null)
-            {
-                binder = binder.Next;
-                Debug.Assert(binder is HostObjectModelBinder);
-            }
-
-            Debug.Assert(binder.Next is InContainerBinder);
-
-            return (InteractiveUsingsBinder)binder.Next.Next;
         }
     }
 }

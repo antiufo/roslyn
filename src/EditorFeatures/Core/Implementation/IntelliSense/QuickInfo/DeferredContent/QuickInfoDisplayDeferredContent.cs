@@ -13,6 +13,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense.QuickInfo
         private readonly IDeferredQuickInfoContent _typeParameterMap;
         private readonly IDeferredQuickInfoContent _anonymousTypes;
         private readonly IDeferredQuickInfoContent _usageText;
+        private readonly IDeferredQuickInfoContent _exceptionText;
         private readonly IDeferredQuickInfoContent _warningGlyph;
 
         public QuickInfoDisplayDeferredContent(
@@ -22,7 +23,8 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense.QuickInfo
             IDeferredQuickInfoContent documentation,
             IDeferredQuickInfoContent typeParameterMap,
             IDeferredQuickInfoContent anonymousTypes,
-            IDeferredQuickInfoContent usageText)
+            IDeferredQuickInfoContent usageText,
+            IDeferredQuickInfoContent exceptionText)
         {
             _symbolGlyph = symbolGlyph;
             _warningGlyph = warningGlyph;
@@ -31,24 +33,15 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense.QuickInfo
             _typeParameterMap = typeParameterMap;
             _anonymousTypes = anonymousTypes;
             _usageText = usageText;
+            _exceptionText = exceptionText;
         }
 
         public FrameworkElement Create()
         {
-            // Workaround: Dev 12 spring update added the "GlyphCompletionWarning" group for the 
-            // linked files warning glyph. However, that code hasn't yet merged into VSPro_Platform 
-            // from VSClient_1. For now, we'll wrap the calls to IGlyphService in a try catch, 
-            // which will be removed when the relevant code has moved over.
             FrameworkElement warningGlyphElement = null;
             if (_warningGlyph != null)
             {
-                try
-                {
-                    warningGlyphElement = _warningGlyph.Create();
-                }
-                catch (ArgumentException)
-                {
-                }
+                warningGlyphElement = _warningGlyph.Create();
             }
 
             FrameworkElement symbolGlyphElement = null;
@@ -64,7 +57,8 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense.QuickInfo
                 _documentation.Create(),
                 _typeParameterMap.Create(),
                 _anonymousTypes.Create(),
-                _usageText.Create());
+                _usageText.Create(),
+                _exceptionText.Create());
         }
 
         // For testing...
@@ -105,6 +99,14 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense.QuickInfo
             get
             {
                 return (ClassifiableDeferredContent)_usageText;
+            }
+        }
+
+        internal ClassifiableDeferredContent ExceptionText
+        {
+            get
+            {
+                return (ClassifiableDeferredContent)_exceptionText;
             }
         }
 

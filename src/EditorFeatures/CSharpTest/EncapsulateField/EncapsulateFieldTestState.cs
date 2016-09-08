@@ -2,11 +2,12 @@
 
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CSharp.EncapsulateField;
 using Microsoft.CodeAnalysis.Editor.Commands;
 using Microsoft.CodeAnalysis.Editor.CSharp.EncapsulateField;
 using Microsoft.CodeAnalysis.Editor.Implementation.Notification;
-using Microsoft.CodeAnalysis.Editor.Shared.SuggestionSupport;
+using Microsoft.CodeAnalysis.Editor.Shared;
 using Microsoft.CodeAnalysis.Editor.UnitTests;
 using Microsoft.CodeAnalysis.Editor.UnitTests.Utilities;
 using Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces;
@@ -28,17 +29,23 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.EncapsulateField
             TestExportProvider.MinimumCatalogWithCSharpAndVisualBasic.WithParts(
             typeof(CSharpEncapsulateFieldService),
             typeof(EditorNotificationServiceFactory),
-            typeof(DefaultDocumentSupportsSuggestionService)));
+            typeof(DefaultDocumentSupportsFeatureService)));
 
-        public EncapsulateFieldTestState(string markup)
+        public EncapsulateFieldTestState(TestWorkspace workspace)
         {
-            Workspace = CSharpWorkspaceFactory.CreateWorkspaceFromFile(markup, exportProvider: s_exportProvider);
+            Workspace = workspace;
             _testDocument = Workspace.Documents.Single(d => d.CursorPosition.HasValue || d.SelectedSpans.Any());
             TargetDocument = Workspace.CurrentSolution.GetDocument(_testDocument.Id);
 
             var notificationService = Workspace.Services.GetService<INotificationService>() as INotificationServiceCallback;
             var callback = new Action<string, string, NotificationSeverity>((message, title, severity) => NotificationMessage = message);
             notificationService.NotificationCallback = callback;
+        }
+
+        public static async Task<EncapsulateFieldTestState> CreateAsync(string markup)
+        {
+            var workspace = await TestWorkspace.CreateCSharpAsync(markup, exportProvider: s_exportProvider);
+            return new EncapsulateFieldTestState(workspace);
         }
 
         public void Encapsulate()

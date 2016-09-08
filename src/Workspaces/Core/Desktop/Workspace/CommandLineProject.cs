@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System;
 using System.Collections.Generic;
@@ -27,25 +27,28 @@ namespace Microsoft.CodeAnalysis
             var languageServices = tmpWorkspace.Services.GetLanguageServices(language);
             if (languageServices == null)
             {
-                throw new ArgumentException(WorkspacesResources.UnrecognizedLanguageName);
+                throw new ArgumentException(WorkspacesResources.Unrecognized_language_name);
             }
 
             var commandLineParser = languageServices.GetRequiredService<ICommandLineParserService>();
             var commandLineArguments = commandLineParser.Parse(commandLineArgs, projectDirectory, isInteractive: false, sdkDirectory: RuntimeEnvironment.GetRuntimeDirectory());
 
-            // TODO (tomat): to match csc.exe/vbc.exe we should use CommonCommandLineCompiler.ExistingReferencesResolver to deal with #r's
-            var referenceResolver = new RelativePathReferenceResolver(commandLineArguments.ReferencePaths, commandLineArguments.BaseDirectory);
-            var referenceProvider = tmpWorkspace.Services.GetRequiredService<IMetadataService>().GetProvider();
+            var metadataService = tmpWorkspace.Services.GetRequiredService<IMetadataService>();
+
+            // we only support file paths in /r command line arguments
+            var commandLineMetadataReferenceResolver = new WorkspaceMetadataFileReferenceResolver(
+                metadataService, new RelativePathResolver(commandLineArguments.ReferencePaths, commandLineArguments.BaseDirectory));
+
             var analyzerLoader = tmpWorkspace.Services.GetRequiredService<IAnalyzerService>().GetLoader();
             var xmlFileResolver = new XmlFileResolver(commandLineArguments.BaseDirectory);
             var strongNameProvider = new DesktopStrongNameProvider(commandLineArguments.KeyFileSearchPaths);
 
             // resolve all metadata references.
-            var boundMetadataReferences = commandLineArguments.ResolveMetadataReferences(new AssemblyReferenceResolver(referenceResolver, referenceProvider));
+            var boundMetadataReferences = commandLineArguments.ResolveMetadataReferences(commandLineMetadataReferenceResolver);
             var unresolvedMetadataReferences = boundMetadataReferences.FirstOrDefault(r => r is UnresolvedMetadataReference);
             if (unresolvedMetadataReferences != null)
             {
-                throw new ArgumentException(string.Format(WorkspacesResources.CantResolveMetadataReference, ((UnresolvedMetadataReference)unresolvedMetadataReferences).Reference));
+                throw new ArgumentException(string.Format(WorkspacesResources.Can_t_resolve_metadata_reference_colon_0, ((UnresolvedMetadataReference)unresolvedMetadataReferences).Reference));
             }
 
             // resolve all analyzer references.
@@ -53,11 +56,12 @@ namespace Microsoft.CodeAnalysis
             {
                 analyzerLoader.AddDependencyLocation(path);
             }
+
             var boundAnalyzerReferences = commandLineArguments.ResolveAnalyzerReferences(analyzerLoader);
             var unresolvedAnalyzerReferences = boundAnalyzerReferences.FirstOrDefault(r => r is UnresolvedAnalyzerReference);
             if (unresolvedAnalyzerReferences != null)
             {
-                throw new ArgumentException(string.Format(WorkspacesResources.CantResolveAnalyzerReference, ((UnresolvedAnalyzerReference)unresolvedAnalyzerReferences).Display));
+                throw new ArgumentException(string.Format(WorkspacesResources.Can_t_resolve_analyzer_reference_colon_0, ((UnresolvedAnalyzerReference)unresolvedAnalyzerReferences).Display));
             }
 
             AssemblyIdentityComparer assemblyIdentityComparer;
@@ -72,7 +76,7 @@ namespace Microsoft.CodeAnalysis
                 }
                 catch (Exception e)
                 {
-                    throw new ArgumentException(string.Format(WorkspacesResources.ErrorWhileReadingSpecifiedConfigFile, e.Message));
+                    throw new ArgumentException(string.Format(WorkspacesResources.An_error_occurred_while_reading_the_specified_configuration_file_colon_0, e.Message));
                 }
             }
             else
@@ -155,7 +159,8 @@ namespace Microsoft.CodeAnalysis
                     .WithXmlReferenceResolver(xmlFileResolver)
                     .WithAssemblyIdentityComparer(assemblyIdentityComparer)
                     .WithStrongNameProvider(strongNameProvider)
-                    .WithMetadataReferenceResolver(new AssemblyReferenceResolver(referenceResolver, referenceProvider)),
+                    // TODO (https://github.com/dotnet/roslyn/issues/4967): 
+                    .WithMetadataReferenceResolver(new WorkspaceMetadataFileReferenceResolver(metadataService, new RelativePathResolver(ImmutableArray<string>.Empty, projectDirectory))),
                 parseOptions: commandLineArguments.ParseOptions,
                 documents: docs,
                 additionalDocuments: additionalDocs,

@@ -2,14 +2,11 @@
 
 ////#define TRACKDEPTH
 
-using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
-using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Shared.Extensions;
-using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Shared.Utilities
@@ -339,6 +336,11 @@ namespace Microsoft.CodeAnalysis.Shared.Utilities
             {
                 Debug.Assert(GetTypeKind(x) == GetTypeKind(y));
 
+                if (x.IsTupleType)
+                {
+                    return y.IsTupleType && TypeArgumentsAreEquivalent(x.TupleElementTypes, y.TupleElementTypes, equivalentTypesWithDifferingAssemblies);
+                }
+
                 if (x.IsDefinition != y.IsDefinition ||
                     IsConstructedFromSelf(x) != IsConstructedFromSelf(y) ||
                     x.Arity != y.Arity ||
@@ -354,7 +356,7 @@ namespace Microsoft.CodeAnalysis.Shared.Utilities
                     return false;
                 }
 
-                // Above check makes sure that the containing assemblies are considered the same by the the assembly comparer being used.
+                // Above check makes sure that the containing assemblies are considered the same by the assembly comparer being used.
                 // If they are in fact not the same (have different name) and the caller requested to know about such types add {x, y} 
                 // to equivalentTypesWithDifferingAssemblies map.
                 if (equivalentTypesWithDifferingAssemblies != null &&
@@ -503,6 +505,18 @@ namespace Microsoft.CodeAnalysis.Shared.Utilities
 
             private bool PropertiesAreEquivalent(IPropertySymbol x, IPropertySymbol y, Dictionary<INamedTypeSymbol, INamedTypeSymbol> equivalentTypesWithDifferingAssemblies)
             {
+                if (x.ContainingType.IsAnonymousType && y.ContainingType.IsAnonymousType)
+                {
+                    // We can short circuit here and just use the symbols themselves to determine
+                    // equality.  This will properly handle things like the VB case where two
+                    // anonymous types will be considered the same if they have properties that
+                    // differ in casing.
+                    if (x.Equals(y))
+                    {
+                        return true;
+                    }
+                }
+
                 return
                     x.IsIndexer == y.IsIndexer &&
                     x.MetadataName == y.MetadataName &&

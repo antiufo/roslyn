@@ -9,7 +9,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests.PDB
 {
     public class PDBLambdaTests : CSharpPDBTestBase
     {
-        [WorkItem(539898, "DevDiv")]
+        [WorkItem(539898, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539898")]
         [Fact]
         public void SequencePoints_Body()
         {
@@ -66,7 +66,7 @@ class C
 </symbols>");
         }
 
-        [Fact, WorkItem(543479, "DevDiv")]
+        [Fact, WorkItem(543479, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543479")]
         public void Nested()
         {
             var source = @"
@@ -189,7 +189,7 @@ class Test
 </symbols>");
         }
 
-        [Fact, WorkItem(543479, "DevDiv")]
+        [Fact, WorkItem(543479, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543479")]
         public void InitialSequencePoints()
         {
             var source = @"
@@ -246,7 +246,7 @@ class Test
 </symbols>");
         }
 
-        [Fact, WorkItem(543479, "DevDiv")]
+        [Fact, WorkItem(543479, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543479")]
         public void Nested_InitialSequencePoints()
         {
             var source = @"
@@ -543,6 +543,7 @@ class C : B
       </customDebugInfo>
       <sequencePoints>
         <entry offset=""0x0"" hidden=""true"" />
+        <entry offset=""0x14"" startLine=""13"" startColumn=""30"" endLine=""13"" endColumn=""43"" />
         <entry offset=""0x27"" hidden=""true"" />
         <entry offset=""0x2d"" startLine=""14"" startColumn=""5"" endLine=""14"" endColumn=""6"" />
         <entry offset=""0x2e"" startLine=""15"" startColumn=""9"" endLine=""15"" endColumn=""19"" />
@@ -553,8 +554,8 @@ class C : B
       </sequencePoints>
       <scope startOffset=""0x0"" endOffset=""0x6c"">
         <local name=""CS$&lt;&gt;8__locals0"" il_index=""0"" il_start=""0x0"" il_end=""0x6c"" attributes=""0"" />
-        <scope startOffset=""0x27"" endOffset=""0x6b"">
-          <local name=""CS$&lt;&gt;8__locals1"" il_index=""1"" il_start=""0x27"" il_end=""0x6b"" attributes=""0"" />
+        <scope startOffset=""0x27"" endOffset=""0x6c"">
+          <local name=""CS$&lt;&gt;8__locals1"" il_index=""1"" il_start=""0x27"" il_end=""0x6c"" attributes=""0"" />
         </scope>
       </scope>
     </method>
@@ -1329,6 +1330,90 @@ class C
   </methods>
 </symbols>
 ");
+        }
+
+        [Fact]
+        public void IfStatement1()
+        {
+            string source = @"
+class C
+{
+    static void F()
+    {
+        new System.Action(() =>
+        {
+            bool result = false;
+            if (result)
+                System.Console.WriteLine(1);
+        })();
+    }
+}
+";
+            var v = CompileAndVerify(source, options: TestOptions.DebugDll);
+
+            v.VerifyIL("C.<>c.<F>b__0_0", @"
+{
+  // Code size       16 (0x10)
+  .maxstack  1
+  .locals init (bool V_0, //result
+                bool V_1)
+ -IL_0000:  nop
+ -IL_0001:  ldc.i4.0
+  IL_0002:  stloc.0
+ -IL_0003:  ldloc.0
+  IL_0004:  stloc.1
+ ~IL_0005:  ldloc.1
+  IL_0006:  brfalse.s  IL_000f
+ -IL_0008:  ldc.i4.1
+  IL_0009:  call       ""void System.Console.WriteLine(int)""
+  IL_000e:  nop
+ -IL_000f:  ret
+}
+", sequencePoints: "C+<>c.<F>b__0_0");
+        }
+
+        [Fact]
+        public void IfStatement2()
+        {
+            string source = @"
+class C
+{
+    static void F()
+    {
+        new System.Action(() =>
+        {
+            {
+                bool result = false;
+                if (result)
+                    System.Console.WriteLine(1);
+            }
+        })();
+    }
+}
+";
+            var v = CompileAndVerify(source, options: TestOptions.DebugDll);
+
+            v.VerifyIL("C.<>c.<F>b__0_0", @"
+{
+  // Code size       18 (0x12)
+  .maxstack  1
+  .locals init (bool V_0, //result
+                bool V_1)
+ -IL_0000:  nop
+ -IL_0001:  nop
+ -IL_0002:  ldc.i4.0
+  IL_0003:  stloc.0
+ -IL_0004:  ldloc.0
+  IL_0005:  stloc.1
+ ~IL_0006:  ldloc.1
+  IL_0007:  brfalse.s  IL_0010
+ -IL_0009:  ldc.i4.1
+  IL_000a:  call       ""void System.Console.WriteLine(int)""
+  IL_000f:  nop
+ -IL_0010:  nop
+ -IL_0011:  ret
+}
+", sequencePoints: "C+<>c.<F>b__0_0");
         }
     }
 }

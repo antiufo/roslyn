@@ -9,7 +9,7 @@ using System.Globalization;
 using Microsoft.Build.Framework;
 using Microsoft.Build.Utilities;
 using Microsoft.Build.Tasks.Hosting;
-using Microsoft.CodeAnalysis.CompilerServer;
+using Microsoft.CodeAnalysis.CommandLine;
 using System.Diagnostics;
 
 namespace Microsoft.CodeAnalysis.BuildTasks
@@ -232,8 +232,7 @@ namespace Microsoft.CodeAnalysis.BuildTasks
 
         #region Tool Members
 
-        internal override BuildProtocolConstants.RequestLanguage Language
-            => BuildProtocolConstants.RequestLanguage.VisualBasicCompile;
+        internal override RequestLanguage Language => RequestLanguage.VisualBasicCompile;
 
         private static readonly string[] s_separator = { "\r\n" };
 
@@ -273,7 +272,10 @@ namespace Microsoft.CodeAnalysis.BuildTasks
                 return false;
             }
 
-            MovePdbFileIfNecessary(OutputAssembly.ItemSpec);
+            if (!SkipCompilerExecution)
+            {
+                MovePdbFileIfNecessary(OutputAssembly.ItemSpec);
+            }
 
             return !Log.HasLoggedErrors;
         }
@@ -951,6 +953,8 @@ namespace Microsoft.CodeAnalysis.BuildTasks
                     CheckHostObjectSupport(param = nameof(NoVBRuntimeReference), resultFromHostObjectSetOperation: false);
                 }
 
+                InitializeHostObjectSupportForNewSwitches(vbcHostObject, ref param);
+
                 // In general, we don't support preferreduilang with the in-proc compiler.  It will always use the same locale as the
                 // host process, so in general, we have to fall back to the command line compiler if this option is specified.
                 // However, we explicitly allow two values (mostly for parity with C#):
@@ -961,17 +965,9 @@ namespace Microsoft.CodeAnalysis.BuildTasks
                     CheckHostObjectSupport(param = nameof(PreferredUILang), resultFromHostObjectSetOperation: false);
                 }
             }
-            catch (Exception e) when (!Utilities.IsCriticalException(e))
+            catch (Exception e)
             {
-                if (this.HostCompilerSupportsAllParameters)
-                {
-                    // If the host compiler doesn't support everything we need, we're going to end up 
-                    // shelling out to the command-line compiler anyway.  That means the command-line
-                    // compiler will log the error.  So here, we only log the error if we would've
-                    // tried to use the host compiler.
-                    Log.LogErrorWithCodeFromResources("General_CouldNotSetHostObjectParameter", param, e.Message);
-                }
-
+                Log.LogErrorWithCodeFromResources("General_CouldNotSetHostObjectParameter", param, e.Message);
                 return false;
             }
             finally
@@ -1028,26 +1024,41 @@ namespace Microsoft.CodeAnalysis.BuildTasks
                                 HostObjectInitializationStatus.NoActionReturnFailure;
                         }
 
-                        // Roslyn doesn't support using the host object for compilation
+                        if (!this.HostCompilerSupportsAllParameters)
+                        {
+                            // Since the host compiler has refused to take on the responsibility for this compilation,
+                            // we're about to shell out to the command-line compiler to handle it.  If some of the
+                            // references don't exist on disk, we know the command-line compiler will fail, so save
+                            // the trouble, and just throw a consistent error ourselves.  This allows us to give
+                            // more information than the compiler would, and also make things consistent across
+                            // Vbc / Csc / etc.  Actually, the real reason is bug 275726 (ddsuites\src\vs\env\vsproject\refs\ptp3).
+                            // This suite behaves differently in localized builds than on English builds because 
+                            // VBC.EXE doesn't localize the word "error" when they emit errors and so we can't scan for it.
+                            if (!CheckAllReferencesExistOnDisk())
+                            {
+                                return HostObjectInitializationStatus.NoActionReturnFailure;
+                            }
 
-                        // Since the host compiler has refused to take on the responsibility for this compilation,
-                        // we're about to shell out to the command-line compiler to handle it.  If some of the
-                        // references don't exist on disk, we know the command-line compiler will fail, so save
-                        // the trouble, and just throw a consistent error ourselves.  This allows us to give
-                        // more information than the compiler would, and also make things consistent across
-                        // Vbc / Csc / etc.  Actually, the real reason is bug 275726 (ddsuites\src\vs\env\vsproject\refs\ptp3).
-                        // This suite behaves differently in localized builds than on English builds because 
-                        // VBC.EXE doesn't localize the word "error" when they emit errors and so we can't scan for it.
-                        if (!CheckAllReferencesExistOnDisk())
+                            // The host compiler doesn't support some of the switches/parameters
+                            // being passed to it.  Therefore, we resort to using the command-line compiler
+                            // in this case.
+                            UsedCommandLineTool = true;
+                            return HostObjectInitializationStatus.UseAlternateToolToExecute;
+                        }
+
+                        // Ok, by now we validated that the host object supports the necessary switches
+                        // and parameters.  Last thing to check is whether the host object is up to date,
+                        // and in that case, we will inform the caller that no further action is necessary.
+                        if (hostObjectSuccessfullyInitialized)
+                        {
+                            return vbcHostObject.IsUpToDate() ?
+                                HostObjectInitializationStatus.NoActionReturnSuccess :
+                                HostObjectInitializationStatus.UseHostObjectToExecute;
+                        }
+                        else
                         {
                             return HostObjectInitializationStatus.NoActionReturnFailure;
                         }
-
-                        // The host compiler doesn't support some of the switches/parameters
-                        // being passed to it.  Therefore, we resort to using the command-line compiler
-                        // in this case.
-                        UsedCommandLineTool = true;
-                        return HostObjectInitializationStatus.UseAlternateToolToExecute;
                     }
                     else
                     {

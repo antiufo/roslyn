@@ -5,6 +5,7 @@ Imports System.Runtime.Serialization
 Imports Microsoft.CodeAnalysis.CommonDiagnosticAnalyzers
 Imports Microsoft.CodeAnalysis.Diagnostics
 Imports Microsoft.CodeAnalysis.Diagnostics.VisualBasic
+Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 Imports Roslyn.Test.Utilities
 
@@ -12,138 +13,6 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests.Semantics
 
     Partial Public Class DiagnosticAnalyzerTests
         Inherits BasicTestBase
-
-        <Serializable>
-        Public Class TestDiagnostic
-            Inherits Diagnostic
-            Implements ISerializable
-
-            Private ReadOnly _kind As String
-            Private ReadOnly _severity As DiagnosticSeverity
-            Private ReadOnly _location As Location
-            Private ReadOnly _message As String
-            Private ReadOnly _isWarningAsError As Boolean
-            Private ReadOnly _arguments As Object()
-            Private ReadOnly _descriptor As DiagnosticDescriptor
-
-            Public Sub New(id As String,
-                           kind As String,
-                           severity As DiagnosticSeverity,
-                           location As Location,
-                           message As String,
-                           ParamArray arguments As Object())
-                Me.New(New DiagnosticDescriptor(id, String.Empty, message, id, severity, True), kind, severity, location, message, arguments)
-            End Sub
-
-            Private Sub New(info As SerializationInfo, context As StreamingContext)
-                Dim id = info.GetString("id")
-                Me._kind = info.GetString("kind")
-                Me._message = info.GetString("message")
-                Me._location = CType(info.GetValue("location", GetType(Location)), Location)
-                Me._severity = CType(info.GetValue("severity", GetType(DiagnosticSeverity)), DiagnosticSeverity)
-                Dim defaultSeverity = CType(info.GetValue("defaultSeverity", GetType(DiagnosticSeverity)), DiagnosticSeverity)
-                Me._arguments = CType(info.GetValue("arguments", GetType(Object())), Object())
-                Me._descriptor = New DiagnosticDescriptor(id, String.Empty, _message, id, defaultSeverity, True)
-            End Sub
-
-            Private Sub New(descriptor As DiagnosticDescriptor,
-                           kind As String,
-                           severity As DiagnosticSeverity,
-                           location As Location,
-                           message As String,
-                           ParamArray arguments As Object())
-                Me._descriptor = descriptor
-                Me._kind = kind
-                Me._severity = severity
-                Me._location = location
-                Me._message = message
-                Me._arguments = arguments
-            End Sub
-
-            Public Overrides ReadOnly Property AdditionalLocations As IReadOnlyList(Of Location)
-                Get
-                    Dim loc As Location() = New Location(0) {}
-                    Return loc
-                End Get
-            End Property
-
-            Public Overrides ReadOnly Property Id As String
-                Get
-                    Return _descriptor.Id
-                End Get
-            End Property
-
-            Public Overrides ReadOnly Property Descriptor As DiagnosticDescriptor
-                Get
-                    Return _descriptor
-                End Get
-            End Property
-
-            Public Overrides ReadOnly Property Location As Location
-                Get
-                    Return _location
-                End Get
-            End Property
-
-            Public Overrides ReadOnly Property Severity As DiagnosticSeverity
-                Get
-                    Return _severity
-                End Get
-            End Property
-
-            Public Overrides ReadOnly Property WarningLevel As Integer
-                Get
-                    Return 2
-                End Get
-            End Property
-
-            Public Sub GetObjectData(info As SerializationInfo, context As StreamingContext) Implements ISerializable.GetObjectData
-                info.AddValue("id", Me._descriptor.Id)
-                info.AddValue("kind", Me._kind)
-                info.AddValue("message", Me._message)
-                info.AddValue("location", Me._location, GetType(Location))
-                info.AddValue("severity", Me._severity, GetType(DiagnosticSeverity))
-                info.AddValue("defaultSeverity", Me._descriptor.DefaultSeverity, GetType(DiagnosticSeverity))
-                info.AddValue("arguments", Me._arguments, GetType(Object()))
-            End Sub
-
-            Friend Overrides Function WithLocation(location As Location) As Diagnostic
-                Throw New NotImplementedException()
-            End Function
-
-            Public Overrides Function GetMessage(Optional formatProvider As IFormatProvider = Nothing) As String
-                Return String.Format(_message, _arguments)
-            End Function
-
-            Public Overrides Function GetHashCode() As Integer
-                Return Hash.Combine(Me._descriptor.GetHashCode(), Me._kind.GetHashCode())
-            End Function
-
-            Public Overloads Overrides Function Equals(obj As Object) As Boolean
-                Return Me.Equals(TryCast(obj, TestDiagnostic))
-            End Function
-
-            Public Overloads Overrides Function Equals(obj As Diagnostic) As Boolean
-                Return Me.Equals(TryCast(obj, TestDiagnostic))
-            End Function
-
-            Public Overloads Function Equals(other As TestDiagnostic) As Boolean
-                If other Is Nothing OrElse Me.GetType() <> other.GetType() Then Return False
-                Return Me._descriptor.Id = other._descriptor.Id AndAlso
-                    Me._kind = other._kind AndAlso
-                    Me._location = other._location AndAlso
-                    Me._message = other._message AndAlso
-                    SameData(Me._arguments, other._arguments)
-            End Function
-
-            Private Shared Function SameData(d1 As Object(), d2 As Object()) As Boolean
-                Return (d1 Is Nothing) = (d2 Is Nothing) AndAlso (d1 Is Nothing OrElse d1.SequenceEqual(d2))
-            End Function
-
-            Friend Overrides Function WithSeverity(severity As DiagnosticSeverity) As Diagnostic
-                Return New TestDiagnostic(Me._descriptor.Id, Me._kind, severity, Me._location, Me._message, Me._arguments)
-            End Function
-        End Class
 
         Public Class ComplainAboutX
             Inherits DiagnosticAnalyzer
@@ -443,7 +312,7 @@ End Module
             End Sub
         End Class
 
-        <WorkItem(998724)>
+        <WorkItem(998724, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/998724")>
         <Fact>
         Public Sub TestSymbolAnalyzerNotInvokedForMyTemplateSymbols()
             Dim analyzer = New MockSymbolAnalyzer()
@@ -539,7 +408,7 @@ End Namespace
             End Sub
         End Class
 
-        <Fact, WorkItem(1008059)>
+        <Fact, WorkItem(1008059, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1008059")>
         Public Sub TestCodeBlockAnalyzersForNoExecutableCode()
             Dim analyzer = New CodeBlockAnalyzer()
             Dim sources = <compilation>
@@ -562,7 +431,7 @@ End Class
             compilation.VerifyAnalyzerDiagnostics({analyzer})
         End Sub
 
-        <Fact, WorkItem(1008059)>
+        <Fact, WorkItem(1008059, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1008059")>
         Public Sub TestCodeBlockAnalyzersForEmptyMethodBody()
             Dim analyzer = New CodeBlockAnalyzer()
             Dim sources = <compilation>
@@ -584,7 +453,7 @@ End Class
             compilation.VerifyAnalyzerDiagnostics({analyzer}, Nothing, Nothing, False, Diagnostic("CodeBlockDiagnostic", <![CDATA[Public Sub Method()]]>))
         End Sub
 
-        <Fact, WorkItem(1096600)>
+        <Fact, WorkItem(1096600, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1096600")>
         Private Sub TestDescriptorForConfigurableCompilerDiagnostics()
             ' Verify that all configurable compiler diagnostics, i.e. all non-error diagnostics,
             ' have a non-null and non-empty Title and Category.
@@ -638,7 +507,7 @@ End Class
             End Sub
         End Class
 
-        <Fact, WorkItem(1109126)>
+        <Fact, WorkItem(1109126, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1109126")>
         Public Sub TestFieldSymbolAnalyzer_EnumField()
             Dim analyzer = New FieldSymbolAnalyzer()
             Dim sources = <compilation>
@@ -660,7 +529,7 @@ End Enum
                     Diagnostic("FieldSymbolDiagnostic", <![CDATA[X]]>))
         End Sub
 
-        <Fact, WorkItem(1111667)>
+        <Fact, WorkItem(1111667, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1111667")>
         Public Sub TestFieldSymbolAnalyzer_FieldWithoutInitializer()
             Dim analyzer = New FieldSymbolAnalyzer()
             Dim sources = <compilation>
@@ -703,7 +572,7 @@ End Class
             End Sub
         End Class
 
-        <Fact, WorkItem(565)>
+        <Fact, WorkItem(565, "https://github.com/dotnet/roslyn/issues/565")>
         Public Sub TestFieldDeclarationAnalyzer()
             Dim analyzer = New FieldDeclarationAnalyzer()
             Dim sources = <compilation>
@@ -729,6 +598,62 @@ End Class
                     Diagnostic("FieldDeclarationDiagnostic", <![CDATA[Dim z As Integer]]>),
                     Diagnostic("FieldDeclarationDiagnostic", <![CDATA[Dim x2 = 0, y2 = 0]]>),
                     Diagnostic("FieldDeclarationDiagnostic", <![CDATA[Dim z2 = 0]]>))
+        End Sub
+
+        <Fact, WorkItem(4745, "https://github.com/dotnet/roslyn/issues/4745")>
+        Public Sub TestNamespaceDeclarationAnalyzer()
+            Dim analyzer = New VisualBasicNamespaceDeclarationAnalyzer()
+            Dim sources = <compilation>
+                              <file name="c.vb">
+                                  <![CDATA[
+Namespace Foo.Bar.FooBar
+End Namespace
+]]>
+                              </file>
+                          </compilation>
+
+            Dim compilation = CreateCompilationWithMscorlibAndReferences(sources,
+                    references:={SystemCoreRef, MsvbRef},
+                    options:=TestOptions.ReleaseDll)
+
+            compilation.VerifyDiagnostics()
+            compilation.VerifyAnalyzerDiagnostics({analyzer}, Nothing, Nothing, False,
+                    Diagnostic(VisualBasicNamespaceDeclarationAnalyzer.DiagnosticId, <![CDATA[Namespace Foo.Bar.FooBar]]>))
+        End Sub
+
+        <Fact, WorkItem(5463, "https://github.com/dotnet/roslyn/issues/5463")>
+        Public Sub TestObjectCreationInCodeBlockAnalyzer()
+            Dim analyzer = New VisualBasicCodeBlockObjectCreationAnalyzer()
+            Dim sources = <compilation>
+                              <file name="c.vb">
+                                  <![CDATA[
+Public Class C1
+End Class
+
+Public Class C2
+End Class
+
+Public Class C3
+End Class
+
+Public Class D
+    Dim x As C1 = New C1()
+    Dim y As New C2()
+    Public ReadOnly Property Z As New C3()
+End Class
+]]>
+                              </file>
+                          </compilation>
+
+            Dim compilation = CreateCompilationWithMscorlibAndReferences(sources,
+                    references:={SystemCoreRef, MsvbRef},
+                    options:=TestOptions.ReleaseDll)
+
+            compilation.VerifyDiagnostics()
+            compilation.VerifyAnalyzerDiagnostics({analyzer}, Nothing, Nothing, False,
+                    Diagnostic(VisualBasicCodeBlockObjectCreationAnalyzer.DiagnosticDescriptor.Id, <![CDATA[New C1()]]>),
+                    Diagnostic(VisualBasicCodeBlockObjectCreationAnalyzer.DiagnosticDescriptor.Id, <![CDATA[New C2()]]>),
+                    Diagnostic(VisualBasicCodeBlockObjectCreationAnalyzer.DiagnosticDescriptor.Id, <![CDATA[New C3()]]>))
         End Sub
 
         <Fact, WorkItem(1473, "https://github.com/dotnet/roslyn/issues/1473")>
@@ -832,14 +757,14 @@ End Class
         End Sub
 
         <Fact>
-        <WorkItem(1107500, "DevDiv")>
+        <WorkItem(1107500, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1107500")>
         <WorkItem(2598, "https://github.com/dotnet/roslyn/issues/2598")>
         Public Sub EffectiveSeverity_DiagnosticDefault1()
             TestEffectiveSeverity(DiagnosticSeverity.Warning, ReportDiagnostic.Warn)
         End Sub
 
         <Fact>
-        <WorkItem(1107500, "DevDiv")>
+        <WorkItem(1107500, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1107500")>
         <WorkItem(2598, "https://github.com/dotnet/roslyn/issues/2598")>
         Public Sub EffectiveSeverity_DiagnosticDefault2()
             Dim specificOptions = New Dictionary(Of String, ReportDiagnostic) From {{"Test0001", ReportDiagnostic.Default}}
@@ -849,7 +774,7 @@ End Class
         End Sub
 
         <Fact>
-        <WorkItem(1107500, "DevDiv")>
+        <WorkItem(1107500, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1107500")>
         <WorkItem(2598, "https://github.com/dotnet/roslyn/issues/2598")>
         Public Sub EffectiveSeverity_GeneralOption()
             Dim generalOption = ReportDiagnostic.Error
@@ -857,7 +782,7 @@ End Class
         End Sub
 
         <Fact>
-        <WorkItem(1107500, "DevDiv")>
+        <WorkItem(1107500, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1107500")>
         <WorkItem(2598, "https://github.com/dotnet/roslyn/issues/2598")>
         Public Sub EffectiveSeverity_SpecificOption()
             Dim specificOption = ReportDiagnostic.Suppress
@@ -868,7 +793,7 @@ End Class
         End Sub
 
         <Fact>
-        <WorkItem(1107500, "DevDiv")>
+        <WorkItem(1107500, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1107500")>
         <WorkItem(2598, "https://github.com/dotnet/roslyn/issues/2598")>
         Public Sub EffectiveSeverity_GeneralOptionDoesNotEnableDisabledDiagnostic()
             Dim generalOption = ReportDiagnostic.Error
@@ -878,7 +803,7 @@ End Class
         End Sub
 
         <Fact>
-        <WorkItem(1107500, "DevDiv")>
+        <WorkItem(1107500, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1107500")>
         <WorkItem(2598, "https://github.com/dotnet/roslyn/issues/2598")>
         Public Sub EffectiveSeverity_SpecificOptionEnablesDisabledDiagnostic()
             Dim specificOption = ReportDiagnostic.Warn
@@ -887,6 +812,297 @@ End Class
             Dim enabledByDefault = False
 
             TestEffectiveSeverity(DiagnosticSeverity.Warning, expectedEffectiveSeverity:=specificOption, specificOptions:=specificOptions, generalOption:=generalOption, isEnabledByDefault:=enabledByDefault)
+        End Sub
+
+        <Fact, WorkItem(6998, "https://github.com/dotnet/roslyn/issues/6998")>
+        Public Sub TestGeneratedCodeAnalyzer()
+            Dim source = <![CDATA[
+<System.CodeDom.Compiler.GeneratedCodeAttribute("tool", "version")> _
+Class GeneratedCode{0}
+	Private Class Nested{0}
+	End Class
+End Class
+
+Class NonGeneratedCode{0}
+	<System.CodeDom.Compiler.GeneratedCodeAttribute("tool", "version")> _
+	Private Class NestedGeneratedCode{0}
+	End Class
+End Class
+]]>.Value
+
+            Dim generatedFileNames =
+                {"TemporaryGeneratedFile_036C0B5B-1481-4323-8D20-8F5ADCB23D92.vb", "Test.designer.vb", "Test.Designer.vb", "Test.generated.vb", "Test.g.vb", "Test.g.i.vb"}
+
+            Dim builder = ImmutableArray.CreateBuilder(Of SyntaxTree)()
+            Dim treeNum As Integer = 0
+
+            ' Trees with non-generated code file names
+            Dim tree = VisualBasicSyntaxTree.ParseText(String.Format(source, treeNum), path:="SourceFileRegular.vb")
+            builder.Add(tree)
+            treeNum = treeNum + 1
+
+            tree = VisualBasicSyntaxTree.ParseText(String.Format(source, treeNum), path:="AssemblyInfo.vb")
+            builder.Add(tree)
+            treeNum = treeNum + 1
+
+            ' Trees with generated code file names
+            For Each fileName In generatedFileNames
+                tree = VisualBasicSyntaxTree.ParseText(String.Format(source, treeNum), path:=fileName)
+                builder.Add(tree)
+                treeNum = treeNum + 1
+            Next
+
+            ' Tree with '<auto-generated>' comment
+            Dim autoGeneratedPrefixes = {"' <auto-generated> ", "' <autogenerated> "}
+            For i = 0 To autoGeneratedPrefixes.Length - 1
+                Dim autoGeneratedPrefix = autoGeneratedPrefixes(i)
+                tree = VisualBasicSyntaxTree.ParseText(String.Format(autoGeneratedPrefix + source, treeNum), path:=$"SourceFileWithAutoGeneratedComment{i}.vb")
+                builder.Add(tree)
+                treeNum = treeNum + 1
+            Next
+
+            ' Verify no compiler diagnostics.
+            Dim trees = builder.ToImmutable()
+            Dim compilation = CreateCompilationWithMscorlib45(trees, {SystemRef}, TestOptions.ReleaseDll)
+            compilation.VerifyDiagnostics()
+
+            Dim isGeneratedFile As Func(Of String, Boolean) = Function(fileName) fileName.Contains("SourceFileWithAutoGeneratedComment") OrElse generatedFileNames.Contains(fileName)
+
+            ' (1) Verify default mode of analysis when there is no generated code configuration.
+            VerifyGeneratedCodeAnalyzerDiagnostics(compilation, isGeneratedFile, generatedCodeAnalysisFlagsOpt:=Nothing)
+
+            ' (2) Verify ConfigureGeneratedCodeAnalysis with different combinations of GeneratedCodeAnalysisFlags.
+            VerifyGeneratedCodeAnalyzerDiagnostics(compilation, isGeneratedFile, GeneratedCodeAnalysisFlags.None)
+            VerifyGeneratedCodeAnalyzerDiagnostics(compilation, isGeneratedFile, AnalyzerDriver.DefaultGeneratedCodeAnalysisFlags)
+            VerifyGeneratedCodeAnalyzerDiagnostics(compilation, isGeneratedFile, GeneratedCodeAnalysisFlags.Analyze)
+            VerifyGeneratedCodeAnalyzerDiagnostics(compilation, isGeneratedFile, GeneratedCodeAnalysisFlags.ReportDiagnostics)
+            VerifyGeneratedCodeAnalyzerDiagnostics(compilation, isGeneratedFile, GeneratedCodeAnalysisFlags.Analyze Or GeneratedCodeAnalysisFlags.ReportDiagnostics)
+
+            ' (4) Ensure warnaserror doesn't produce noise in generated files.
+            Dim options = compilation.Options.WithGeneralDiagnosticOption(ReportDiagnostic.Error)
+            Dim warnAsErrorCompilation = compilation.WithOptions(options)
+            VerifyGeneratedCodeAnalyzerDiagnostics(warnAsErrorCompilation, isGeneratedFile, generatedCodeAnalysisFlagsOpt:=Nothing)
+        End Sub
+
+        <Fact, WorkItem(6998, "https://github.com/dotnet/roslyn/issues/6998")>
+        Public Sub TestGeneratedCodeAnalyzerPartialType()
+            Dim source As String = <![CDATA['
+<System.CodeDom.Compiler.GeneratedCodeAttribute("tool", "version")> _
+Partial Class PartialType
+End Class
+
+Partial Class PartialType
+End Class
+]]>.Value
+            Dim tree = VisualBasicSyntaxTree.ParseText(source, path:="SourceFileRegular.vb")
+            Dim compilation = CreateCompilationWithMscorlib45({tree}, {SystemRef}, TestOptions.ReleaseDll)
+            compilation.VerifyDiagnostics()
+
+            Dim builder = ArrayBuilder(Of DiagnosticDescription).GetInstance()
+
+            ' Expected symbol diagnostics
+            Dim squiggledText = "PartialType"
+            Dim diagnosticArgument = squiggledText
+            Dim line = 3
+            Dim column = 15
+            AddExpectedLocalDiagnostics(builder, False, squiggledText, line, column, GeneratedCodeAnalysisFlags.ReportDiagnostics, diagnosticArgument)
+
+            ' Expected tree diagnostics
+            squiggledText = "Class"
+            diagnosticArgument = tree.FilePath
+            line = 7
+            column = 5
+            AddExpectedLocalDiagnostics(builder, False, squiggledText, line, column, GeneratedCodeAnalysisFlags.ReportDiagnostics, diagnosticArgument)
+
+            ' Expected compilation diagnostics
+            AddExpectedNonLocalDiagnostic(builder, "PartialType", compilation.SyntaxTrees(0).FilePath)
+
+            Dim expected = builder.ToArrayAndFree()
+
+            VerifyGeneratedCodeAnalyzerDiagnostics(compilation, expected, generatedCodeAnalysisFlagsOpt:=Nothing)
+            VerifyGeneratedCodeAnalyzerDiagnostics(compilation, expected, GeneratedCodeAnalysisFlags.None)
+            VerifyGeneratedCodeAnalyzerDiagnostics(compilation, expected, AnalyzerDriver.DefaultGeneratedCodeAnalysisFlags)
+            VerifyGeneratedCodeAnalyzerDiagnostics(compilation, expected, GeneratedCodeAnalysisFlags.Analyze)
+            VerifyGeneratedCodeAnalyzerDiagnostics(compilation, expected, GeneratedCodeAnalysisFlags.ReportDiagnostics)
+            VerifyGeneratedCodeAnalyzerDiagnostics(compilation, expected, GeneratedCodeAnalysisFlags.Analyze Or GeneratedCodeAnalysisFlags.ReportDiagnostics)
+        End Sub
+
+        Friend Class OwningSymbolTestAnalyzer
+            Inherits DiagnosticAnalyzer
+
+            Public Shared ReadOnly ExpressionDescriptor As New DiagnosticDescriptor("Expression", "Expression", "Expression found.", "Testing", DiagnosticSeverity.Warning, isEnabledByDefault:=True)
+
+            Public NotOverridable Overrides ReadOnly Property SupportedDiagnostics As ImmutableArray(Of DiagnosticDescriptor)
+                Get
+                    Return ImmutableArray.Create(ExpressionDescriptor)
+                End Get
+            End Property
+
+            Public NotOverridable Overrides Sub Initialize(context As AnalysisContext)
+                context.RegisterSyntaxNodeAction(
+                     Sub(nodeContext)
+                         If nodeContext.ContainingSymbol.Name.StartsWith("Funky") AndAlso nodeContext.Compilation.Language = "Visual Basic" Then
+                             nodeContext.ReportDiagnostic(CodeAnalysis.Diagnostic.Create(ExpressionDescriptor, nodeContext.Node.GetLocation()))
+                         End If
+                     End Sub,
+                     SyntaxKind.IdentifierName,
+                     SyntaxKind.NumericLiteralExpression)
+            End Sub
+        End Class
+
+        <Fact>
+        Public Sub OwningSymbolVisualBasic()
+            Dim source = <compilation>
+                             <file name="c.vb">
+                                 <![CDATA[
+Class C
+    Public Sub UnFunkyMethod()
+        Dim x As Integer = 0
+        Dim y As Integer = x
+    End Sub
+
+    Public Sub FunkyMethod()
+        Dim x As Integer = 0
+        Dim y As Integer = x
+    End Sub
+
+    Public FunkyField As Integer = 12
+    Public UnFunkyField As Integer = 12
+End Class
+]]>
+                             </file>
+                         </compilation>
+
+            Dim comp = CompilationUtils.CreateCompilationWithMscorlibAndVBRuntime(source)
+            comp.VerifyDiagnostics()
+            comp.VerifyAnalyzerDiagnostics({New OwningSymbolTestAnalyzer}, Nothing, Nothing, False,
+                                           Diagnostic(OwningSymbolTestAnalyzer.ExpressionDescriptor.Id, "0").WithLocation(8, 28),
+                                           Diagnostic(OwningSymbolTestAnalyzer.ExpressionDescriptor.Id, "x").WithLocation(9, 28),
+                                           Diagnostic(OwningSymbolTestAnalyzer.ExpressionDescriptor.Id, "12").WithLocation(12, 36))
+        End Sub
+
+        Private Shared Sub VerifyGeneratedCodeAnalyzerDiagnostics(compilation As Compilation, isGeneratedFileName As Func(Of String, Boolean), generatedCodeAnalysisFlagsOpt As GeneratedCodeAnalysisFlags?)
+            Dim expected = GetExpectedGeneratedCodeAnalyzerDiagnostics(compilation, isGeneratedFileName, generatedCodeAnalysisFlagsOpt)
+            VerifyGeneratedCodeAnalyzerDiagnostics(compilation, expected, generatedCodeAnalysisFlagsOpt)
+        End Sub
+
+        Private Shared Sub VerifyGeneratedCodeAnalyzerDiagnostics(compilation As Compilation, expected As DiagnosticDescription(), generatedCodeAnalysisFlagsOpt As GeneratedCodeAnalysisFlags?)
+            Dim analyzers = New DiagnosticAnalyzer() {New GeneratedCodeAnalyzer(generatedCodeAnalysisFlagsOpt)}
+            compilation.VerifyAnalyzerDiagnostics(analyzers, Nothing, Nothing, False, expected)
+        End Sub
+
+        Private Shared Function GetExpectedGeneratedCodeAnalyzerDiagnostics(compilation As Compilation, isGeneratedFileName As Func(Of String, Boolean), generatedCodeAnalysisFlagsOpt As GeneratedCodeAnalysisFlags?) As DiagnosticDescription()
+            Dim analyzers = New DiagnosticAnalyzer() {New GeneratedCodeAnalyzer(generatedCodeAnalysisFlagsOpt)}
+            Dim files = compilation.SyntaxTrees.Select(Function(t) t.FilePath).ToImmutableArray()
+            Dim sortedCallbackSymbolNames = New SortedSet(Of String)()
+            Dim sortedCallbackTreePaths = New SortedSet(Of String)()
+            Dim builder = ArrayBuilder(Of DiagnosticDescription).GetInstance()
+            For i As Integer = 0 To compilation.SyntaxTrees.Count() - 1
+                Dim file = files(i)
+                Dim isGeneratedFile = isGeneratedFileName(file)
+
+                ' Type "GeneratedCode{0}"
+                Dim squiggledText = String.Format("GeneratedCode{0}", i)
+                Dim diagnosticArgument = squiggledText
+                Dim line = 3
+                Dim column = 7
+                Dim isGeneratedCode = True
+                AddExpectedLocalDiagnostics(builder, isGeneratedCode, squiggledText, line, column, generatedCodeAnalysisFlagsOpt, diagnosticArgument)
+
+                ' Type "Nested{0}"
+                squiggledText = String.Format("Nested{0}", i)
+                diagnosticArgument = squiggledText
+                line = 4
+                column = 16
+                isGeneratedCode = True
+                AddExpectedLocalDiagnostics(builder, isGeneratedCode, squiggledText, line, column, generatedCodeAnalysisFlagsOpt, diagnosticArgument)
+
+                ' Type "NonGeneratedCode{0}"
+                squiggledText = String.Format("NonGeneratedCode{0}", i)
+                diagnosticArgument = squiggledText
+                line = 8
+                column = 7
+                isGeneratedCode = isGeneratedFile
+                AddExpectedLocalDiagnostics(builder, isGeneratedCode, squiggledText, line, column, generatedCodeAnalysisFlagsOpt, diagnosticArgument)
+
+                ' Type "NestedGeneratedCode{0}"
+                squiggledText = String.Format("NestedGeneratedCode{0}", i)
+                diagnosticArgument = squiggledText
+                line = 10
+                column = 16
+                isGeneratedCode = True
+                AddExpectedLocalDiagnostics(builder, isGeneratedCode, squiggledText, line, column, generatedCodeAnalysisFlagsOpt, diagnosticArgument)
+
+                ' File diagnostic
+                squiggledText = "Class" ' last token in file.
+                diagnosticArgument = file
+                line = 12
+                column = 5
+                isGeneratedCode = isGeneratedFile
+                AddExpectedLocalDiagnostics(builder, isGeneratedCode, squiggledText, line, column, generatedCodeAnalysisFlagsOpt, diagnosticArgument)
+
+                ' Compilation end summary diagnostic (verify callbacks into analyzer)
+                ' Analyzer always called for generated code, unless generated code analysis is explicitly disabled.
+                If generatedCodeAnalysisFlagsOpt Is Nothing OrElse (generatedCodeAnalysisFlagsOpt And GeneratedCodeAnalysisFlags.Analyze) <> 0 Then
+                    sortedCallbackSymbolNames.Add(String.Format("GeneratedCode{0}", i))
+                    sortedCallbackSymbolNames.Add(String.Format("Nested{0}", i))
+                    sortedCallbackSymbolNames.Add(String.Format("NonGeneratedCode{0}", i))
+                    sortedCallbackSymbolNames.Add(String.Format("NestedGeneratedCode{0}", i))
+
+                    sortedCallbackTreePaths.Add(file)
+                ElseIf Not isGeneratedFile Then
+                    ' Analyzer always called for non-generated code.
+                    sortedCallbackSymbolNames.Add(String.Format("NonGeneratedCode{0}", i))
+                    sortedCallbackTreePaths.Add(file)
+                End If
+            Next
+
+            ' Compilation end summary diagnostic (verify callbacks into analyzer)
+            Dim arg1 = sortedCallbackSymbolNames.Join(",")
+            Dim arg2 = sortedCallbackTreePaths.Join(",")
+            AddExpectedNonLocalDiagnostic(builder, {arg1, arg2})
+
+            If compilation.Options.GeneralDiagnosticOption = ReportDiagnostic.Error Then
+                For i As Integer = 0 To builder.Count - 1
+                    If DirectCast(builder(i).Code, String) <> GeneratedCodeAnalyzer.Error.Id Then
+                        builder(i) = builder(i).WithWarningAsError(True)
+                    End If
+                Next
+            End If
+
+            Return builder.ToArrayAndFree()
+        End Function
+
+        Private Shared Sub AddExpectedLocalDiagnostics(
+            builder As ArrayBuilder(Of DiagnosticDescription),
+            isGeneratedCode As Boolean,
+            squiggledText As String,
+            line As Integer,
+            column As Integer,
+            generatedCodeAnalysisFlagsOpt As GeneratedCodeAnalysisFlags?,
+            ParamArray arguments As String())
+
+            ' Always report diagnostics in generated code, unless explicitly suppressed or we are not even analyzing generated code.
+            Dim reportInGeneratedCode = generatedCodeAnalysisFlagsOpt Is Nothing OrElse
+                ((generatedCodeAnalysisFlagsOpt And GeneratedCodeAnalysisFlags.ReportDiagnostics) <> 0 AndAlso
+                 (generatedCodeAnalysisFlagsOpt And GeneratedCodeAnalysisFlags.Analyze) <> 0)
+
+            If Not isGeneratedCode OrElse reportInGeneratedCode Then
+                Dim diag = Diagnostic(GeneratedCodeAnalyzer.Warning.Id, squiggledText).WithArguments(arguments).WithLocation(line, column)
+                builder.Add(diag)
+
+                diag = Diagnostic(GeneratedCodeAnalyzer.Error.Id, squiggledText).WithArguments(arguments).WithLocation(line, column)
+                builder.Add(diag)
+            End If
+        End Sub
+
+        Private Shared Sub AddExpectedNonLocalDiagnostic(builder As ArrayBuilder(Of DiagnosticDescription), ParamArray arguments As String())
+            AddExpectedDiagnostic(builder, GeneratedCodeAnalyzer.Summary.Id, Nothing, 1, 1, arguments)
+        End Sub
+
+        Private Shared Sub AddExpectedDiagnostic(builder As ArrayBuilder(Of DiagnosticDescription), diagnosticId As String, squiggledText As String, line As Integer, column As Integer, ParamArray arguments As String())
+            Dim diag = Diagnostic(diagnosticId, squiggledText).WithArguments(arguments).WithLocation(line, column)
+            builder.Add(diag)
         End Sub
     End Class
 End Namespace

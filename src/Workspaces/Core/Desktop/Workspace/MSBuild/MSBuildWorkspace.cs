@@ -9,11 +9,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-
-#if !MSBUILD12
 using Microsoft.Build.Construction;
-#endif
-
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Host;
@@ -21,6 +17,7 @@ using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 using System.Runtime.InteropServices;
+using Microsoft.CodeAnalysis.Shared.Utilities;
 
 namespace Microsoft.CodeAnalysis.MSBuild
 {
@@ -58,6 +55,15 @@ namespace Microsoft.CodeAnalysis.MSBuild
         public static MSBuildWorkspace Create(IDictionary<string, string> properties)
         {
             return Create(properties, DesktopMefHostServices.DefaultServices);
+        }
+
+        /// <summary>
+        /// Create a new instance of a workspace that can be populated by opening solution and project files.
+        /// </summary>
+        /// <param name="hostServices">The <see cref="HostServices"/> used to configure this workspace.</param>
+        public static MSBuildWorkspace Create(HostServices hostServices)
+        {
+            return Create(ImmutableDictionary<string, string>.Empty, hostServices);
         }
 
         /// <summary>
@@ -188,11 +194,11 @@ namespace Microsoft.CodeAnalysis.MSBuild
             return this.CurrentSolution.GetProject(projects[0].Id);
         }
 
-        private Dictionary<string, ProjectId> GetCurrentProjectMap()
+        private ImmutableDictionary<string, ProjectId> GetCurrentProjectMap()
         {
             return this.CurrentSolution.Projects
                 .Where(p => !string.IsNullOrEmpty(p.FilePath))
-                .ToDictionary(p => p.FilePath, p => p.Id);
+                .ToImmutableDictionary(p => p.FilePath, p => p.Id);
         }
 
         #endregion
@@ -233,9 +239,14 @@ namespace Microsoft.CodeAnalysis.MSBuild
 
         public override bool TryApplyChanges(Solution newSolution)
         {
+            return TryApplyChanges(newSolution, new ProgressTracker());
+        }
+
+        internal override bool TryApplyChanges(Solution newSolution, IProgressTracker progressTracker)
+        {
             using (_serializationLock.DisposableWait())
             {
-                return base.TryApplyChanges(newSolution);
+                return base.TryApplyChanges(newSolution, progressTracker);
             }
         }
 
@@ -448,7 +459,7 @@ namespace Microsoft.CodeAnalysis.MSBuild
                 project = project.AddMetadataReference(metadataReference);
             }
 
-            var compilation = project.GetCompilationAsync(CancellationToken.None).WaitAndGetResult(CancellationToken.None);
+            var compilation = project.GetCompilationAsync(CancellationToken.None).WaitAndGetResult_CanCallOnBackground(CancellationToken.None);
             var symbol = compilation.GetAssemblyOrModuleSymbol(metadataReference) as IAssemblySymbol;
             return symbol != null ? symbol.Identity : null;
         }
@@ -493,5 +504,5 @@ namespace Microsoft.CodeAnalysis.MSBuild
             this.OnAnalyzerReferenceRemoved(projectId, analyzerReference);
         }
     }
-#endregion
+    #endregion
 }

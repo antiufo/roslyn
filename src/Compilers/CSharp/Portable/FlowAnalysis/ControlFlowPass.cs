@@ -12,6 +12,7 @@ namespace Microsoft.CodeAnalysis.CSharp
     {
         private readonly PooledHashSet<LabelSymbol> _labelsDefined = PooledHashSet<LabelSymbol>.GetInstance();
         private readonly PooledHashSet<LabelSymbol> _labelsUsed = PooledHashSet<LabelSymbol>.GetInstance();
+        protected bool _convertInsufficientExecutionStackExceptionToCancelledByStackGuardException = false; // By default, just let the original exception to bubble up.
 
         protected override void Free()
         {
@@ -126,11 +127,17 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         /// <summary>
         /// Perform control flow analysis, reporting all necessary diagnostics.  Returns true if the end of
-        /// the body might be reachable..
+        /// the body might be reachable...
         /// </summary>
-        public static bool Analyze(CSharpCompilation compilation, Symbol member, BoundNode node, DiagnosticBag diagnostics)
+        public static bool Analyze(CSharpCompilation compilation, Symbol member, BoundBlock block, DiagnosticBag diagnostics)
         {
-            var walker = new ControlFlowPass(compilation, member, node);
+            var walker = new ControlFlowPass(compilation, member, block);
+
+            if (diagnostics != null)
+            {
+                walker._convertInsufficientExecutionStackExceptionToCancelledByStackGuardException = true;
+            }
+
             try
             {
                 bool badRegion = false;
@@ -138,10 +145,20 @@ namespace Microsoft.CodeAnalysis.CSharp
                 Debug.Assert(!badRegion);
                 return result;
             }
+            catch (BoundTreeVisitor.CancelledByStackGuardException ex) when (diagnostics != null)
+            {
+                ex.AddAnError(diagnostics);
+                return true;
+            }
             finally
             {
                 walker.Free();
             }
+        }
+
+        protected override bool ConvertInsufficientExecutionStackExceptionToCancelledByStackGuardException()
+        {
+            return _convertInsufficientExecutionStackExceptionToCancelledByStackGuardException;
         }
 
         /// <summary>
@@ -201,6 +218,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 case BoundKind.Block:
                 case BoundKind.ThrowStatement:
                 case BoundKind.LabeledStatement:
+                case BoundKind.LocalFunctionStatement:
                     base.VisitStatement(statement);
                     break;
                 case BoundKind.StatementList:
@@ -215,7 +233,10 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         private void CheckReachable(BoundStatement statement)
         {
-            if (!this.State.Alive && !this.State.Reported && !statement.WasCompilerGenerated && statement.Syntax.Span.Length != 0)
+            if (!this.State.Alive &&
+                !this.State.Reported &&
+                !statement.WasCompilerGenerated &&
+                statement.Syntax.Span.Length != 0)
             {
                 var firstToken = statement.Syntax.GetFirstToken();
                 Diagnostics.Add(ErrorCode.WRN_UnreachableCode, new SourceLocation(firstToken));
@@ -289,15 +310,6 @@ namespace Microsoft.CodeAnalysis.CSharp
             return base.VisitGotoStatement(node);
         }
 
-        protected override void VisitSwitchSectionLabel(LabelSymbol label, BoundSwitchSection node)
-        {
-            _labelsDefined.Add(label);
-            base.VisitSwitchSectionLabel(label, node);
-
-            // switch statement labels are always considered to be referenced
-            _labelsUsed.Add(label);
-        }
-
         public override BoundNode VisitSwitchSection(BoundSwitchSection node, bool lastSection)
         {
             base.VisitSwitchSection(node);
@@ -305,15 +317,38 @@ namespace Microsoft.CodeAnalysis.CSharp
             // Check for switch section fall through error
             if (this.State.Alive)
             {
-                Debug.Assert(node.BoundSwitchLabels.Any());
+                Debug.Assert(node.SwitchLabels.Any());
 
-                var boundLabel = node.BoundSwitchLabels.Last();
+                var boundLabel = node.SwitchLabels.Last();
                 Diagnostics.Add(lastSection ? ErrorCode.ERR_SwitchFallOut : ErrorCode.ERR_SwitchFallThrough,
                                 new SourceLocation(boundLabel.Syntax), boundLabel.Label.Name);
                 this.State.Reported = true;
             }
 
             return null;
+        }
+
+        public override BoundNode VisitPatternSwitchStatement(BoundPatternSwitchStatement node)
+        {
+            // The pattern switch statement has computed a state machine, and gathered diagnostics
+            // related to subsumption. We report those here.
+            Diagnostics.AddRange(node.DecisionTreeDiagnostics);
+
+            return base.VisitPatternSwitchStatement(node);
+        }
+
+        protected override void VisitPatternSwitchSection(BoundPatternSwitchSection node, BoundExpression switchExpression, bool isLastSection)
+        {
+            base.VisitPatternSwitchSection(node, switchExpression, isLastSection);
+
+            // Check for switch section fall through error
+            if (this.State.Alive)
+            {
+                var syntax = node.SwitchLabels.Last().Pattern.Syntax;
+                Diagnostics.Add(isLastSection ? ErrorCode.ERR_SwitchFallOut : ErrorCode.ERR_SwitchFallThrough,
+                                new SourceLocation(syntax), syntax.ToString());
+                this.State.Reported = true;
+            }
         }
     }
 }

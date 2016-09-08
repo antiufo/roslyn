@@ -1,24 +1,26 @@
 // Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
-using System.Collections.Generic;
+using System;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Completion;
 using Microsoft.CodeAnalysis.Completion.Providers;
 using Microsoft.CodeAnalysis.CSharp.Extensions;
 using Microsoft.CodeAnalysis.CSharp.Extensions.ContextQuery;
+using Microsoft.CodeAnalysis.ErrorReporting;
 using Microsoft.CodeAnalysis.LanguageServices;
 using Microsoft.CodeAnalysis.Options;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
+using System.Collections.Immutable;
+using System.Threading;
 
 namespace Microsoft.CodeAnalysis.CSharp.Completion.Providers
 {
-    internal partial class EnumAndCompletionListTagCompletionProvider : AbstractCompletionProvider
+    internal partial class EnumAndCompletionListTagCompletionProvider : CommonCompletionProvider
     {
-        public override bool IsTriggerCharacter(SourceText text, int characterPosition, OptionSet options)
+        internal override bool IsInsertionTrigger(SourceText text, int characterPosition, OptionSet options)
         {
             // Bring up on space or at the start of a word, or after a ( or [.
             //
@@ -31,81 +33,109 @@ namespace Microsoft.CodeAnalysis.CSharp.Completion.Providers
                 ch == ' ' ||
                 ch == '[' ||
                 ch == '(' ||
+                ch == '~' ||
                 (options.GetOption(CompletionOptions.TriggerOnTypingLetters, LanguageNames.CSharp) && CompletionUtilities.IsStartingNewWord(text, characterPosition));
         }
 
-        protected override async Task<IEnumerable<CompletionItem>> GetItemsWorkerAsync(
-            Document document, int position, CompletionTriggerInfo triggerInfo,
-            CancellationToken cancellationToken)
+        public override async Task ProvideCompletionsAsync(CompletionContext context)
         {
-            var tree = await document.GetSyntaxTreeAsync(cancellationToken).ConfigureAwait(false);
-            if (tree.IsInNonUserCode(position, cancellationToken))
+            try
             {
-                return null;
-            }
+                var document = context.Document;
+                var position = context.Position;
+                var options = context.Options;
+                var cancellationToken = context.CancellationToken;
 
-            var token = tree.FindTokenOnLeftOfPosition(position, cancellationToken);
-            if (token.IsMandatoryNamedParameterPosition())
-            {
-                return null;
-            }
-
-            var typeInferenceService = document.GetLanguageService<ITypeInferenceService>();
-
-            var span = new TextSpan(position, 0);
-            var semanticModel = await document.GetSemanticModelForSpanAsync(span, cancellationToken).ConfigureAwait(false);
-            var type = typeInferenceService.InferType(semanticModel, position,
-                objectAsDefault: true,
-                cancellationToken: cancellationToken);
-
-            // If we have a Nullable<T>, unwrap it.
-            if (type.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T)
-            {
-                type = type.GetTypeArguments().FirstOrDefault();
-
-                if (type == null)
+                var tree = await document.GetSyntaxTreeAsync(cancellationToken).ConfigureAwait(false);
+                if (tree.IsInNonUserCode(position, cancellationToken))
                 {
-                    return null;
+                    return;
                 }
-            }
 
-            if (type.TypeKind != TypeKind.Enum)
-            {
-                type = GetCompletionListType(type, semanticModel.GetEnclosingNamedType(position, cancellationToken), semanticModel.Compilation);
-                if (type == null)
+                var token = tree.FindTokenOnLeftOfPosition(position, cancellationToken);
+                if (token.IsMandatoryNamedParameterPosition())
                 {
-                    return null;
+                    return;
                 }
-            }
 
-            if (!type.IsEditorBrowsable(document.ShouldHideAdvancedMembers(), semanticModel.Compilation))
+                // Don't show up within member access
+                // This previously worked because the type inferrer didn't work
+                // in member access expressions.
+                if (token.IsKind(SyntaxKind.DotToken))
+                {
+                    return;
+                }
+
+                var typeInferenceService = document.GetLanguageService<ITypeInferenceService>();
+                Contract.ThrowIfNull(typeInferenceService, nameof(typeInferenceService));
+
+                var span = new TextSpan(position, 0);
+                var semanticModel = await document.GetSemanticModelForSpanAsync(span, cancellationToken).ConfigureAwait(false);
+                var type = typeInferenceService.InferType(semanticModel, position,
+                    objectAsDefault: true,
+                    cancellationToken: cancellationToken);
+
+                // If we have a Nullable<T>, unwrap it.
+                if (type.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T)
+                {
+                    type = type.GetTypeArguments().FirstOrDefault();
+
+                    if (type == null)
+                    {
+                        return;
+                    }
+                }
+
+                if (type.TypeKind != TypeKind.Enum)
+                {
+                    type = GetCompletionListType(type, semanticModel.GetEnclosingNamedType(position, cancellationToken), semanticModel.Compilation);
+                    if (type == null)
+                    {
+                        return;
+                    }
+                }
+
+                if (!type.IsEditorBrowsable(options.GetOption(CompletionOptions.HideAdvancedMembers, semanticModel.Language), semanticModel.Compilation))
+                {
+                    return;
+                }
+
+                // Does type have any aliases?
+                ISymbol alias = await type.FindApplicableAlias(position, semanticModel, cancellationToken).ConfigureAwait(false);
+
+                var displayService = document.GetLanguageService<ISymbolDisplayService>();
+                var displayText = alias != null
+                    ? alias.Name
+                    : displayService.ToMinimalDisplayString(semanticModel, position, type);
+
+                var workspace = document.Project.Solution.Workspace;
+                var text = await semanticModel.SyntaxTree.GetTextAsync(cancellationToken).ConfigureAwait(false);
+
+                var item = SymbolCompletionItem.Create(
+                    displayText: displayText,
+                    insertionText: null,
+                    symbol: alias ?? type,
+                    contextPosition: position,
+                    matchPriority: MatchPriority.Preselect,
+                    rules: s_rules);
+
+                context.AddItem(item);
+            }
+            catch (Exception e) when (FatalError.ReportUnlessCanceled(e))
             {
-                return null;
+                throw ExceptionUtilities.Unreachable;
             }
-
-            // Does type have any aliases?
-            ISymbol alias = await type.FindApplicableAlias(position, semanticModel, cancellationToken).ConfigureAwait(false);
-
-            var displayService = document.GetLanguageService<ISymbolDisplayService>();
-            var displayText = alias != null
-                ? alias.Name
-                : displayService.ToMinimalDisplayString(semanticModel, position, type);
-
-            var workspace = document.Project.Solution.Workspace;
-            var text = await semanticModel.SyntaxTree.GetTextAsync(cancellationToken).ConfigureAwait(false);
-            var textChangeSpan = CompletionUtilities.GetTextChangeSpan(text, position);
-
-            var item = new CompletionItem(
-                this,
-                displayText: displayText,
-                filterSpan: textChangeSpan,
-                descriptionFactory: CommonCompletionUtilities.CreateDescriptionFactory(workspace, semanticModel, position, alias ?? type),
-                glyph: (alias ?? type).GetGlyph(),
-                preselect: true,
-                rules: ItemRules.Instance);
-
-            return SpecializedCollections.SingletonEnumerable(item);
         }
+
+        public override Task<CompletionDescription> GetDescriptionAsync(Document document, CompletionItem item, CancellationToken cancellationToken)
+        {
+            return SymbolCompletionItem.GetDescriptionAsync(item, document, cancellationToken);
+        }
+
+        private static readonly CompletionItemRules s_rules =
+            CompletionItemRules.Default.WithCommitCharacterRules(ImmutableArray.Create(CharacterSetModificationRule.Create(CharacterSetModificationKind.Replace, '.')))
+                                       .WithMatchPriority(MatchPriority.Preselect)
+                                       .WithSelectionBehavior(CompletionItemSelectionBehavior.HardSelection);
 
         private INamedTypeSymbol GetCompletionListType(ITypeSymbol type, INamedTypeSymbol within, Compilation compilation)
         {

@@ -2,6 +2,8 @@
 
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeRefactorings;
+using Microsoft.CodeAnalysis.Editor.Host;
+using Microsoft.CodeAnalysis.Shared.TestHooks;
 using Microsoft.VisualStudio.Text;
 
 namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
@@ -15,9 +17,11 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
             Workspace workspace,
             ITextBuffer subjectBuffer,
             ICodeActionEditHandlerService editHandler,
+            IWaitIndicator waitIndicator,
             CodeAction codeAction,
-            CodeRefactoringProvider provider)
-            : base(workspace, subjectBuffer, editHandler, codeAction, provider)
+            CodeRefactoringProvider provider,
+            IAsynchronousOperationListener operationListener)
+            : base(workspace, subjectBuffer, editHandler, waitIndicator, codeAction, provider, operationListener)
         {
         }
     }

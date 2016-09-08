@@ -107,9 +107,9 @@ class C
         <entry offset=""0x0"" startLine=""10"" startColumn=""9"" endLine=""10"" endColumn=""10"" />
         <entry offset=""0x1"" startLine=""12"" startColumn=""13"" endLine=""12"" endColumn=""14"" />
         <entry offset=""0x2"" startLine=""14"" startColumn=""13"" endLine=""14"" endColumn=""14"" />
-        <entry offset=""0x5"" startLine=""15"" startColumn=""9"" endLine=""15"" endColumn=""10"" />
+        <entry offset=""0x3"" startLine=""15"" startColumn=""9"" endLine=""15"" endColumn=""10"" />
       </sequencePoints>
-      <scope startOffset=""0x0"" endOffset=""0x6"">
+      <scope startOffset=""0x0"" endOffset=""0x4"">
         <constant name=""y"" value=""2"" type=""Int32"" />
         <scope startOffset=""0x1"" endOffset=""0x3"">
           <constant name=""z"" value=""3"" type=""Int32"" />
@@ -120,7 +120,7 @@ class C
 </symbols>");
         }
 
-        [WorkItem(543342, "DevDiv")]
+        [WorkItem(543342, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543342")]
         [Fact]
         public void TestIteratorLocalConstants()
         {
@@ -292,7 +292,7 @@ this is a string constant that is too long to fit into the PDB"";
 }
 ";
             var c = CompileAndVerify(text, options: TestOptions.DebugDll);
-            
+
             c.VerifyPdb("C.M", @"
 <symbols>
   <methods>
@@ -320,6 +320,109 @@ this is a string constant that is too long to fit into the PDB"";
       </sequencePoints>
       <scope startOffset=""0x0"" endOffset=""0x2"">
         <constant name=""text"" value=""\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB\u000D\u000Athis is a string constant that is too long to fit into the PDB"" type=""String"" />
+      </scope>
+    </method>
+  </methods>
+</symbols>", format: DebugInformationFormat.PortablePdb);
+        }
+
+        [Fact, WorkItem(178988, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/178988")]
+        public void TestStringWithNulCharacter_MaxSupportedLength()
+        {
+            const int length = 2031;
+            string str = new string('x', 9) + "\0" + new string('x', length - 10);
+
+            string text = @"
+class C
+{
+    void M()
+    {
+        const string x = """ + str + @""";
+    }
+}
+";
+            var c = CompileAndVerify(text, options: TestOptions.DebugDll);
+
+            c.VerifyPdb("C.M", @"
+<symbols>
+  <methods>
+    <method containingType=""C"" name=""M"">
+      <customDebugInfo>
+        <using>
+          <namespace usingCount=""0"" />
+        </using>
+      </customDebugInfo>
+      <sequencePoints>
+        <entry offset=""0x0"" startLine=""5"" startColumn=""5"" endLine=""5"" endColumn=""6"" />
+        <entry offset=""0x1"" startLine=""7"" startColumn=""5"" endLine=""7"" endColumn=""6"" />
+      </sequencePoints>
+      <scope startOffset=""0x0"" endOffset=""0x2"">
+        <constant name=""x"" value=""" + str.Replace("\0", @"\u0000") + @""" type=""String"" />
+      </scope>
+    </method>
+  </methods>
+</symbols>", format: DebugInformationFormat.Pdb);
+
+            c.VerifyPdb("C.M", @"
+<symbols>
+  <methods>
+    <method containingType=""C"" name=""M"">
+      <sequencePoints>
+        <entry offset=""0x0"" startLine=""5"" startColumn=""5"" endLine=""5"" endColumn=""6"" />
+        <entry offset=""0x1"" startLine=""7"" startColumn=""5"" endLine=""7"" endColumn=""6"" />
+      </sequencePoints>
+      <scope startOffset=""0x0"" endOffset=""0x2"">
+        <constant name=""x"" value=""" + str.Replace("\0", @"\u0000") + @""" type=""String"" />
+      </scope>
+    </method>
+  </methods>
+</symbols>", format: DebugInformationFormat.PortablePdb);
+        }
+
+        [Fact, WorkItem(178988, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/178988")]
+        public void TestStringWithNulCharacter_OverSupportedLength()
+        {
+            const int length = 2032;
+            string str = new string('x', 9) + "\0" + new string('x', length - 10);
+
+            string text = @"
+class C
+{
+    void M()
+    {
+        const string x = """ + str + @""";
+    }
+}
+";
+            var c = CompileAndVerify(text, options: TestOptions.DebugDll);
+
+            c.VerifyPdb("C.M", @"
+<symbols>
+  <methods>
+    <method containingType=""C"" name=""M"">
+      <customDebugInfo>
+        <using>
+          <namespace usingCount=""0"" />
+        </using>
+      </customDebugInfo>
+      <sequencePoints>
+        <entry offset=""0x0"" startLine=""5"" startColumn=""5"" endLine=""5"" endColumn=""6"" />
+        <entry offset=""0x1"" startLine=""7"" startColumn=""5"" endLine=""7"" endColumn=""6"" />
+      </sequencePoints>
+    </method>
+  </methods>
+</symbols>", format: DebugInformationFormat.Pdb);
+
+            c.VerifyPdb("C.M", @"
+<symbols>
+  <methods>
+    <method containingType=""C"" name=""M"">
+      <sequencePoints>
+        <entry offset=""0x0"" startLine=""5"" startColumn=""5"" endLine=""5"" endColumn=""6"" />
+        <entry offset=""0x1"" startLine=""7"" startColumn=""5"" endLine=""7"" endColumn=""6"" />
+      </sequencePoints>
+      <scope startOffset=""0x0"" endOffset=""0x2"">
+        <constant name=""x"" value=""" + str.Replace("\0", @"\u0000") + @""" type=""String"" />
       </scope>
     </method>
   </methods>

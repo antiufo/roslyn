@@ -3,8 +3,10 @@
 using System;
 using System.Collections.Immutable;
 using System.Composition;
+using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using Microsoft.CodeAnalysis;
@@ -15,7 +17,6 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Formatting;
 using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.Host.Mef;
-using Microsoft.CodeAnalysis.Host.UnitTests;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Test.Utilities;
 using Microsoft.CodeAnalysis.Text;
@@ -82,7 +83,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Workspace)]
-        [WorkItem(543964, "DevDiv")]
+        [WorkItem(543964, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543964")]
         public void MultipleProjectsWithSameDisplayName()
         {
             var solution = CreateSolution();
@@ -227,7 +228,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
                 {
                     if (solution.ContainsProject(referenced.ProjectId))
                     {
-                        var referencedMetadata = solution.GetMetadataReferenceAsync(referenced, solution.GetProjectState(project.Id), CancellationToken.None).Result;
+                        var referencedMetadata = solution.State.GetMetadataReferenceAsync(referenced, solution.GetProjectState(project.Id), CancellationToken.None).Result;
                         Assert.NotNull(referencedMetadata);
                         var compilationReference = referencedMetadata as CompilationReference;
                         if (compilationReference != null)
@@ -301,7 +302,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
             return solution;
         }
 
-        [WorkItem(636431, "DevDiv")]
+        [WorkItem(636431, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/636431")]
         [Fact, Trait(Traits.Feature, Traits.Features.Workspace)]
         public void TestProjectDependencyLoading()
         {
@@ -309,8 +310,8 @@ namespace Microsoft.CodeAnalysis.UnitTests
             var solution = CreateSolutionWithProjectDependencyChain(projectCount);
             ProjectId[] projectIds = solution.ProjectIds.ToArray();
 
-            var compilation0 = solution.GetCompilationAsync(projectIds[0], CancellationToken.None).Result;
-            var compilation2 = solution.GetCompilationAsync(projectIds[2], CancellationToken.None).Result;
+            var compilation0 = solution.GetProject(projectIds[0]).GetCompilationAsync(CancellationToken.None).Result;
+            var compilation2 = solution.GetProject(projectIds[2]).GetCompilationAsync(CancellationToken.None).Result;
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Workspace)]
@@ -611,7 +612,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
                 .AddDocument(did, "foo.cs", "public class Foo { }");
 
             var observedRoot = GetObservedSyntaxTreeRoot(sol, did);
-            StopObservingAndWaitForReferenceToGo(observedRoot);
+            observedRoot.AssertReleased();
 
             // re-get the tree (should recover from storage, not reparse)
             var root = sol.GetDocument(did).GetSyntaxRootAsync().Result;
@@ -619,7 +620,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
 
         [MethodImpl(MethodImplOptions.NoInlining)]
         [Fact, Trait(Traits.Feature, Traits.Features.Workspace)]
-        [WorkItem(542736, "DevDiv")]
+        [WorkItem(542736, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542736")]
         public void TestDocumentChangedOnDiskIsNotObserved()
         {
             var text1 = "public class A {}";
@@ -644,7 +645,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
             Assert.Equal(text2, textOnDisk);
 
             // stop observing it and let GC reclaim it
-            StopObservingAndWaitForReferenceToGo(observedText);
+            observedText.AssertReleased();
 
             // if we ask for the same text again we should get the original content
             var observedText2 = sol.GetDocument(did).GetTextAsync().Result;
@@ -656,27 +657,6 @@ namespace Microsoft.CodeAnalysis.UnitTests
             var workspace = new AdhocWorkspace(TestHost.Services, "NotKeptAlive");
             workspace.Options = workspace.Options.WithChangedOption(CacheOptions.RecoverableTreeLengthThreshold, 0);
             return workspace.CurrentSolution;
-        }
-
-        private void StopObservingAndWaitForReferenceToGo(ObjectReference observed, int delay = 0)
-        {
-            // stop observing it and let GC reclaim it
-            observed.Strong = null;
-
-            DateTime start = DateTime.UtcNow;
-            TimeSpan maximumTimeToWait = TimeSpan.FromSeconds(120);
-
-            while (observed.Weak.IsAlive && (DateTime.UtcNow - start) < maximumTimeToWait)
-            {
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-            }
-
-            const int TimerPrecision = 30;
-            var actualTimePassed = DateTime.UtcNow - start + TimeSpan.FromMilliseconds(TimerPrecision);
-
-            Assert.True(observed.Weak.Target == null,
-                string.Format("Target object ({0}) was not collected after {1} ms", observed.Weak.Target, actualTimePassed));
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Workspace)]
@@ -733,7 +713,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
 
             // observe the text and then wait for the references to be GC'd
             var observed = GetObservedText(sol, did, text);
-            StopObservingAndWaitForReferenceToGo(observed);
+            observed.AssertReleased();
 
             // get it async and force it to recover from temporary storage
             var doc = sol.GetDocument(did);
@@ -836,7 +816,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
 
             // observe the syntax tree root and wait for the references to be GC'd
             var observed = GetObservedSyntaxTreeRoot(sol, did);
-            StopObservingAndWaitForReferenceToGo(observed);
+            observed.AssertReleased();
 
             // get it async and force it to be recovered from storage
             var doc = sol.GetDocument(did);
@@ -896,11 +876,11 @@ namespace Microsoft.CodeAnalysis.UnitTests
 
             // observe the text and then wait for the references to be GC'd
             var observed = GetObservedText(sol, did, text);
-            StopObservingAndWaitForReferenceToGo(observed);
+            observed.AssertReleased();
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private ObjectReference GetObservedText(Solution solution, DocumentId documentId, string expectedText = null)
+        private ObjectReference<SourceText> GetObservedText(Solution solution, DocumentId documentId, string expectedText = null)
         {
             var observedText = solution.GetDocument(documentId).GetTextAsync().Result;
 
@@ -909,7 +889,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
                 Assert.Equal(expectedText, observedText.ToString());
             }
 
-            return new ObjectReference(observedText);
+            return new ObjectReference<SourceText>(observedText);
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -926,11 +906,11 @@ namespace Microsoft.CodeAnalysis.UnitTests
 
             // observe the text and then wait for the references to be GC'd
             var observed = GetObservedTextAsync(sol, did, text);
-            StopObservingAndWaitForReferenceToGo(observed);
+            observed.AssertReleased();
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private ObjectReference GetObservedTextAsync(Solution solution, DocumentId documentId, string expectedText = null)
+        private ObjectReference<SourceText> GetObservedTextAsync(Solution solution, DocumentId documentId, string expectedText = null)
         {
             var observedText = solution.GetDocument(documentId).GetTextAsync().Result;
 
@@ -939,7 +919,7 @@ namespace Microsoft.CodeAnalysis.UnitTests
                 Assert.Equal(expectedText, observedText.ToString());
             }
 
-            return new ObjectReference(observedText);
+            return new ObjectReference<SourceText>(observedText);
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -957,14 +937,14 @@ namespace Microsoft.CodeAnalysis.UnitTests
 
             // get it async and wait for it to get GC'd
             var observed = GetObservedSyntaxTreeRoot(sol, did);
-            StopObservingAndWaitForReferenceToGo(observed);
+            observed.AssertReleased();
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private ObjectReference GetObservedSyntaxTreeRoot(Solution solution, DocumentId documentId)
+        private ObjectReference<SyntaxNode> GetObservedSyntaxTreeRoot(Solution solution, DocumentId documentId)
         {
             var observedTree = solution.GetDocument(documentId).GetSyntaxRootAsync().Result;
-            return new ObjectReference(observedTree);
+            return new ObjectReference<SyntaxNode>(observedTree);
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -982,14 +962,14 @@ namespace Microsoft.CodeAnalysis.UnitTests
 
             // get it async and wait for it to get GC'd
             var observed = GetObservedSyntaxTreeRootAsync(sol, did);
-            StopObservingAndWaitForReferenceToGo(observed);
+            observed.AssertReleased();
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private ObjectReference GetObservedSyntaxTreeRootAsync(Solution solution, DocumentId documentId)
+        private ObjectReference<SyntaxNode> GetObservedSyntaxTreeRootAsync(Solution solution, DocumentId documentId)
         {
             var observedTree = solution.GetDocument(documentId).GetSyntaxRootAsync().Result;
-            return new ObjectReference(observedTree);
+            return new ObjectReference<SyntaxNode>(observedTree);
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -1048,7 +1028,7 @@ End Class";
         {
             // get it async and wait for it to get GC'd
             var observed = GetObservedSyntaxTreeRootAsync(sol, did);
-            StopObservingAndWaitForReferenceToGo(observed);
+            observed.AssertReleased();
 
             var doc = sol.GetDocument(did);
 
@@ -1067,7 +1047,7 @@ End Class";
 
             // get it async and wait for it to get GC'd
             var observed2 = GetObservedSyntaxTreeRootAsync(doc2.Project.Solution, did);
-            StopObservingAndWaitForReferenceToGo(observed2);
+            observed2.AssertReleased();
 
             // access the tree & root again (recover it)
             var tree2 = doc2.GetSyntaxTreeAsync().Result;
@@ -1093,14 +1073,14 @@ End Class";
 
             // get it async and wait for it to get GC'd
             var observed = GetObservedCompilationAsync(sol, pid);
-            StopObservingAndWaitForReferenceToGo(observed);
+            observed.AssertReleased();
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private ObjectReference GetObservedCompilationAsync(Solution solution, ProjectId projectId)
+        private ObjectReference<Compilation> GetObservedCompilationAsync(Solution solution, ProjectId projectId)
         {
             var observed = solution.GetProject(projectId).GetCompilationAsync().Result;
-            return new ObjectReference(observed);
+            return new ObjectReference<Compilation>(observed);
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -1117,14 +1097,14 @@ End Class";
 
             // get it async and wait for it to get GC'd
             var observed = GetObservedCompilation(sol, pid);
-            StopObservingAndWaitForReferenceToGo(observed);
+            observed.AssertReleased();
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private ObjectReference GetObservedCompilation(Solution solution, ProjectId projectId)
+        private ObjectReference<Compilation> GetObservedCompilation(Solution solution, ProjectId projectId)
         {
             var observed = solution.GetProject(projectId).GetCompilationAsync().Result;
-            return new ObjectReference(observed);
+            return new ObjectReference<Compilation>(observed);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Workspace)]
@@ -1247,7 +1227,7 @@ End Class";
         }
 
         [Fact]
-        [WorkItem(666263, "DevDiv")]
+        [WorkItem(666263, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/666263")]
         public void TestWorkspaceDiagnosticHasDebuggerText()
         {
             var solution = new AdhocWorkspace().CurrentSolution;
@@ -1273,7 +1253,7 @@ End Class";
             Assert.NotNull(diagnostic);
             var dd = diagnostic as DocumentDiagnostic;
             Assert.NotNull(dd);
-            Assert.Equal(dd.GetDebuggerDisplay(), string.Format("[{0}] {1}", dd.Kind.ToString(), dd.Message));
+            Assert.Equal(dd.ToString(), string.Format("[{0}] {1}", WorkspacesResources.Failure, dd.Message));
         }
 
         private bool WaitFor(Func<bool> condition, TimeSpan timeout)
@@ -1345,7 +1325,7 @@ public class C : A {
             Assert.Equal(pid1, projectForBaseType.Id);
         }
 
-        [WorkItem(1088127, "DevDiv")]
+        [WorkItem(1088127, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1088127")]
         [Fact]
         public void TestEncodingRetainedAfterTreeChanged()
         {
@@ -1361,6 +1341,166 @@ public class C : A {
             var newDoc = doc.WithSyntaxRoot(newRoot);
 
             Assert.Equal(Encoding.UTF32, newDoc.GetTextAsync().Result.Encoding);
+        }
+
+        [Fact]
+        public void TestProjectWithNoBrokenReferencesHasNoIncompleteReferences()
+        {
+            var workspace = new AdhocWorkspace();
+            var project1 = workspace.AddProject("CSharpProject", LanguageNames.CSharp);
+            var project2 = workspace.AddProject(
+                ProjectInfo.Create(
+                    ProjectId.CreateNewId(),
+                    VersionStamp.Create(),
+                    "VisualBasicProject",
+                    "VisualBasicProject",
+                    LanguageNames.VisualBasic,
+                    projectReferences: new[] { new ProjectReference(project1.Id) }));
+
+            // Nothing should have incomplete references, and everything should build
+            Assert.True(project1.HasSuccessfullyLoadedAsync().Result);
+            Assert.True(project2.HasSuccessfullyLoadedAsync().Result);
+            Assert.Single(project2.GetCompilationAsync().Result.ExternalReferences);
+        }
+
+        [Fact]
+        public void TestProjectWithBrokenCrossLanguageReferenceHasIncompleteReferences()
+        {
+            var workspace = new AdhocWorkspace();
+            var project1 = workspace.AddProject("CSharpProject", LanguageNames.CSharp);
+            workspace.AddDocument(project1.Id, "Broken.cs", SourceText.From("class "));
+
+            var project2 = workspace.AddProject(
+                ProjectInfo.Create(
+                    ProjectId.CreateNewId(),
+                    VersionStamp.Create(),
+                    "VisualBasicProject",
+                    "VisualBasicProject",
+                    LanguageNames.VisualBasic,
+                    projectReferences: new[] { new ProjectReference(project1.Id) }));
+
+            Assert.True(project1.HasSuccessfullyLoadedAsync().Result);
+            Assert.False(project2.HasSuccessfullyLoadedAsync().Result);
+            Assert.Empty(project2.GetCompilationAsync().Result.ExternalReferences);
+        }
+
+        [Fact]
+        public void TestFrozenPartialProjectAlwaysIsIncomplete()
+        {
+            var workspace = new AdhocWorkspace();
+            var project1 = workspace.AddProject("CSharpProject", LanguageNames.CSharp);
+
+            var project2 = workspace.AddProject(
+                ProjectInfo.Create(
+                    ProjectId.CreateNewId(),
+                    VersionStamp.Create(),
+                    "VisualBasicProject",
+                    "VisualBasicProject",
+                    LanguageNames.VisualBasic,
+                    projectReferences: new[] { new ProjectReference(project1.Id) }));
+
+            var document = workspace.AddDocument(project2.Id, "Test.cs", SourceText.From(""));
+
+            // Nothing should have incomplete references, and everything should build
+            var frozenSolution = document.WithFrozenPartialSemanticsAsync(CancellationToken.None).Result.Project.Solution;
+
+            Assert.True(frozenSolution.GetProject(project1.Id).HasSuccessfullyLoadedAsync().Result);
+            Assert.True(frozenSolution.GetProject(project2.Id).HasSuccessfullyLoadedAsync().Result);
+        }
+
+        [Fact]
+        public void TestProjectCompletenessWithMultipleProjects()
+        {
+            Project csBrokenProject;
+            Project vbNormalProject;
+            Project dependsOnBrokenProject;
+            Project dependsOnVbNormalProject;
+            Project transitivelyDependsOnBrokenProjects;
+            Project transitivelyDependsOnNormalProjects;
+            GetMultipleProjects(out csBrokenProject, out vbNormalProject, out dependsOnBrokenProject, out dependsOnVbNormalProject, out transitivelyDependsOnBrokenProjects, out transitivelyDependsOnNormalProjects);
+
+            // check flag for a broken project itself
+            Assert.False(csBrokenProject.HasSuccessfullyLoadedAsync().Result);
+
+            // check flag for a normal project itself
+            Assert.True(vbNormalProject.HasSuccessfullyLoadedAsync().Result);
+
+            // check flag for normal project that directly reference a broken project
+            Assert.False(dependsOnBrokenProject.HasSuccessfullyLoadedAsync().Result);
+
+            // check flag for normal project that directly reference only normal project
+            Assert.True(dependsOnVbNormalProject.HasSuccessfullyLoadedAsync().Result);
+
+            // check flag for normal project that indirectly reference a borken project
+            // normal project -> normal project -> broken project
+            Assert.False(transitivelyDependsOnBrokenProjects.HasSuccessfullyLoadedAsync().Result);
+
+            // check flag for normal project that indirectly reference only normal project
+            // normal project -> normal project -> normal project
+            Assert.True(transitivelyDependsOnNormalProjects.HasSuccessfullyLoadedAsync().Result);
+        }
+
+        private static void GetMultipleProjects(
+            out Project csBrokenProject,
+            out Project vbNormalProject,
+            out Project dependsOnBrokenProject,
+            out Project dependsOnVbNormalProject,
+            out Project transitivelyDependsOnBrokenProjects,
+            out Project transitivelyDependsOnNormalProjects)
+        {
+            var workspace = new AdhocWorkspace();
+
+            csBrokenProject = workspace.AddProject(
+                ProjectInfo.Create(
+                    ProjectId.CreateNewId(),
+                    VersionStamp.Create(),
+                    "CSharpProject",
+                    "CSharpProject",
+                    LanguageNames.CSharp).WithHasAllInformation(hasAllInformation: false));
+
+            vbNormalProject = workspace.AddProject(
+                ProjectInfo.Create(
+                    ProjectId.CreateNewId(),
+                    VersionStamp.Create(),
+                    "VisualBasicProject",
+                    "VisualBasicProject",
+                    LanguageNames.VisualBasic));
+
+            dependsOnBrokenProject = workspace.AddProject(
+                ProjectInfo.Create(
+                    ProjectId.CreateNewId(),
+                    VersionStamp.Create(),
+                    "VisualBasicProject",
+                    "VisualBasicProject",
+                    LanguageNames.VisualBasic,
+                    projectReferences: new[] { new ProjectReference(csBrokenProject.Id), new ProjectReference(vbNormalProject.Id) }));
+
+            dependsOnVbNormalProject = workspace.AddProject(
+                ProjectInfo.Create(
+                    ProjectId.CreateNewId(),
+                    VersionStamp.Create(),
+                    "CSharpProject",
+                    "CSharpProject",
+                    LanguageNames.CSharp,
+                    projectReferences: new[] { new ProjectReference(vbNormalProject.Id) }));
+
+            transitivelyDependsOnBrokenProjects = workspace.AddProject(
+                ProjectInfo.Create(
+                    ProjectId.CreateNewId(),
+                    VersionStamp.Create(),
+                    "CSharpProject",
+                    "CSharpProject",
+                    LanguageNames.CSharp,
+                    projectReferences: new[] { new ProjectReference(dependsOnBrokenProject.Id) }));
+
+            transitivelyDependsOnNormalProjects = workspace.AddProject(
+                ProjectInfo.Create(
+                    ProjectId.CreateNewId(),
+                    VersionStamp.Create(),
+                    "VisualBasicProject",
+                    "VisualBasicProject",
+                    LanguageNames.VisualBasic,
+                    projectReferences: new[] { new ProjectReference(dependsOnVbNormalProject.Id) }));
         }
     }
 }

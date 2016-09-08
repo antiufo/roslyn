@@ -16,12 +16,16 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Completion.Complet
     Public Class CrefCompletionProviderTests
         Inherits AbstractVisualBasicCompletionProviderTests
 
-        Friend Overrides Function CreateCompletionProvider() As CompletionListProvider
+        Public Sub New(workspaceFixture As VisualBasicTestWorkspaceFixture)
+            MyBase.New(workspaceFixture)
+        End Sub
+
+        Friend Overrides Function CreateCompletionProvider() As CompletionProvider
             Return New CrefCompletionProvider()
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub NotOutsideCref()
+        Public Async Function TestNotOutsideCref() As Task
             Dim text = <File>
 Class C
     ''' $$
@@ -30,11 +34,11 @@ Class C
 End Class
 </File>.Value
 
-            VerifyNoItemsExist(text)
-        End Sub
+            Await VerifyNoItemsExistAsync(text)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub NotOutsideCref2()
+        Public Async Function TestNotOutsideCref2() As Task
             Dim text = <File>
 Class C
     $$
@@ -43,11 +47,11 @@ Class C
 End Class
 </File>.Value
 
-            VerifyNoItemsExist(text)
-        End Sub
+            Await VerifyNoItemsExistAsync(text)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub NotOutsideCref3()
+        Public Async Function TestNotOutsideCref3() As Task
             Dim text = <File>
 Class C
     Sub Foo()
@@ -56,11 +60,11 @@ Class C
 End Class
 </File>.Value
 
-            VerifyNoItemsExist(text)
-        End Sub
+            Await VerifyNoItemsExistAsync(text)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub AfterCrefOpenQuote()
+        Public Async Function TestAfterCrefOpenQuote() As Task
             Dim text = <File><![CDATA[
 Imports System
 
@@ -72,11 +76,11 @@ Module Program
     End Sub
 End Module]]></File>.Value
 
-            VerifyAnyItemExists(text)
-        End Sub
+            Await VerifyAnyItemExistsAsync(text)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub RightSideOfQualifiedName()
+        Public Async Function TestRightSideOfQualifiedName() As Task
             Dim text = <File><![CDATA[
 Imports System
 
@@ -88,11 +92,11 @@ Module Program
     End Sub
 End Module]]></File>.Value
 
-            VerifyItemExists(text, "Foo()")
-        End Sub
+            Await VerifyItemExistsAsync(text, "Foo()")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub NotInTypeParameterContext()
+        Public Async Function TestNotInTypeParameterContext() As Task
             Dim text = <File><![CDATA[
 Imports System
 
@@ -104,11 +108,11 @@ Class Program(Of T)
     End Sub
 End Class]]></File>.Value
 
-            VerifyItemIsAbsent(text, "Integer")
-        End Sub
+            Await VerifyItemIsAbsentAsync(text, "Integer")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub InSignature_FirstParameter()
+        Public Async Function TestInSignature_FirstParameter() As Task
             Dim text = <File><![CDATA[
 Imports System
 
@@ -120,12 +124,12 @@ Class Program(Of T)
     End Sub
 End Class]]></File>.Value
 
-            VerifyItemExists(text, "Integer")
-            VerifyItemIsAbsent(text, "Foo(Integer")
-        End Sub
+            Await VerifyItemExistsAsync(text, "Integer")
+            Await VerifyItemIsAbsentAsync(text, "Foo(Integer")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub InSignature_SecondParameter()
+        Public Async Function TestInSignature_SecondParameter() As Task
             Dim text = <File><![CDATA[
 Imports System
 
@@ -137,11 +141,11 @@ Class Program(Of T)
     End Sub
 End Class]]></File>.Value
 
-            VerifyItemExists(text, "Integer")
-        End Sub
+            Await VerifyItemExistsAsync(text, "Integer")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub NotAfterSignature()
+        Public Async Function TestNotAfterSignature() As Task
             Dim text = <File><![CDATA[
 Imports System
 
@@ -153,10 +157,10 @@ Class Program(Of T)
     End Sub
 End Class]]></File>.Value
 
-            VerifyNoItemsExist(text)
-        End Sub
+            Await VerifyNoItemsExistAsync(text)
+        End Function
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub NotAfterDotAfterSignature()
+        Public Async Function TestNotAfterDotAfterSignature() As Task
             Dim text = <File><![CDATA[
 Imports System
 
@@ -168,11 +172,11 @@ Class Program(Of T)
     End Sub
 End Class]]></File>.Value
 
-            VerifyNoItemsExist(text)
-        End Sub
+            Await VerifyNoItemsExistAsync(text)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub MethodParametersIncluded()
+        Public Async Function TestMethodParametersIncluded() As Task
             Dim text = <File><![CDATA[
 ''' <summary>
 ''' <see cref="Program(Of T).$$"
@@ -182,11 +186,11 @@ Class Program(Of T)
     End Sub
 End Class]]></File>.Value
 
-            VerifyItemExists(text, "Foo(ByRef Integer, Integer, Integer())")
-        End Sub
+            Await VerifyItemExistsAsync(text, "Foo(ByRef Integer, Integer, Integer())")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub TypesSuggestedWithTypeParameters()
+        Public Async Function TestTypesSuggestedWithTypeParameters() As Task
             Dim text = <File><![CDATA[
 ''' <summary>
 ''' <see cref="$$"
@@ -197,11 +201,11 @@ End Class
 Class Program
 End Class]]></File>.Value
 
-            VerifyItemExists(text, "Program")
-            VerifyItemExists(text, "Program(Of TTypeParameter)")
-        End Sub
+            Await VerifyItemExistsAsync(text, "Program")
+            Await VerifyItemExistsAsync(text, "Program(Of TTypeParameter)")
+        End Function
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub Operators()
+        Public Async Function TestOperators() As Task
             Dim text = <File><![CDATA[Imports System
 Imports System.Collections.Generic
 Imports System.Linq
@@ -223,11 +227,11 @@ Class C
     End Operator
 End Class]]></File>.Value
 
-            VerifyItemExists(text, "Operator +(C)")
-        End Sub
+            Await VerifyItemExistsAsync(text, "Operator +(C)")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub ModOperator()
+        Public Async Function TestModOperator() As Task
             Dim text = <File><![CDATA[Imports System
 Imports System.Collections.Generic
 Imports System.Linq
@@ -249,11 +253,11 @@ Class C
     End Operator
 End Class]]></File>.Value
 
-            VerifyItemExists(text, "Operator Mod(C, Integer)")
-        End Sub
+            Await VerifyItemExistsAsync(text, "Operator Mod(C, Integer)")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub ConstructorsShown()
+        Public Async Function TestConstructorsShown() As Task
             Dim text = <File><![CDATA[
 ''' <summary>
 ''' <see cref="C.$$"/>
@@ -264,10 +268,10 @@ Class C
 End Class
 ]]></File>.Value
 
-            VerifyItemExists(text, "New(Integer)")
-        End Sub
+            Await VerifyItemExistsAsync(text, "New(Integer)")
+        End Function
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub AfterNamespace()
+        Public Async Function TestAfterNamespace() As Task
             Dim text = <File><![CDATA[
 Imports System
 ''' <summary>
@@ -279,11 +283,11 @@ Class C
 End Class
 ]]></File>.Value
 
-            VerifyItemExists(text, "String")
-        End Sub
+            Await VerifyItemExistsAsync(text, "String")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub ParameterizedProperties()
+        Public Async Function TestParameterizedProperties() As Task
             Dim text = <File><![CDATA[
 ''' <summary>
 ''' <see cref="C.$$"/>
@@ -308,12 +312,12 @@ End Class
 
 ]]></File>.Value
 
-            VerifyItemExists(text, "Item(Integer)")
-            VerifyItemExists(text, "Item(Integer, String)")
-        End Sub
+            Await VerifyItemExistsAsync(text, "Item(Integer)")
+            Await VerifyItemExistsAsync(text, "Item(Integer, String)")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub NoIdentifierEscaping()
+        Public Async Function TestNoIdentifierEscaping() As Task
             Dim text = <File><![CDATA[
 ''' <see cref="A.$$"/>
 ''' </summary>
@@ -322,11 +326,11 @@ End Class
 
 ]]></File>.Value
 
-            VerifyItemExists(text, "GetType()")
-        End Sub
+            Await VerifyItemExistsAsync(text, "GetType()")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub NoCommitOnParen()
+        Public Async Function TestNoCommitOnParen() As Task
             Dim text = <File><![CDATA[
 ''' <summary>
 ''' <see cref="C.$$"/>
@@ -347,11 +351,11 @@ End Sub
 End Class
 ]]></File>.Value
 
-            VerifyProviderCommit(text, "bar(Integer, Integer)", expected, "("c, "bar")
-        End Sub
+            Await VerifyProviderCommitAsync(text, "bar(Integer, Integer)", expected, "("c, "bar")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub AllowTypingTypeParameters()
+        Public Async Function TestAllowTypingTypeParameters() As Task
             Dim text = <File><![CDATA[
 Imports System.Collections.Generic
 ''' <summary>
@@ -374,11 +378,11 @@ End Sub
 End Class
 ]]></File>.Value
 
-            VerifyProviderCommit(text, "List(Of T)", expected, " "c, "List(Of")
-        End Sub
+            Await VerifyProviderCommitAsync(text, "List(Of T)", expected, " "c, "List(Of")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub OfAfterParen()
+        Public Async Function TestOfAfterParen() As Task
             Dim text = <File><![CDATA[
 Imports System
 
@@ -390,11 +394,11 @@ Module Program
     End Sub
 End Module]]></File>.Value
 
-            VerifyItemExists(text, "Of")
-        End Sub
+            Await VerifyItemExistsAsync(text, "Of")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub OfNotAfterComma()
+        Public Async Function TestOfNotAfterComma() As Task
             Dim text = <File><![CDATA[
 Imports System
 
@@ -406,10 +410,10 @@ Module Program
     End Sub
 End Module]]></File>.Value
 
-            VerifyItemIsAbsent(text, "Of")
-        End Sub
+            Await VerifyItemIsAbsentAsync(text, "Of")
+        End Function
 
-        Public Sub CrefCompletionSpeculatesOutsideTrivia()
+        Public Async Function TestCrefCompletionSpeculatesOutsideTrivia() As Task
             Dim text = <a><![CDATA[
 Class C
     ''' <see cref="$$
@@ -418,18 +422,18 @@ Class C
 End Class]]></a>.Value.NormalizeLineEndings()
             Dim exportProvider = MinimalTestExportProvider.CreateExportProvider(TestExportProvider.EntireAssemblyCatalogWithCSharpAndVisualBasic.WithPart(GetType(PickySemanticFactsService)))
 
-            Using workspace = TestWorkspaceFactory.CreateWorkspaceFromFiles(LanguageNames.VisualBasic, New VisualBasicCompilationOptions(OutputKind.ConsoleApplication), New VisualBasicParseOptions(), {text}, exportProvider)
+            Using workspace = Await TestWorkspace.CreateAsync(LanguageNames.VisualBasic, New VisualBasicCompilationOptions(OutputKind.ConsoleApplication), New VisualBasicParseOptions(), {text}, exportProvider)
                 ' This test uses MEF to compose in an ISyntaxFactsService that 
                 ' asserts it isn't asked to speculate on nodes inside documentation trivia.
                 ' This verifies that the provider is asking for a speculative SemanticModel
                 ' by walking to the node the documentation is attached to. 
 
-                Dim provider = New CrefCompletionProvider()
                 Dim hostDocument = workspace.DocumentWithCursor
                 Dim document = workspace.CurrentSolution.GetDocument(hostDocument.Id)
-                Dim completionList = GetCompletionList(provider, document, hostDocument.CursorPosition.Value, CompletionTriggerInfo.CreateInvokeCompletionTriggerInfo())
+                Dim service = GetCompletionService(workspace)
+                Dim completionList = Await GetCompletionListAsync(service, document, hostDocument.CursorPosition.Value, CompletionTrigger.Default)
             End Using
-        End Sub
+        End Function
 
         <ExportLanguageServiceAttribute(GetType(ISyntaxFactsService), LanguageNames.VisualBasic, ServiceLayer.Host), [Shared]>
         Friend Class PickySemanticFactsService
@@ -446,10 +450,6 @@ End Class]]></a>.Value.NormalizeLineEndings()
             End Sub
 
             Public Function ContainsInMemberBody(node As SyntaxNode, span As TextSpan) As Boolean Implements ISyntaxFactsService.ContainsInMemberBody
-                Throw New NotImplementedException()
-            End Function
-
-            Public Function ConvertToSingleLine(node As SyntaxNode) As SyntaxNode Implements ISyntaxFactsService.ConvertToSingleLine
                 Throw New NotImplementedException()
             End Function
 
@@ -522,6 +522,10 @@ End Class]]></a>.Value.NormalizeLineEndings()
 
             Public Function GetRefKindOfArgument(node As SyntaxNode) As RefKind Implements ISyntaxFactsService.GetRefKindOfArgument
                 Throw New NotImplementedException()
+            End Function
+
+            Public Function IsDeclaration(node As SyntaxNode) As Boolean Implements ISyntaxFactsService.IsDeclaration
+                Throw New NotImplementedException
             End Function
 
             Public Function GetText(kind As Integer) As String Implements ISyntaxFactsService.GetText
@@ -680,6 +684,10 @@ End Class]]></a>.Value.NormalizeLineEndings()
                 Throw New NotImplementedException()
             End Function
 
+            Public Function IsObjectInitializerNamedAssignmentIdentifier(node As SyntaxNode, ByRef initializedInstance As SyntaxNode) As Boolean Implements ISyntaxFactsService.IsObjectInitializerNamedAssignmentIdentifier
+                Throw New NotImplementedException()
+            End Function
+
             Public Function IsObjectInitializerNamedAssignmentIdentifier(node As SyntaxNode) As Boolean Implements ISyntaxFactsService.IsObjectInitializerNamedAssignmentIdentifier
                 Throw New NotImplementedException()
             End Function
@@ -728,7 +736,7 @@ End Class]]></a>.Value.NormalizeLineEndings()
                 Throw New NotImplementedException()
             End Function
 
-            Public Function IsStringLiteral(token As SyntaxToken) As Boolean Implements ISyntaxFactsService.IsStringLiteral
+            Public Function IsStringLiteralOrInterpolatedStringLiteral(token As SyntaxToken) As Boolean Implements ISyntaxFactsService.IsStringLiteralOrInterpolatedStringLiteral
                 Throw New NotImplementedException()
             End Function
 
@@ -746,6 +754,18 @@ End Class]]></a>.Value.NormalizeLineEndings()
 
             Public Function IsTypeNamedDynamic(token As SyntaxToken, parent As SyntaxNode) As Boolean Implements ISyntaxFactsService.IsTypeNamedDynamic
                 Throw New NotImplementedException()
+            End Function
+
+            Public Function IsDocumentationComment(node As SyntaxNode) As Boolean Implements ISyntaxFactsService.IsDocumentationComment
+                Throw New NotImplementedException
+            End Function
+
+            Public Function IsUsingOrExternOrImport(node As SyntaxNode) As Boolean Implements ISyntaxFactsService.IsUsingOrExternOrImport
+                Throw New NotImplementedException
+            End Function
+
+            Public Function IsGlobalAttribute(node As SyntaxNode) As Boolean Implements ISyntaxFactsService.IsGlobalAttribute
+                Throw New NotImplementedException
             End Function
 
             Public Function IsTypeNamedVarInVariableOrFieldDeclaration(token As SyntaxToken, parent As SyntaxNode) As Boolean Implements ISyntaxFactsService.IsTypeNamedVarInVariableOrFieldDeclaration
@@ -807,6 +827,74 @@ End Class]]></a>.Value.NormalizeLineEndings()
             Public Function TryGetPredefinedType(token As SyntaxToken, ByRef type As PredefinedType) As Boolean Implements ISyntaxFactsService.TryGetPredefinedType
                 Throw New NotImplementedException()
             End Function
+
+            Public Function GetInactiveRegionSpanAroundPosition(tree As SyntaxTree, position As Integer, cancellationToken As CancellationToken) As TextSpan Implements ISyntaxFactsService.GetInactiveRegionSpanAroundPosition
+                Throw New NotImplementedException()
+            End Function
+
+            Public Function GetNameForArgument(argument As SyntaxNode) As String Implements ISyntaxFactsService.GetNameForArgument
+                Throw New NotImplementedException()
+            End Function
+
+            Public Function IsLeftSideOfDot(node As SyntaxNode) As Boolean Implements ISyntaxFactsService.IsLeftSideOfDot
+                Throw New NotImplementedException()
+            End Function
+
+            Public Function GetRightSideOfDot(node As SyntaxNode) As SyntaxNode Implements ISyntaxFactsService.GetRightSideOfDot
+                Throw New NotImplementedException()
+            End Function
+
+            Public Function IsLeftSideOfAssignment(node As SyntaxNode) As Boolean Implements ISyntaxFactsService.IsLeftSideOfAssignment
+                Throw New NotImplementedException()
+            End Function
+
+            Public Function IsLeftSideOfAnyAssignment(node As SyntaxNode) As Boolean Implements ISyntaxFactsService.IsLeftSideOfAnyAssignment
+                Throw New NotImplementedException()
+            End Function
+
+            Public Function GetRightHandSideOfAssignment(node As SyntaxNode) As SyntaxNode Implements ISyntaxFactsService.GetRightHandSideOfAssignment
+                Throw New NotImplementedException()
+            End Function
+
+            Public Function IsInferredAnonymousObjectMemberDeclarator(node As SyntaxNode) As Boolean Implements ISyntaxFactsService.IsInferredAnonymousObjectMemberDeclarator
+                Throw New NotImplementedException()
+            End Function
+
+            Public Function IsOperandOfIncrementExpression(node As SyntaxNode) As Boolean Implements ISyntaxFactsService.IsOperandOfIncrementExpression
+                Throw New NotImplementedException()
+            End Function
+
+            Public Function IsOperandOfIncrementOrDecrementExpression(node As SyntaxNode) As Boolean Implements ISyntaxFactsService.IsOperandOfIncrementOrDecrementExpression
+                Throw New NotImplementedException()
+            End Function
+
+            Public Function IsNumericLiteralExpression(node As SyntaxNode) As Boolean Implements ISyntaxFactsService.IsNumericLiteralExpression
+                Throw New NotImplementedException()
+            End Function
+
+            Public Function GetExpressionOfInterpolation(node As SyntaxNode) As SyntaxNode Implements ISyntaxFactsService.GetExpressionOfInterpolation
+                Throw New NotImplementedException()
+            End Function
+
+            Public Function GetContentsOfInterpolatedString(interpolatedString As SyntaxNode) As SyntaxList(Of SyntaxNode) Implements ISyntaxFactsService.GetContentsOfInterpolatedString
+                Throw New NotImplementedException()
+            End Function
+
+            Public Function IsStringLiteral(token As SyntaxToken) As Boolean Implements ISyntaxFactsService.IsStringLiteral
+                Throw New NotImplementedException()
+            End Function
+
+            Public Function GetArgumentsForInvocationExpression(invocationExpression As SyntaxNode) As SeparatedSyntaxList(Of SyntaxNode) Implements ISyntaxFactsService.GetArgumentsForInvocationExpression
+                Throw New NotImplementedException()
+            End Function
+
+            Public Function ConvertToSingleLine(node As SyntaxNode, Optional useElasticTrivia As Boolean = False) As SyntaxNode Implements ISyntaxFactsService.ConvertToSingleLine
+                Throw New NotImplementedException()
+            End Function
+
+            Public Sub AddFirstMissingCloseBrace(root As SyntaxNode, contextNode As SyntaxNode, ByRef newRoot As SyntaxNode, ByRef newContextNode As SyntaxNode) Implements ISyntaxFactsService.AddFirstMissingCloseBrace
+                Throw New NotImplementedException()
+            End Sub
         End Class
     End Class
 End Namespace

@@ -74,26 +74,12 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
 
         private static bool IsWord(SyntaxToken token)
         {
-            return new CSharpSyntaxFactsService().IsWord(token);
+            return CSharpSyntaxFactsService.Instance.IsWord(token);
         }
 
         public static SyntaxToken GetNextNonZeroWidthTokenOrEndOfFile(this SyntaxToken token)
         {
             return token.GetNextTokenOrEndOfFile();
-        }
-
-        public static SyntaxToken GetNextTokenOrEndOfFile(
-            this SyntaxToken token,
-            bool includeZeroWidth = false,
-            bool includeSkipped = false,
-            bool includeDirectives = false,
-            bool includeDocumentationComments = false)
-        {
-            var nextToken = token.GetNextToken(includeZeroWidth, includeSkipped, includeDirectives, includeDocumentationComments);
-
-            return nextToken.Kind() == SyntaxKind.None
-                ? token.GetAncestor<CompilationUnitSyntax>().EndOfFileToken
-                : nextToken;
         }
 
         public static SyntaxToken With(this SyntaxToken token, SyntaxTriviaList leading, SyntaxTriviaList trailing)
@@ -362,6 +348,11 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
         {
             return (token.IsKind(SyntaxKind.OpenBraceToken) || token.IsKind(SyntaxKind.CommaToken)) &&
                 token.Parent.IsKind(SyntaxKind.ObjectInitializerExpression);
+        }
+
+        public static bool IsOpenBraceOfAccessorList(this SyntaxToken token)
+        {
+            return token.IsKind(SyntaxKind.OpenBraceToken) && token.Parent.IsKind(SyntaxKind.AccessorList);
         }
     }
 }

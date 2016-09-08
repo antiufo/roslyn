@@ -11,30 +11,30 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.KeywordHighlightin
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestRegionSample1_1()
-            Test(<Text>
+        Public Async Function TestRegionSample1_1() As Task
+            Await TestAsync(<Text>
 Class C
 {|Cursor:[|#Region|]|} "Main"
     Sub Main()
     End Sub
 [|#End Region|]
 End Class</Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestRegionSample1_2()
-            Test(<Text>
+        Public Async Function TestRegionSample1_2() As Task
+            Await TestAsync(<Text>
 Class C
 [|#Region|] "Main"
     Sub Main()
     End Sub
 {|Cursor:[|#End Region|]|}
 End Class</Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestRegionSample2_1()
-            Test(<Text>
+        Public Async Function TestRegionSample2_1() As Task
+            Await TestAsync(<Text>
 Class C
 {|Cursor:[|#Region|]|} "Main"
     Sub Main()
@@ -43,11 +43,11 @@ Class C
     End Sub
 [|#End Region|]
 End Class</Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestRegionSample2_2()
-            Test(<Text>
+        Public Async Function TestRegionSample2_2() As Task
+            Await TestAsync(<Text>
 Class C
 #Region "Main"
     Sub Main()
@@ -56,11 +56,11 @@ Class C
     End Sub
 #End Region
 End Class</Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestRegionSample2_3()
-            Test(<Text>
+        Public Async Function TestRegionSample2_3() As Task
+            Await TestAsync(<Text>
 Class C
 #Region "Main"
     Sub Main()
@@ -69,11 +69,11 @@ Class C
     End Sub
 #End Region
 End Class</Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestRegionSample2_4()
-            Test(<Text>
+        Public Async Function TestRegionSample2_4() As Task
+            Await TestAsync(<Text>
 Class C
 [|#Region|] "Main"
     Sub Main()
@@ -82,6 +82,6 @@ Class C
     End Sub
 {|Cursor:[|#End Region|]|}
 End Class</Text>)
-        End Sub
+        End Function
     End Class
 End Namespace

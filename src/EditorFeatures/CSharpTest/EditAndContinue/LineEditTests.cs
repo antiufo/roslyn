@@ -1,8 +1,7 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System;
 using Microsoft.CodeAnalysis.CSharp.UnitTests;
-using Microsoft.CodeAnalysis.Differencing;
 using Microsoft.CodeAnalysis.EditAndContinue;
 using Microsoft.CodeAnalysis.Emit;
 using Xunit;
@@ -338,7 +337,7 @@ class C<T>
             edits.VerifyLineEdits(
                 Array.Empty<LineChange>(),
                 new string[] { "static void Bar()" },
-                Diagnostic(RudeEditKind.GenericTypeTriviaUpdate, "\r\n        ", FeaturesResources.Method));
+                Diagnostic(RudeEditKind.GenericTypeTriviaUpdate, "\r\n        ", FeaturesResources.method));
         }
 
         [Fact]
@@ -366,7 +365,7 @@ class C<T>
             edits.VerifyLineEdits(
                 Array.Empty<LineChange>(),
                 new string[] { "static void Bar()" },
-                Diagnostic(RudeEditKind.GenericTypeTriviaUpdate, "\r\n        /*edit*/", FeaturesResources.Method));
+                Diagnostic(RudeEditKind.GenericTypeTriviaUpdate, "\r\n        /*edit*/", FeaturesResources.method));
         }
 
         [Fact]
@@ -394,7 +393,7 @@ class C
             edits.VerifyLineEdits(
                 Array.Empty<LineChange>(),
                 new string[] { "static void Bar<T>()" },
-                Diagnostic(RudeEditKind.GenericMethodTriviaUpdate, "\r\n        ", FeaturesResources.Method));
+                Diagnostic(RudeEditKind.GenericMethodTriviaUpdate, "\r\n        ", FeaturesResources.method));
         }
 
         [Fact]
@@ -566,7 +565,7 @@ class C<T>
             edits.VerifyLineEdits(
                 Array.Empty<LineChange>(),
                 new string[] { "public C(int a)" },
-                Diagnostic(RudeEditKind.GenericTypeTriviaUpdate, "          ", FeaturesResources.Constructor));
+                Diagnostic(RudeEditKind.GenericTypeTriviaUpdate, "          ", FeaturesResources.constructor));
         }
 
         #endregion
@@ -845,7 +844,7 @@ class C<T>
             edits.VerifyLineEdits(
                 Array.Empty<LineChange>(),
                 new string[] { "Foo = 1 +  1" },
-                Diagnostic(RudeEditKind.GenericTypeTriviaUpdate, "  ", FeaturesResources.Field));
+                Diagnostic(RudeEditKind.GenericTypeTriviaUpdate, "  ", FeaturesResources.field));
         }
 
         #endregion

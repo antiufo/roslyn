@@ -5,7 +5,6 @@ Imports Microsoft.CodeAnalysis.CSharp
 Imports Microsoft.CodeAnalysis.Diagnostics
 Imports Microsoft.CodeAnalysis.Editor.UnitTests
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
-Imports Microsoft.CodeAnalysis.Options
 Imports Microsoft.CodeAnalysis.Shared.Options
 Imports Microsoft.CodeAnalysis.SolutionCrawler
 Imports Microsoft.CodeAnalysis.VisualBasic
@@ -273,15 +272,14 @@ Namespace Microsoft.CodeAnalysis.Editor.Implementation.Diagnostics.UnitTests
         End Sub
 
         Private Sub VerifyAllAvailableDiagnostics(test As XElement, diagnostics As XElement, Optional ordered As Boolean = True, Optional enabled As Boolean = True)
-            Using workspace = TestWorkspaceFactory.CreateWorkspace(test)
+            Using workspace = TestWorkspace.CreateWorkspace(test)
 
                 ' turn off diagnostic
                 If Not enabled Then
-                    Dim optionService = workspace.Services.GetService(Of IOptionService)()
-                    optionService.SetOptions(
-                        optionService.GetOptions().WithChangedOption(ServiceComponentOnOffOptions.DiagnosticProvider, False) _
+                    workspace.Options = workspace.Options _
+                                                  .WithChangedOption(ServiceComponentOnOffOptions.DiagnosticProvider, False) _
                                                   .WithChangedOption(ServiceFeatureOnOffOptions.ClosedFileDiagnostic, LanguageNames.CSharp, False) _
-                                                  .WithChangedOption(ServiceFeatureOnOffOptions.ClosedFileDiagnostic, LanguageNames.VisualBasic, False))
+                                                  .WithChangedOption(ServiceFeatureOnOffOptions.ClosedFileDiagnostic, LanguageNames.VisualBasic, False)
                 End If
 
                 Dim registrationService = workspace.Services.GetService(Of ISolutionCrawlerRegistrationService)()

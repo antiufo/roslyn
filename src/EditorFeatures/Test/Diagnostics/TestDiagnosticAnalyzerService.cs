@@ -1,47 +1,69 @@
 ﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System;
-using System.Collections.Immutable;
-using System.Linq;
-using Microsoft.CodeAnalysis.Diagnostics.Log;
-using Roslyn.Utilities;
-using System.Runtime.CompilerServices;
 using System.Collections.Generic;
+using System.Collections.Immutable;
+using Microsoft.CodeAnalysis.Diagnostics.Log;
+using Microsoft.CodeAnalysis.Editor.UnitTests.Diagnostics;
+using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Diagnostics
 {
     internal sealed class TestDiagnosticAnalyzerService : DiagnosticAnalyzerService
     {
         private readonly Action<Exception, DiagnosticAnalyzer, Diagnostic> _onAnalyzerException;
+        private readonly ImmutableDictionary<object, AnalyzerReference> _hostAnalyzerReferenceMap;
 
-        internal TestDiagnosticAnalyzerService(string language, DiagnosticAnalyzer analyzer, AbstractHostDiagnosticUpdateSource hostDiagnosticUpdateSource = null, Action<Exception, DiagnosticAnalyzer, Diagnostic> onAnalyzerException = null)
+        internal TestDiagnosticAnalyzerService(
+            string language,
+            DiagnosticAnalyzer analyzer,
+            AbstractHostDiagnosticUpdateSource hostDiagnosticUpdateSource = null,
+            Action<Exception, DiagnosticAnalyzer, Diagnostic> onAnalyzerException = null)
             : this(CreateHostAnalyzerManager(language, analyzer, hostDiagnosticUpdateSource), hostDiagnosticUpdateSource, onAnalyzerException)
         {
         }
 
-        internal TestDiagnosticAnalyzerService(string language, ImmutableArray<DiagnosticAnalyzer> analyzers, AbstractHostDiagnosticUpdateSource hostDiagnosticUpdateSource = null, Action<Exception, DiagnosticAnalyzer, Diagnostic> onAnalyzerException = null)
+        internal TestDiagnosticAnalyzerService(
+            string language,
+            ImmutableArray<DiagnosticAnalyzer> analyzers,
+            AbstractHostDiagnosticUpdateSource hostDiagnosticUpdateSource = null,
+            Action<Exception, DiagnosticAnalyzer, Diagnostic> onAnalyzerException = null)
             : this(CreateHostAnalyzerManager(language, analyzers, hostDiagnosticUpdateSource), hostDiagnosticUpdateSource, onAnalyzerException)
         {
         }
 
-        internal TestDiagnosticAnalyzerService(ImmutableDictionary<string, ImmutableArray<DiagnosticAnalyzer>> analyzersMap, AbstractHostDiagnosticUpdateSource hostDiagnosticUpdateSource = null, Action<Exception, DiagnosticAnalyzer, Diagnostic> onAnalyzerException = null)
-            : this(CreateHostAnalyzerManager(analyzersMap, hostDiagnosticUpdateSource), hostDiagnosticUpdateSource, onAnalyzerException)
+        internal TestDiagnosticAnalyzerService(
+            ImmutableDictionary<string, ImmutableArray<DiagnosticAnalyzer>> analyzersMap,
+            AbstractHostDiagnosticUpdateSource hostDiagnosticUpdateSource = null,
+            Action<Exception, DiagnosticAnalyzer, Diagnostic> onAnalyzerException = null,
+            IDiagnosticUpdateSourceRegistrationService registrationService = null)
+            : this(CreateHostAnalyzerManager(analyzersMap, hostDiagnosticUpdateSource), hostDiagnosticUpdateSource, onAnalyzerException, registrationService)
         {
         }
 
-        internal TestDiagnosticAnalyzerService(ImmutableArray<AnalyzerReference> hostAnalyzerReferences, AbstractHostDiagnosticUpdateSource hostDiagnosticUpdateSource = null, Action<Exception, DiagnosticAnalyzer, Diagnostic> onAnalyzerException = null)
+        internal TestDiagnosticAnalyzerService(
+            ImmutableArray<AnalyzerReference> hostAnalyzerReferences,
+            AbstractHostDiagnosticUpdateSource hostDiagnosticUpdateSource = null,
+            Action<Exception, DiagnosticAnalyzer, Diagnostic> onAnalyzerException = null)
             : this(CreateHostAnalyzerManager(hostAnalyzerReferences, hostDiagnosticUpdateSource), hostDiagnosticUpdateSource, onAnalyzerException)
         {
         }
 
-        private TestDiagnosticAnalyzerService(HostAnalyzerManager hostAnalyzerManager, AbstractHostDiagnosticUpdateSource hostDiagnosticUpdateSource, Action<Exception, DiagnosticAnalyzer, Diagnostic> onAnalyzerException)
-            : base(hostAnalyzerManager, hostDiagnosticUpdateSource)
+        private TestDiagnosticAnalyzerService(
+            HostAnalyzerManager hostAnalyzerManager,
+            AbstractHostDiagnosticUpdateSource hostDiagnosticUpdateSource,
+            Action<Exception, DiagnosticAnalyzer, Diagnostic> onAnalyzerException,
+            IDiagnosticUpdateSourceRegistrationService registrationService = null)
+            : base(hostAnalyzerManager, hostDiagnosticUpdateSource, registrationService ?? new MockDiagnosticUpdateSourceRegistrationService())
         {
+            _hostAnalyzerReferenceMap = hostAnalyzerManager.CreateAnalyzerReferencesMap(projectOpt: null);
             _onAnalyzerException = onAnalyzerException;
         }
 
-        internal TestDiagnosticAnalyzerService(AbstractHostDiagnosticUpdateSource hostDiagnosticUpdateSource = null, Action<Exception, DiagnosticAnalyzer, Diagnostic> onAnalyzerException = null)
-           : base(SpecializedCollections.EmptyEnumerable<HostDiagnosticAnalyzerPackage>(), hostDiagnosticUpdateSource)
+        internal TestDiagnosticAnalyzerService(
+            AbstractHostDiagnosticUpdateSource hostDiagnosticUpdateSource = null,
+            Action<Exception, DiagnosticAnalyzer, Diagnostic> onAnalyzerException = null)
+           : base(SpecializedCollections.EmptyEnumerable<HostDiagnosticAnalyzerPackage>(), null, hostDiagnosticUpdateSource, new MockDiagnosticUpdateSourceRegistrationService())
         {
             _onAnalyzerException = onAnalyzerException;
         }
@@ -74,54 +96,6 @@ namespace Microsoft.CodeAnalysis.Diagnostics
             return _onAnalyzerException ?? base.GetOnAnalyzerException(projectId, diagnosticLogAggregator);
         }
 
-        private class TestAnalyzerReferenceByLanguage : AnalyzerReference
-        {
-            private readonly ImmutableDictionary<string, ImmutableArray<DiagnosticAnalyzer>> _analyzersMap;
-
-            public TestAnalyzerReferenceByLanguage(ImmutableDictionary<string, ImmutableArray<DiagnosticAnalyzer>> analyzersMap)
-            {
-                _analyzersMap = analyzersMap;
-            }
-
-            public override string FullPath
-            {
-                get
-                {
-                    return null;
-                }
-            }
-
-            public override string Display
-            {
-                get
-                {
-                    return nameof(TestAnalyzerReferenceByLanguage);
-                }
-            }
-
-            public override object Id
-            {
-                get
-                {
-                    return Display;
-                }
-            }
-
-            public override ImmutableArray<DiagnosticAnalyzer> GetAnalyzersForAllLanguages()
-            {
-                return _analyzersMap.SelectMany(kvp => kvp.Value).ToImmutableArray();
-            }
-
-            public override ImmutableArray<DiagnosticAnalyzer> GetAnalyzers(string language)
-            {
-                ImmutableArray<DiagnosticAnalyzer> analyzers;
-                if (_analyzersMap.TryGetValue(language, out analyzers))
-                {
-                    return analyzers;
-                }
-
-                return ImmutableArray<DiagnosticAnalyzer>.Empty;
-            }
-        }
+        internal IEnumerable<AnalyzerReference> HostAnalyzerReferences => _hostAnalyzerReferenceMap.Values;
     }
 }

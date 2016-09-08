@@ -13,13 +13,15 @@
                 $(Win32Resource);
                 $(Win32Manifest);
                 @(CustomAdditionalCompileInputs);
-                $(ResolvedCodeAnalysisRuleSet)"
+                $(ResolvedCodeAnalysisRuleSet);
+                @(AdditionalFiles);
+                @(EmbeddedFiles)"
           Outputs="@(DocFileItem);
                  @(IntermediateAssembly);
                  @(_DebugSymbolsIntermediatePath);
                  $(NonExistentFile);
                  @(CustomAdditionalCompileOutputs)"
-          Returns=""
+          Returns="@(VbcCommandLineArgs)"
           DependsOnTargets="$(CoreCompileDependsOn)"
     >
     <PropertyGroup>
@@ -43,6 +45,8 @@
       <Prefer32Bit>false</Prefer32Bit>
     </PropertyGroup>
 
+    <!-- TODO: Remove this ItemGroup once it has been moved to "_GenerateCompileInputs" target in Microsoft.Common.CurrentVersion.targets.
+         https://github.com/dotnet/roslyn/issues/12223 -->
     <ItemGroup Condition="('$(AdditionalFileItemNames)' != '')">
       <AdditionalFileItems Include="$(AdditionalFileItemNames)" />
       <AdditionalFiles Include="@(%(AdditionalFileItems.Identity))" />
@@ -59,6 +63,7 @@
           AdditionalFiles="@(AdditionalFiles)"
           Analyzers="@(Analyzer)"
           BaseAddress="$(BaseAddress)"
+          ChecksumAlgorithm="$(ChecksumAlgorithm)"
           CodeAnalysisRuleSet="$(ResolvedCodeAnalysisRuleSet)"
           CodePage="$(CodePage)"
           DebugType="$(DebugType)"
@@ -66,6 +71,7 @@
           DelaySign="$(DelaySign)"
           DisabledWarnings="$(NoWarn)"
           DocumentationFile="@(DocFileItem)"
+          EmbeddedFiles="@(EmbeddedFiles)"
           EmitDebugInformation="$(DebugSymbols)"
           EnvironmentVariables="$(VbcEnvironment)"
           ErrorLog="$(ErrorLog)"
@@ -75,6 +81,7 @@
           GenerateDocumentation="$(GenerateDocumentation)"
           HighEntropyVA="$(HighEntropyVA)"
           Imports="@(Import)"
+          Instrument="$(Instrument)"
           KeyContainer="$(KeyContainerName)"
           KeyFile="$(KeyOriginatorFile)"
           LangVersion="$(LangVersion)"
@@ -87,6 +94,8 @@
           NoWarnings="$(_NoWarnings)"
           NoWin32Manifest="$(NoWin32Manifest)"
           Optimize="$(Optimize)"
+          Deterministic="$(Deterministic)"
+          PublicSign="$(PublicSign)"
           OptionCompare="$(OptionCompare)"
           OptionExplicit="$(OptionExplicit)"
           OptionInfer="$(OptionInfer)"
@@ -97,13 +106,16 @@
           Platform="$(PlatformTarget)"
           Prefer32Bit="$(Prefer32Bit)"
           PreferredUILang="$(PreferredUILang)"
+          ProvideCommandLineArgs="$(ProvideCommandLineArgs)"
           References="@(ReferencePath)"
           RemoveIntegerChecks="$(RemoveIntegerChecks)"
           ReportAnalyzer="$(ReportAnalyzer)"
           Resources="@(_CoreCompileResourceInputs);@(CompiledLicenseFile)"
           ResponseFiles="$(CompilerResponseFile)"
           RootNamespace="$(RootNamespace)"
+          RuntimeMetadataVersion="$(RuntimeMetadataVersion)"
           SdkPath="$(FrameworkPathOverride)"
+          SkipCompilerExecution="$(SkipCompilerExecution)"
           Sources="@(Compile)"
           SubsystemVersion="$(SubsystemVersion)"
           TargetCompactFramework="$(TargetCompactFramework)"
@@ -123,8 +135,11 @@
           Win32Manifest="$(Win32Manifest)"
           Win32Resource="$(Win32Resource)"
           VBRuntime="$(VBRuntime)"
-          />
-
+          PathMap="$(PathMap)"
+          SourceLink="$(SourceLink)"
+          >
+      <Output TaskParameter="CommandLineArgs" ItemName="VbcCommandLineArgs" />
+    </Vbc>
     <ItemGroup>
       <_CoreCompileResourceInputs Remove="@(_CoreCompileResourceInputs)" />
     </ItemGroup>

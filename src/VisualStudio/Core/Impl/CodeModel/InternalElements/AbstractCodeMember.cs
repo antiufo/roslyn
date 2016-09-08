@@ -47,7 +47,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
                     throw Exceptions.ThrowEUnexpected();
                 }
 
-                return FileCodeModel.CreateCodeElement<EnvDTE.CodeElement>(containingTypeNode);
+                return FileCodeModel.GetOrCreateCodeElement<EnvDTE.CodeElement>(containingTypeNode);
             }
         }
 
@@ -197,7 +197,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.CodeModel.Inter
 
                 if (codeElement == null)
                 {
-                    throw new ArgumentException(ServicesVSResources.ElementIsNotValid, "element");
+                    throw new ArgumentException(ServicesVSResources.Element_is_not_valid, nameof(element));
                 }
 
                 codeElement.Delete();

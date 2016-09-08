@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using Microsoft.CodeAnalysis.Editor.Host;
 using Microsoft.CodeAnalysis.Editor.Shared.Extensions;
 using Microsoft.CodeAnalysis.Editor.Shared.Options;
-using Microsoft.VisualStudio.Language.Intellisense;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Adornments;
 using Microsoft.VisualStudio.Text.Operations;
@@ -64,7 +63,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.RenameTracking
 
             private IEnumerable<ITagSpan<T>> GetTags<T>(NormalizedSnapshotSpanCollection spans, T tag) where T : ITag
             {
-                if (!_stateMachine.Buffer.GetOption(InternalFeatureOnOffOptions.RenameTracking))
+                if (!_stateMachine.Buffer.GetFeatureOnOffOption(InternalFeatureOnOffOptions.RenameTracking))
                 {
                     // Changes aren't being triggered by the buffer, but there may still be taggers
                     // out there which we should prevent from doing work.

@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
-using Microsoft.CodeAnalysis.CSharp;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
 using Microsoft.CodeAnalysis.Differencing;
 using Microsoft.CodeAnalysis.EditAndContinue;
@@ -156,8 +156,8 @@ namespace Microsoft.CodeAnalysis.CSharp.EditAndContinue.UnitTests
     [A]/*<span>*/public static explicit operator int(Z d)/*</span>*/ { return 1; }
     [A]/*<span>*/operator double(Z d)/*</span>*/ { return 1; }
 
-    [A]/*<span>*/public static operator int +(Z d, int x)/*</span>*/ { return 1; }
-    [A]/*<span>*/operator int +(Z d, int x)/*</span>*/ { return 1; }
+    [A]/*<span>*/public static operator +(Z d, int x)/*</span>*/ { return 1; }
+    [A]/*<span>*/operator +(Z d, int x)/*</span>*/ { return 1; }
     
 }
 ";
@@ -231,7 +231,7 @@ class C
         }
 
         [Fact]
-        public void AnalyzeDocumentAsync_InsignificantChangesInMethodBody()
+        public async Task AnalyzeDocumentAsync_InsignificantChangesInMethodBody()
         {
             string source1 = @"
 class C
@@ -254,17 +254,17 @@ class C
 ";
             var analyzer = new CSharpEditAndContinueAnalyzer();
 
-            using (var workspace = CSharpWorkspaceFactory.CreateWorkspaceFromLines(source1))
+            using (var workspace = await TestWorkspace.CreateCSharpAsync(source1))
             {
                 var documentId = workspace.CurrentSolution.Projects.First().Documents.First().Id;
                 var oldSolution = workspace.CurrentSolution;
                 var newSolution = workspace.CurrentSolution.WithDocumentText(documentId, SourceText.From(source2));
                 var oldDocument = oldSolution.GetDocument(documentId);
-                var oldText = oldDocument.GetTextAsync().Result;
-                var oldSyntaxRoot = oldDocument.GetSyntaxRootAsync().Result;
+                var oldText = await oldDocument.GetTextAsync();
+                var oldSyntaxRoot = await oldDocument.GetSyntaxRootAsync();
                 var newDocument = newSolution.GetDocument(documentId);
-                var newText = newDocument.GetTextAsync().Result;
-                var newSyntaxRoot = newDocument.GetSyntaxRootAsync().Result;
+                var newText = await newDocument.GetTextAsync();
+                var newSyntaxRoot = await newDocument.GetSyntaxRootAsync();
 
                 const string oldStatementSource = "System.Console.WriteLine(1);";
                 var oldStatementPosition = source1.IndexOf(oldStatementSource, StringComparison.Ordinal);
@@ -273,7 +273,7 @@ class C
                 var oldStatementSyntax = oldSyntaxRoot.FindNode(oldStatementTextSpan);
 
                 var baseActiveStatements = ImmutableArray.Create(new ActiveStatementSpan(ActiveStatementFlags.LeafFrame, oldStatementSpan));
-                var result = analyzer.AnalyzeDocumentAsync(oldSolution, baseActiveStatements, newDocument, default(CancellationToken)).Result;
+                var result = await analyzer.AnalyzeDocumentAsync(oldSolution, baseActiveStatements, newDocument, default(CancellationToken));
 
                 Assert.True(result.HasChanges);
                 Assert.True(result.SemanticEdits[0].PreserveLocalVariables);
@@ -289,7 +289,7 @@ class C
         }
 
         [Fact]
-        public void AnalyzeDocumentAsync_SyntaxError_Change()
+        public async Task AnalyzeDocumentAsync_SyntaxError_Change()
         {
             string source1 = @"
 class C
@@ -311,14 +311,14 @@ class C
 ";
             var analyzer = new CSharpEditAndContinueAnalyzer();
 
-            using (var workspace = CSharpWorkspaceFactory.CreateWorkspaceFromLines(source1))
+            using (var workspace = await TestWorkspace.CreateCSharpAsync(source1))
             {
                 var documentId = workspace.CurrentSolution.Projects.First().Documents.First().Id;
                 var oldSolution = workspace.CurrentSolution;
                 var newSolution = workspace.CurrentSolution.WithDocumentText(documentId, SourceText.From(source2));
 
                 var baseActiveStatements = ImmutableArray.Create<ActiveStatementSpan>();
-                var result = analyzer.AnalyzeDocumentAsync(oldSolution, baseActiveStatements, newSolution.GetDocument(documentId), default(CancellationToken)).Result;
+                var result = await analyzer.AnalyzeDocumentAsync(oldSolution, baseActiveStatements, newSolution.GetDocument(documentId), default(CancellationToken));
 
                 Assert.True(result.HasChanges);
                 Assert.True(result.HasChangesAndErrors);
@@ -327,7 +327,7 @@ class C
         }
 
         [Fact]
-        public void AnalyzeDocumentAsync_SyntaxError_NoChange()
+        public async Task AnalyzeDocumentAsync_SyntaxError_NoChange()
         {
             string source = @"
 class C
@@ -340,11 +340,11 @@ class C
 ";
             var analyzer = new CSharpEditAndContinueAnalyzer();
 
-            using (var workspace = CSharpWorkspaceFactory.CreateWorkspaceFromLines(source))
+            using (var workspace = await TestWorkspace.CreateCSharpAsync(source))
             {
                 var document = workspace.CurrentSolution.Projects.First().Documents.First();
                 var baseActiveStatements = ImmutableArray.Create<ActiveStatementSpan>();
-                var result = analyzer.AnalyzeDocumentAsync(workspace.CurrentSolution, baseActiveStatements, document, default(CancellationToken)).Result;
+                var result = await analyzer.AnalyzeDocumentAsync(workspace.CurrentSolution, baseActiveStatements, document, default(CancellationToken));
 
                 Assert.False(result.HasChanges);
                 Assert.False(result.HasChangesAndErrors);
@@ -353,7 +353,7 @@ class C
         }
 
         [Fact]
-        public void AnalyzeDocumentAsync_SyntaxError_NoChange2()
+        public async Task AnalyzeDocumentAsync_SyntaxError_NoChange2()
         {
             string source1 = @"
 class C
@@ -375,14 +375,14 @@ class C
 ";
             var analyzer = new CSharpEditAndContinueAnalyzer();
 
-            using (var workspace = CSharpWorkspaceFactory.CreateWorkspaceFromLines(source1))
+            using (var workspace = await TestWorkspace.CreateCSharpAsync(source1))
             {
                 var documentId = workspace.CurrentSolution.Projects.First().Documents.First().Id;
                 var oldSolution = workspace.CurrentSolution;
                 var newSolution = workspace.CurrentSolution.WithDocumentText(documentId, SourceText.From(source2));
 
                 var baseActiveStatements = ImmutableArray.Create<ActiveStatementSpan>();
-                var result = analyzer.AnalyzeDocumentAsync(oldSolution, baseActiveStatements, newSolution.GetDocument(documentId), default(CancellationToken)).Result;
+                var result = await analyzer.AnalyzeDocumentAsync(oldSolution, baseActiveStatements, newSolution.GetDocument(documentId), default(CancellationToken));
 
                 Assert.False(result.HasChanges);
                 Assert.False(result.HasChangesAndErrors);
@@ -391,7 +391,7 @@ class C
         }
 
         [Fact]
-        public void AnalyzeDocumentAsync_Features_NoChange()
+        public async Task AnalyzeDocumentAsync_Features_NoChange()
         {
             string source = @"
 class C
@@ -406,12 +406,12 @@ class C
             var experimentalFeatures = new Dictionary<string, string>(); // no experimental features to enable
             var experimental = TestOptions.Regular.WithFeatures(experimentalFeatures);
 
-            using (var workspace = CSharpWorkspaceFactory.CreateWorkspaceFromLines(
-                new[] { source }, parseOptions: experimental, compilationOptions: null, exportProvider: null))
+            using (var workspace = await TestWorkspace.CreateCSharpAsync(
+                source, parseOptions: experimental, compilationOptions: null, exportProvider: null))
             {
                 var document = workspace.CurrentSolution.Projects.First().Documents.First();
                 var baseActiveStatements = ImmutableArray.Create<ActiveStatementSpan>();
-                var result = analyzer.AnalyzeDocumentAsync(workspace.CurrentSolution, baseActiveStatements, document, default(CancellationToken)).Result;
+                var result = await analyzer.AnalyzeDocumentAsync(workspace.CurrentSolution, baseActiveStatements, document, default(CancellationToken));
 
                 Assert.False(result.HasChanges);
                 Assert.False(result.HasChangesAndErrors);
@@ -421,7 +421,7 @@ class C
         }
 
         [Fact]
-        public void AnalyzeDocumentAsync_Features_Change()
+        public async Task AnalyzeDocumentAsync_Features_Change()
         {
             // these are all the experimental features currently implemented
             string[] experimentalFeatures = Array.Empty<string>();
@@ -451,15 +451,15 @@ class C
                 var featuresToEnable = new Dictionary<string, string>() { { feature, "enabled" } };
                 var experimental = TestOptions.Regular.WithFeatures(featuresToEnable);
 
-                using (var workspace = CSharpWorkspaceFactory.CreateWorkspaceFromLines(
-                    new[] { source1 }, parseOptions: experimental, compilationOptions: null, exportProvider: null))
+                using (var workspace = await TestWorkspace.CreateCSharpAsync(
+                    source1, parseOptions: experimental, compilationOptions: null, exportProvider: null))
                 {
                     var documentId = workspace.CurrentSolution.Projects.First().Documents.First().Id;
                     var oldSolution = workspace.CurrentSolution;
                     var newSolution = workspace.CurrentSolution.WithDocumentText(documentId, SourceText.From(source2));
 
                     var baseActiveStatements = ImmutableArray.Create<ActiveStatementSpan>();
-                    var result = analyzer.AnalyzeDocumentAsync(oldSolution, baseActiveStatements, newSolution.GetDocument(documentId), default(CancellationToken)).Result;
+                    var result = await analyzer.AnalyzeDocumentAsync(oldSolution, baseActiveStatements, newSolution.GetDocument(documentId), default(CancellationToken));
 
                     Assert.True(result.HasChanges);
                     Assert.True(result.HasChangesAndErrors);
@@ -470,7 +470,7 @@ class C
         }
 
         [Fact]
-        public void AnalyzeDocumentAsync_SemanticError_NoChange()
+        public async Task AnalyzeDocumentAsync_SemanticError_NoChange()
         {
             string source = @"
 class C
@@ -484,11 +484,11 @@ class C
 ";
             var analyzer = new CSharpEditAndContinueAnalyzer();
 
-            using (var workspace = CSharpWorkspaceFactory.CreateWorkspaceFromLines(source))
+            using (var workspace = await TestWorkspace.CreateCSharpAsync(source))
             {
                 var document = workspace.CurrentSolution.Projects.First().Documents.First();
                 var baseActiveStatements = ImmutableArray.Create<ActiveStatementSpan>();
-                var result = analyzer.AnalyzeDocumentAsync(workspace.CurrentSolution, baseActiveStatements, document, default(CancellationToken)).Result;
+                var result = await analyzer.AnalyzeDocumentAsync(workspace.CurrentSolution, baseActiveStatements, document, default(CancellationToken));
 
                 Assert.False(result.HasChanges);
                 Assert.False(result.HasChangesAndErrors);
@@ -497,7 +497,7 @@ class C
         }
 
         [Fact]
-        public void AnalyzeDocumentAsync_SemanticError_Change()
+        public async Task AnalyzeDocumentAsync_SemanticError_Change()
         {
             string source1 = @"
 class C
@@ -521,14 +521,14 @@ class C
 ";
             var analyzer = new CSharpEditAndContinueAnalyzer();
 
-            using (var workspace = CSharpWorkspaceFactory.CreateWorkspaceFromLines(source1))
+            using (var workspace = await TestWorkspace.CreateCSharpAsync(source1))
             {
                 var documentId = workspace.CurrentSolution.Projects.First().Documents.First().Id;
                 var oldSolution = workspace.CurrentSolution;
                 var newSolution = workspace.CurrentSolution.WithDocumentText(documentId, SourceText.From(source2));
 
                 var baseActiveStatements = ImmutableArray.Create<ActiveStatementSpan>();
-                var result = analyzer.AnalyzeDocumentAsync(oldSolution, baseActiveStatements, newSolution.GetDocument(documentId), default(CancellationToken)).Result;
+                var result = await analyzer.AnalyzeDocumentAsync(oldSolution, baseActiveStatements, newSolution.GetDocument(documentId), default(CancellationToken));
 
                 Assert.True(result.HasChanges);
                 Assert.True(result.HasChangesAndErrors);
@@ -537,7 +537,7 @@ class C
         }
 
         [Fact]
-        public void AnalyzeDocumentAsync_AddingNewFileHavingRudeEdits()
+        public async Task AnalyzeDocumentAsync_AddingNewFileHavingRudeEdits()
         {
             string source1 = @"
 namespace N
@@ -560,7 +560,7 @@ namespace N
 ";
             var analyzer = new CSharpEditAndContinueAnalyzer();
 
-            using (var workspace = CSharpWorkspaceFactory.CreateWorkspaceFromLines(source1))
+            using (var workspace = await TestWorkspace.CreateCSharpAsync(source1))
             {
                 // fork the solution to introduce a change
                 var project = workspace.CurrentSolution.Projects.Single();
@@ -583,7 +583,7 @@ namespace N
                 var baseActiveStatements = ImmutableArray.Create<ActiveStatementSpan>();
                 foreach (var changedDocumentId in changedDocuments)
                 {
-                    result.Add(analyzer.AnalyzeDocumentAsync(oldSolution, baseActiveStatements, newProject.GetDocument(changedDocumentId), default(CancellationToken)).Result);
+                    result.Add(await analyzer.AnalyzeDocumentAsync(oldSolution, baseActiveStatements, newProject.GetDocument(changedDocumentId), default(CancellationToken)));
                 }
 
                 Assert.True(result.IsSingle());
@@ -593,7 +593,7 @@ namespace N
         }
 
         [Fact]
-        public void AnalyzeDocumentAsync_AddingNewFile()
+        public async Task AnalyzeDocumentAsync_AddingNewFile()
         {
             string source1 = @"
 namespace N
@@ -610,7 +610,7 @@ namespace N
 ";
             var analyzer = new CSharpEditAndContinueAnalyzer();
 
-            using (var workspace = CSharpWorkspaceFactory.CreateWorkspaceFromLines(source1))
+            using (var workspace = await TestWorkspace.CreateCSharpAsync(source1))
             {
                 // fork the solution to introduce a change
                 var project = workspace.CurrentSolution.Projects.Single();
@@ -633,7 +633,7 @@ namespace N
                 var baseActiveStatements = ImmutableArray.Create<ActiveStatementSpan>();
                 foreach (var changedDocumentId in changedDocuments)
                 {
-                    result.Add(analyzer.AnalyzeDocumentAsync(oldSolution, baseActiveStatements, newProject.GetDocument(changedDocumentId), default(CancellationToken)).Result);
+                    result.Add(await analyzer.AnalyzeDocumentAsync(oldSolution, baseActiveStatements, newProject.GetDocument(changedDocumentId), default(CancellationToken)));
                 }
 
                 Assert.True(result.IsSingle());

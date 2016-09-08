@@ -1,10 +1,9 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Roslyn.Utilities;
@@ -225,7 +224,7 @@ namespace Microsoft.CodeAnalysis.Editing
         public delegate Task AsyncDeclarationEditAction(DocumentEditor editor, SyntaxNode declaration, CancellationToken cancellationToken);
 
         /// <summary>
-        /// Enables editting the definition of one of the symbol's declarations.
+        /// Enables editing the definition of one of the symbol's declarations.
         /// Partial types and methods may have more than one declaration.
         /// </summary>
         /// <param name="symbol">The symbol to edit.</param>
@@ -251,7 +250,7 @@ namespace Microsoft.CodeAnalysis.Editing
         }
 
         /// <summary>
-        /// Enables editting the definition of one of the symbol's declarations.
+        /// Enables editing the definition of one of the symbol's declarations.
         /// Partial types and methods may have more than one declaration.
         /// </summary>
         /// <param name="symbol">The symbol to edit.</param>
@@ -277,7 +276,7 @@ namespace Microsoft.CodeAnalysis.Editing
         {
             if (currentSymbol == null)
             {
-                throw new ArgumentException(string.Format(WorkspacesResources.TheSymbolCannotBeLocatedWithinTheCurrentSolution, argSymbol.Name));
+                throw new ArgumentException(string.Format(WorkspacesResources.The_symbol_0_cannot_be_located_within_the_current_solution, argSymbol.Name));
             }
         }
 
@@ -313,7 +312,7 @@ namespace Microsoft.CodeAnalysis.Editing
         }
 
         /// <summary>
-        /// Enables editting the definition of one of the symbol's declarations.
+        /// Enables editing the definition of one of the symbol's declarations.
         /// Partial types and methods may have more than one declaration.
         /// </summary>
         /// <param name="symbol">The symbol to edit.</param>
@@ -345,7 +344,7 @@ namespace Microsoft.CodeAnalysis.Editing
         }
 
         /// <summary>
-        /// Enables editting the definition of one of the symbol's declarations.
+        /// Enables editing the definition of one of the symbol's declarations.
         /// Partial types and methods may have more than one declaration.
         /// </summary>
         /// <param name="symbol">The symbol to edit.</param>
@@ -388,14 +387,14 @@ namespace Microsoft.CodeAnalysis.Editing
 
             if (decl == null)
             {
-                throw new ArgumentNullException(WorkspacesResources.ThePositionIsNotWithinTheSymbolsDeclaration, nameof(position));
+                throw new ArgumentNullException(WorkspacesResources.The_position_is_not_within_the_symbol_s_declaration, nameof(position));
             }
 
             return await this.EditDeclarationAsync(currentSymbol, decl, editAction, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
-        /// Enables editting the symbol's declaration where the member is also declared.
+        /// Enables editing the symbol's declaration where the member is also declared.
         /// Partial types and methods may have more than one declaration.
         /// </summary>
         /// <param name="symbol">The symbol to edit.</param>
@@ -421,14 +420,14 @@ namespace Microsoft.CodeAnalysis.Editing
 
             if (declaration == null)
             {
-                throw new ArgumentException(string.Format(WorkspacesResources.TheMemberIsNotDeclaredWithinTheDeclarationOfTheSymbol, member.Name));
+                throw new ArgumentException(string.Format(WorkspacesResources.The_member_0_is_not_declared_within_the_declaration_of_the_symbol, member.Name));
             }
 
             return await this.EditDeclarationAsync(currentSymbol, declaration, editAction, cancellationToken).ConfigureAwait(false);
         }
 
         /// <summary>
-        /// Enables editting the symbol's declaration where the member is also declared.
+        /// Enables editing the symbol's declaration where the member is also declared.
         /// Partial types and methods may have more than one declaration.
         /// </summary>
         /// <param name="symbol">The symbol to edit.</param>
@@ -454,10 +453,10 @@ namespace Microsoft.CodeAnalysis.Editing
         }
 
         /// <summary>
-        /// Enables editting all the symbol's declarations. 
+        /// Enables editing all the symbol's declarations. 
         /// Partial types and methods may have more than one declaration.
         /// </summary>
-        /// <param name="symbol">The symbol to be editted.</param>
+        /// <param name="symbol">The symbol to be edited.</param>
         /// <param name="editAction">The action that makes edits to the declaration.</param>
         /// <param name="cancellationToken">An optional <see cref="CancellationToken"/>.</param>
         /// <returns>The new symbol including the changes.</returns>
@@ -512,10 +511,10 @@ namespace Microsoft.CodeAnalysis.Editing
         }
 
         /// <summary>
-        /// Enables editting all the symbol's declarations. 
+        /// Enables editing all the symbol's declarations. 
         /// Partial types and methods may have more than one declaration.
         /// </summary>
-        /// <param name="symbol">The symbol to be editted.</param>
+        /// <param name="symbol">The symbol to be edited.</param>
         /// <param name="editAction">The action that makes edits to the declaration.</param>
         /// <param name="cancellationToken">An optional <see cref="CancellationToken"/>.</param>
         /// <returns>The new symbol including the changes.</returns>

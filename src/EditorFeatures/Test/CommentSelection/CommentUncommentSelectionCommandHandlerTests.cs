@@ -77,28 +77,28 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.CommentSelection
                     supportBlockComments: true));
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
         public void Comment_EmptyLine()
         {
             var code = @"|start||end|";
             CommentSelection(code, Enumerable.Empty<TextChange>(), supportBlockComments: true);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
         public void Comment_NoSelectionAtEndOfLine()
         {
             var code = @"Some text on a line|start||end|";
             CommentSelection(code, new[] { new TextChange(TextSpan.FromBounds(0, 0), "//") }, supportBlockComments: true);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
         public void Comment_Whitespace()
         {
             var code = @"  |start|   |end|   ";
             CommentSelection(code, Enumerable.Empty<TextChange>(), supportBlockComments: true);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
         public void Comment_SingleLineBlockWithBlockSelection()
         {
             var code = @"this is |start| some |end| text";
@@ -110,7 +110,7 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.CommentSelection
             CommentSelection(code, expectedChanges, supportBlockComments: true);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
         public void Comment_MultilineWithBlockSelection()
         {
             var code = @"this is |start| some 
@@ -124,16 +124,16 @@ multiple lines";
             CommentSelection(code, expectedChanges, supportBlockComments: true);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
         public void Comment_SingleLineBlockWithNoBlockSelection()
         {
             var code = @"this is |start| some |end| text";
             CommentSelection(code, new[] { new TextChange(TextSpan.FromBounds(0, 0), "//") }, supportBlockComments: false);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
-        [WorkItem(563915)]
-        [WorkItem(530300)]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
+        [WorkItem(563915, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/563915")]
+        [WorkItem(530300, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530300")]
         public void Comment_MultilineIndented()
         {
             var code = @"
@@ -158,9 +158,9 @@ class Foo
                 expectedSelectedSpans: new[] { Span.FromBounds(16, 48) });
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
-        [WorkItem(527190)]
-        [WorkItem(563924)]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
+        [WorkItem(527190, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/527190")]
+        [WorkItem(563924, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/563924")]
         public void Comment_ApplyTwice()
         {
             var code = @"|start|class C
@@ -168,37 +168,39 @@ class Foo
     void M() { }
 }|end|
 ";
-            var textView = EditorFactory.CreateView(TestExportProvider.ExportProviderWithCSharpAndVisualBasic, code);
-            var selectedSpans = SetupSelection(textView);
-
-            var expectedChanges = new[]
+            using (var disposableView = EditorFactory.CreateView(TestExportProvider.ExportProviderWithCSharpAndVisualBasic, code))
             {
+                var selectedSpans = SetupSelection(disposableView.TextView);
+
+                var expectedChanges = new[]
+                {
                 new TextChange(new TextSpan(0, 0), "//"),
                 new TextChange(new TextSpan(9, 0), "//"),
                 new TextChange(new TextSpan(12, 0), "//"),
                 new TextChange(new TextSpan(30, 0), "//"),
             };
-            CommentSelection(
-                textView,
-                expectedChanges,
-                supportBlockComments: false,
-                expectedSelectedSpans: new[] { new Span(0, 39) });
+                CommentSelection(
+                    disposableView.TextView,
+                    expectedChanges,
+                    supportBlockComments: false,
+                    expectedSelectedSpans: new[] { new Span(0, 39) });
 
-            expectedChanges = new[]
-            {
+                expectedChanges = new[]
+                {
                 new TextChange(new TextSpan(0, 0), "//"),
                 new TextChange(new TextSpan(11, 0), "//"),
                 new TextChange(new TextSpan(16, 0), "//"),
                 new TextChange(new TextSpan(36, 0), "//"),
             };
-            CommentSelection(
-                textView,
-                expectedChanges,
-                supportBlockComments: false,
-                expectedSelectedSpans: new[] { new Span(0, 47) });
+                CommentSelection(
+                    disposableView.TextView,
+                    expectedChanges,
+                    supportBlockComments: false,
+                    expectedSelectedSpans: new[] { new Span(0, 47) });
+            }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
         public void Comment_SelectionEndsAtColumnZero()
         {
             var code = @"
@@ -218,7 +220,7 @@ class Foo
             CommentSelection(code, expectedChanges, supportBlockComments: false);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
         public void Comment_BoxSelectionAtStartOfLines()
         {
             var code = @"
@@ -240,7 +242,7 @@ class Foo
             CommentSelection(code, expectedChanges, supportBlockComments: true);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
         public void Comment_BoxSelectionIndentedAtStart()
         {
             var code = @"
@@ -262,7 +264,7 @@ class Foo
             CommentSelection(code, expectedChanges, supportBlockComments: true);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
         public void Comment_BoxSelectionBlock()
         {
             var code = @"
@@ -288,7 +290,7 @@ class Foo
             CommentSelection(code, expectedChanges, supportBlockComments: true);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
         public void Comment_BoxSelectionBlockWithoutSupport()
         {
             var code = @"
@@ -309,14 +311,14 @@ class Foo
             CommentSelection(code, expectedChanges, supportBlockComments: false);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
         public void Uncomment_NoSelection()
         {
             var code = @"//Foo|start||end|Bar";
             UncommentSelection(code, new[] { new TextChange(new TextSpan(0, 2), string.Empty) }, Span.FromBounds(0, 6), supportBlockComments: true);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
         public void Uncomment_MatchesBlockComment()
         {
             var code = @"Before |start|/* Some Commented Text */|end| after";
@@ -329,7 +331,7 @@ class Foo
             UncommentSelection(code, expectedChanges, Span.FromBounds(7, 28), supportBlockComments: true);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
         public void Uncomment_InWhitespaceOutsideBlockComment()
         {
             var code = @"Before |start|    /* Some Commented Text */    |end| after";
@@ -342,7 +344,7 @@ class Foo
             UncommentSelection(code, expectedChanges, Span.FromBounds(11, 32), supportBlockComments: true);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
         public void Uncomment_IndentedSingleLineCommentsAndUncommentedLines()
         {
             var code = @"
@@ -370,8 +372,9 @@ class C
             UncommentSelection(code, expectedChanges, Span.FromBounds(14, 119), supportBlockComments: true);
         }
 
-        [Fact(Skip = "563927"), Trait(Traits.Feature, Traits.Features.CommentSelection)]
-        [WorkItem(563927)]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
+        [WorkItem(563927, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/563927")]
+        // This test is just measuring current behavior, there is no reason not to support maintaining box selection.
         public void Uncomment_BoxSelection()
         {
             var code = @"
@@ -388,23 +391,18 @@ class Foo
                 new TextChange(new TextSpan(20, 2), string.Empty),
                 new TextChange(new TextSpan(23, 2), string.Empty),
                 new TextChange(new TextSpan(38, 2), string.Empty),
-                new TextChange(new TextSpan(49, 2), string.Empty),
-                new TextChange(new TextSpan(52, 2), string.Empty),
                 new TextChange(new TextSpan(64, 2), string.Empty),
             };
 
             var expectedSelectedSpans = new[]
                 {
-                    Span.FromBounds(20, 21),
-                    Span.FromBounds(34, 34),
-                    Span.FromBounds(41, 42),
-                    Span.FromBounds(56, 56),
-                };
+                    Span.FromBounds(20, 21)
+                 };
 
             UncommentSelection(code, expectedChanges, expectedSelectedSpans, supportBlockComments: true);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
         public void Uncomment_PartOfMultipleComments()
         {
             var code = @"
@@ -421,17 +419,17 @@ class Foo
             UncommentSelection(code, expectedChanges, Span.FromBounds(2, 25), supportBlockComments: true);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
-        [WorkItem(530300)]
-        [WorkItem(563924)]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
+        [WorkItem(530300, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530300")]
+        [WorkItem(563924, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/563924")]
         public void Comment_NoSelectionAtStartOfLine()
         {
             var code = @"|start||end|using System;";
             CommentSelection(code, new[] { new TextChange(TextSpan.FromBounds(0, 0), "//") }, new[] { new Span(0, 15) }, supportBlockComments: true);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
-        [WorkItem(932411)]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
+        [WorkItem(932411, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/932411")]
         public void Uncomment_NoSelectionInBlockComment()
         {
             var code = @"using /* Sy|start||end|stem.*/IO;";
@@ -445,8 +443,8 @@ class Foo
                 supportBlockComments: true);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
-        [WorkItem(932411)]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
+        [WorkItem(932411, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/932411")]
         public void Uncomment_BlockCommentWithPreviousBlockComment()
         {
             var code = @"/* comment */using /* Sy|start||end|stem.*/IO;";
@@ -460,8 +458,8 @@ class Foo
                 supportBlockComments: true);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
-        [WorkItem(932411)]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
+        [WorkItem(932411, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/932411")]
         public void Uncomment_InsideEndOfBlockComment()
         {
             var code = @"/*using System;*|start||end|/";
@@ -475,8 +473,8 @@ class Foo
                 supportBlockComments: true);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
-        [WorkItem(932411)]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
+        [WorkItem(932411, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/932411")]
         public void Uncomment_AtBeginningOfEndOfBlockComment()
         {
             var code = @"/*using System;|start||end|*/";
@@ -490,16 +488,16 @@ class Foo
                 supportBlockComments: true);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
-        [WorkItem(932411)]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
+        [WorkItem(932411, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/932411")]
         public void Uncomment_AtEndOfBlockComment()
         {
             var code = @"/*using System;*/|start||end|";
             UncommentSelection(code, Enumerable.Empty<TextChange>(), new Span(17, 0), supportBlockComments: true);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
-        [WorkItem(932411)]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.CommentSelection)]
+        [WorkItem(932411, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/932411")]
         public void Uncomment_BlockCommentWithNoEnd()
         {
             var code = @"/*using |start||end|System;";
@@ -538,10 +536,12 @@ class Foo
             bool supportBlockComments,
             CommentUncommentSelectionCommandHandler.Operation operation)
         {
-            var textView = EditorFactory.CreateView(TestExportProvider.ExportProviderWithCSharpAndVisualBasic, code);
-            var selectedSpans = SetupSelection(textView);
+            using (var disposableView = EditorFactory.CreateView(TestExportProvider.ExportProviderWithCSharpAndVisualBasic, code))
+            {
+                var selectedSpans = SetupSelection(disposableView.TextView);
 
-            CommentOrUncommentSelection(textView, expectedChanges, expectedSelectedSpans, supportBlockComments, operation);
+                CommentOrUncommentSelection(disposableView.TextView, expectedChanges, expectedSelectedSpans, supportBlockComments, operation);
+            }
         }
 
         private static void CommentOrUncommentSelection(

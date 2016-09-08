@@ -55,6 +55,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         IDS_FeatureDefault = MessageBase + 12525,
         IDS_FeatureNullable = MessageBase + 12528,
         IDS_Lambda = MessageBase + 12531,
+        IDS_FeaturePatternMatching = MessageBase + 12532,
 
         IDS_FeatureImplicitArray = MessageBase + 12557,
         IDS_FeatureImplicitLocal = MessageBase + 12558,
@@ -111,6 +112,16 @@ namespace Microsoft.CodeAnalysis.CSharp
         IDS_FeatureInterpolatedStrings = MessageBase + 12702,
         IDS_OperationCausedStackOverflow = MessageBase + 12703,
         IDS_AwaitInCatchAndFinally = MessageBase + 12704,
+        IDS_FeatureReadonlyAutoImplementedProperties = MessageBase + 12705,
+        IDS_FeatureBinaryLiteral = MessageBase + 12706,
+        IDS_FeatureDigitSeparator = MessageBase + 12707,
+        IDS_FeatureLocalFunctions = MessageBase + 12708,
+
+        IDS_FeatureRefLocalsReturns = MessageBase + 12710,
+        IDS_FeatureTuples = MessageBase + 12711,
+        IDS_FeatureOutVar = MessageBase + 12713,
+
+        IDS_FeatureIOperation = MessageBase + 12714,
     }
 
     // Message IDs may refer to strings that need to be localized.
@@ -144,10 +155,18 @@ namespace Microsoft.CodeAnalysis.CSharp
             return new LocalizableErrorArgument(id);
         }
 
+        // Returns the string to be used in the /features flag switch to enable the MessageID feature.
+        // Always call this before RequiredVersion:
+        //   If this method returns null, call RequiredVersion and use that.
+        //   If this method returns non-null, use that.
+        // Features should be mutually exclusive between RequiredFeature and RequiredVersion.
+        //   (hence the above rule - RequiredVersion throws when RequiredFeature returns non-null)
         internal static string RequiredFeature(this MessageID feature)
         {
             switch (feature)
             {
+                case MessageID.IDS_FeatureIOperation:
+                    return "IOperation";
                 default:
                     return null;
             }
@@ -159,6 +178,16 @@ namespace Microsoft.CodeAnalysis.CSharp
             // Checks are in the LanguageParser unless otherwise noted.
             switch (feature)
             {
+                // C# 7 features.
+                case MessageID.IDS_FeatureBinaryLiteral:
+                case MessageID.IDS_FeatureDigitSeparator:
+                case MessageID.IDS_FeatureLocalFunctions:
+                case MessageID.IDS_FeatureRefLocalsReturns:
+                case MessageID.IDS_FeaturePatternMatching:
+                case MessageID.IDS_FeatureTuples:
+                case MessageID.IDS_FeatureOutVar:
+                    return LanguageVersion.CSharp7;
+
                 // C# 6 features.
                 case MessageID.IDS_FeatureExceptionFilter:
                 case MessageID.IDS_FeatureAutoPropertyInitializer:
@@ -171,6 +200,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 case MessageID.IDS_FeatureUsingStatic:
                 case MessageID.IDS_FeatureInterpolatedStrings:
                 case MessageID.IDS_AwaitInCatchAndFinally:
+                case MessageID.IDS_FeatureReadonlyAutoImplementedProperties:
                     return LanguageVersion.CSharp6;
 
                 // C# 5 features.

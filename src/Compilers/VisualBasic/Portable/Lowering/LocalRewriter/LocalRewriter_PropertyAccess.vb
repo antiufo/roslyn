@@ -1,11 +1,6 @@
 ﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
-Imports System.Diagnostics
-Imports System.Runtime.InteropServices
-Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports TypeKind = Microsoft.CodeAnalysis.TypeKind
 
 Namespace Microsoft.CodeAnalysis.VisualBasic
     Partial Friend NotInheritable Class LocalRewriter
@@ -19,7 +14,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             ' we have a special node for such cases.
             If receiverOpt IsNot Nothing AndAlso receiverOpt.Type.IsArrayType Then
                 Dim asArrayType = DirectCast(receiverOpt.Type, ArrayTypeSymbol)
-                If asArrayType.Rank = 1 Then
+                If asArrayType.IsSZArray Then
                     ' NOTE: we are not interested in potential badness of Array.Length property.
                     ' If it is bad reference compare will not succeed.
                     If (node.PropertySymbol Is GetSpecialTypeMember(SpecialMember.System_Array__Length) OrElse
@@ -54,8 +49,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                                            receiverOpt,
                                                            node.Arguments,
                                                            node.ConstantValueOpt,
-                                                           False,
-                                                           getMethod.ReturnType)
+                                                           isLValue:=node.IsLValue,
+                                                           suppressObjectClone:=False,
+                                                           type:=getMethod.ReturnType)
         End Function
 
     End Class

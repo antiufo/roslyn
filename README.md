@@ -1,41 +1,37 @@
 ## Welcome to the .NET Compiler Platform ("Roslyn")
 
-||Windows - Debug|Windows - Release|Linux|Mac OSX|
-|:--:|:--:|:--:|:--:|:--:|
-|**master**|[![Build Status](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn_master_win_dbg/badge/icon)](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn_master_win_dbg/)|[![Build Status](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn_master_win_rel/badge/icon)](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn_master_win_rel/)|[![Build Status](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn_master_lin/badge/icon)](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn_master_lin/)|[![Build Status](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn_master_mac/badge/icon)](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn_master_mac/)|
-|**future**|[![Build Status](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn_future_win_dbg/badge/icon)](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn_future_win_dbg/)|[![Build Status](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn_future_win_rel/badge/icon)](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn_future_win_rel/)|[![Build Status](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn_future_lin/badge/icon)](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn_future_lin/)|[![Build Status](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn_future_mac/badge/icon)](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn_future_mac/)|
-|**stabilization**|[![Build Status](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn_stabil_win_dbg/badge/icon)](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn_stabil_win_dbg/)|[![Build Status](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn_stabil_win_rel/badge/icon)](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn_stabil_win_rel/)|[![Build Status](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn_stabil_lin/badge/icon)](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn_stabil_lin/)|[![Build Status](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn_stabil_mac/badge/icon)](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn_stabil_mac/)|
+[//]: # (Begin current test results)
 
+### Windows - Unit Tests
+||Debug x86|Debug x64|Release x86|Release x64|Determinism|
+|:--:|:--:|:--:|:--:|:--:|:--:|
+|**master (2.0 Preview 4)**|[![Build Status](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn/job/master/job/windows_debug_unit32/badge/icon)](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn/job/master/job/windows_debug_unit32/)|[![Build Status](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn/job/master/job/windows_debug_unit64/badge/icon)](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn/job/master/job/windows_debug_unit64/)|[![Build Status](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn/job/master/job/windows_release_unit32/badge/icon)](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn/job/master/job/windows_release_unit32/)|[![Build Status](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn/job/master/job/windows_release_unit64/badge/icon)](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn/job/master/job/windows_release_unit64/)|[![Build Status](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn/job/master/job/windows_determinism/badge/icon)](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn/job/master/job/windows_determinism/)|
+
+### Linux/Mac - Unit Tests
+||Linux|Mac OSX|
+|:--:|:--:|:--:|
+|**master (2.0 Preview 4)**|[![Build Status](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn/job/master/job/linux_debug/badge/icon)](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn/job/master/job/linux_debug/)|[![Build Status](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn/job/master/job/mac_debug/badge/icon)](http://dotnet-ci.cloudapp.net/job/dotnet_roslyn/job/master/job/mac_debug/)|
+
+[//]: # (End current test results)
 
 [![Join the chat at https://gitter.im/dotnet/roslyn](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/dotnet/roslyn?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 
-The .NET Compiler Platform ("Roslyn") provides open-source C# and Visual Basic compilers 
-with rich code analysis APIs.  It enables building code analysis tools with the same APIs 
-that are used by Visual Studio.
+Roslyn provides open-source C# and Visual Basic compilers with rich code analysis APIs.  It enables building code analysis tools with the same APIs that are used by Visual Studio.
 
-### Try new language and IDE features
+### Download C# and Visual Basic
 
-Just want to provide feedback on new [language features](https://github.com/dotnet/roslyn/wiki/Languages-features-in-C%23-6-and-VB-14) 
-and [IDE features](http://blogs.msdn.com/b/visualstudio/archive/2014/11/12/the-c-and-visual-basic-code-focused-ide-experience.aspx)? 
+Want to start developing in C# and Visual Basic? Download [Visual Studio 2015](https://www.visualstudio.com/en-us/downloads/visual-studio-2015-downloads-vs.aspx), 
+which has the latest features built-in. There are also [prebuilt Azure VM images](https://azure.microsoft.com/en-us/marketplace/virtual-machines/all/?term=Visual+Studio+2015) available with VS 2015 already installed.
 
-* Try out [Visual Studio 2015](https://www.visualstudio.com/en-us/downloads/visual-studio-2015-downloads-vs.aspx), 
-which has the latest features built-in.
+To install the latest release without Visual Studio, run one of the following [nuget](https://dist.nuget.org/index.html) command lines:
 
-* Want to keep your box clean? You can use 
-[prebuilt Azure VM images](http://blogs.msdn.com/b/visualstudioalm/archive/2014/06/04/visual-studio-14-ctp-now-available-in-the-virtual-machine-azure-gallery.aspx) 
-with VS 2015 already installed.
+```
+nuget install Microsoft.Net.Compilers   # Install C# and VB compilers
+nuget install Microsoft.CodeAnalysis    # Install Language APIs and Services
+```
 
-### Build tools that understand C# and Visual Basic
-
-Get started building diagnostics, code fixes, refactorings, and other code-aware tools!
-
-- [**Getting Started On Visual Studio 2015**](https://github.com/dotnet/roslyn/wiki/Getting-Started-on-Visual-Studio-2015)
-
-Or, you can grab the latest [NuGet Roslyn compiler package](http://www.nuget.org/packages/Microsoft.CodeAnalysis). 
-From the NuGet package manager console:
-
-    Install-Package Microsoft.CodeAnalysis
+To get the latest "preview" drop, published about once per month, add the `-pre` switch to the nuget commands.
 
 ### Source code
 
@@ -45,14 +41,20 @@ From the NuGet package manager console:
 
 ### Get started
 
+* Tutorial articles by Alex Turner in MSDN Magazine
+  - [Use Roslyn to Write a Live Code Analyzer for Your API](https://msdn.microsoft.com/en-us/magazine/dn879356)
+  - [Adding a Code Fix to your Roslyn Analyzer](https://msdn.microsoft.com/en-us/magazine/dn904670.aspx)
 * [Roslyn Overview](https://github.com/dotnet/roslyn/wiki/Roslyn%20Overview) 
 * [API Changes between CTP 6 and RC](https://github.com/dotnet/roslyn/wiki/VS-2015-RC-API-Changes)
 * [Samples and Walkthroughs](https://github.com/dotnet/roslyn/wiki/Samples-and-Walkthroughs)
+* [Documentation](https://github.com/dotnet/roslyn/tree/master/docs)
+* [Analyzer documentation](https://github.com/dotnet/roslyn/tree/master/docs/analyzers)
 * [Syntax Visualizer Tool](https://github.com/dotnet/roslyn/wiki/Syntax%20Visualizer)
+* [Syntax Quoter Tool](http://roslynquoter.azurewebsites.net)
 * [Roadmap](https://github.com/dotnet/roslyn/wiki/Roadmap) 
-* [Language Feature Status](https://github.com/dotnet/roslyn/wiki/Languages-features-in-C%23-6-and-VB-14)
 * [Language Design Notes](https://github.com/dotnet/roslyn/issues?q=label%3A%22Design+Notes%22+)
 * [FAQ](https://github.com/dotnet/roslyn/wiki/FAQ)
+* Also take a look at our [Wiki](https://github.com/dotnet/roslyn/wiki) for more information on how to contribute, what the labels on issue mean, etc.
 
 ### Contribute!
 
@@ -63,7 +65,9 @@ Some of the best ways to contribute are to try things out, file bugs, and join i
 
 Looking for something to work on? The list of [up for grabs issues](https://github.com/dotnet/roslyn/issues?q=is%3Aopen+is%3Aissue+label%3A%22Up+for+Grabs%22) is a great place to start.
 
+This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).  For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
+
 ### .NET Foundation
 
 This project is part of the [.NET Foundation](http://www.dotnetfoundation.org/projects) along with other
-projects like [the class libraries for .NET Core](https://github.com/dotnet/corefx/).
+projects like [the class libraries for .NET Core](https://github.com/dotnet/corefx/). 

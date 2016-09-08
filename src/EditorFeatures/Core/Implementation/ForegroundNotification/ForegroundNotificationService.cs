@@ -3,12 +3,14 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.Composition;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Editor.Shared.Utilities;
 using Microsoft.CodeAnalysis.Internal.Log;
 using Microsoft.CodeAnalysis.Shared.TestHooks;
 using Roslyn.Utilities;
+using Microsoft.CodeAnalysis.ErrorReporting;
 
 namespace Microsoft.CodeAnalysis.Editor.Implementation.ForegroundNotification
 {
@@ -32,6 +34,8 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.ForegroundNotification
             _workQueue = new PriorityQueue();
             _lastProcessedTimeInMS = Environment.TickCount;
 
+            Contract.ThrowIfFalse(IsValid());
+            Debug.Assert(IsForeground());
             Task.Factory.SafeStartNewFromAsync(ProcessAsync, CancellationToken.None, TaskScheduler.Default);
         }
 
@@ -73,15 +77,30 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.ForegroundNotification
 
         private async Task ProcessAsync()
         {
-            AssertIsBackground();
-
+            var isFirst = true;
             while (true)
             {
-                // wait until it is time to run next item
-                await WaitForPendingWorkAsync().ConfigureAwait(continueOnCapturedContext: false);
+                try
+                {
+                    if (isFirst)
+                    {
+                        AssertIsBackground();
+                        isFirst = false;
+                    }
 
-                // run them in UI thread
-                await InvokeBelowInputPriority(NotifyOnForeground).ConfigureAwait(continueOnCapturedContext: false);
+                    // wait until it is time to run next item
+                    await WaitForPendingWorkAsync().ConfigureAwait(continueOnCapturedContext: false);
+
+                    // run them in UI thread
+                    await InvokeBelowInputPriority(NotifyOnForeground).ConfigureAwait(continueOnCapturedContext: false);
+                }
+                catch (Exception ex) when (FatalError.ReportWithoutCrash(ex))
+                {
+                    // This is an error condition but we must continue to drain the work queue.  If we
+                    // do not then IAsyncToken values will remain uncomplete and the unit test code
+                    // will deadlock waiting for the values to complete.
+                    Debug.Assert(false, ex.Message);
+                }
             }
         }
 
@@ -128,6 +147,15 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.ForegroundNotification
                         {
                             // eat up cancellation
                         }
+                        catch (Exception ex) when (FatalError.ReportWithoutCrash(ex))
+                        {
+                            // The PendingWork callbacks should never throw.  In the case they do we
+                            // must ensure the IAsyncToken implementation is completed.  If it is not
+                            // then the unit test code will end up in a deadlock doing an 'await' 
+                            // on the token instance.
+                            Debug.Assert(false, ex.Message);
+                            done = true;
+                        }
                     }
 
                     if (done)
@@ -137,7 +165,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.ForegroundNotification
 
                     processedCount++;
 
-                    // there is input to process, or we've exceeded a timeslice, postpone the remaining work
+                    // there is input to process, or we've exceeded a time slice, postpone the remaining work
                     if (IsInputPending() || Environment.TickCount - startProcessingTime > DefaultTimeSliceInMS)
                     {
                         return;
@@ -275,7 +303,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.ForegroundNotification
             private void Enqueue_NoLock(LinkedListNode<PendingWork> entry)
             {
                 // TODO: if this cost shows up in the trace, either use tree based implementation
-                // or just have separate lists for each delay (shart, medium, long)
+                // or just have separate lists for each delay (short, medium, long)
                 if (_list.Count == 0)
                 {
                     _list.AddLast(entry);
@@ -296,6 +324,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.ForegroundNotification
                 }
 
                 _list.AddFirst(entry);
+                _hasItemsGate.Release();
                 return;
             }
 

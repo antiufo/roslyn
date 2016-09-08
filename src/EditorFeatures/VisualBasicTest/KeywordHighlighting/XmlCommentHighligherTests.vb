@@ -11,8 +11,8 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.KeywordHighlightin
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestXmlLiteralSample3_1()
-            Test(<Text><![CDATA[
+        Public Async Function TestXmlLiteralSample3_1() As Task
+            Await TestAsync(<Text><![CDATA[
 Class C
 Sub M()
 Dim q = <?xml version="1.0"?>
@@ -25,11 +25,11 @@ Dim q = <?xml version="1.0"?>
 </contact>
 End Sub
 End Class]]></Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestXmlLiteralSample3_2()
-            Test(<Text><![CDATA[
+        Public Async Function TestXmlLiteralSample3_2() As Task
+            Await TestAsync(<Text><![CDATA[
 Class C
 Sub M()
 Dim q = <?xml version="1.0"?>
@@ -42,11 +42,11 @@ Dim q = <?xml version="1.0"?>
 </contact>
 End Sub
 End Class]]></Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestXmlLiteralSample3_3()
-            Test(<Text><![CDATA[
+        Public Async Function TestXmlLiteralSample3_3() As Task
+            Await TestAsync(<Text><![CDATA[
 Class C
 Sub M()
 Dim q = <?xml version="1.0"?>
@@ -59,6 +59,6 @@ Dim q = <?xml version="1.0"?>
 </contact>
 End Sub
 End Class]]></Text>)
-        End Sub
+        End Function
     End Class
 End Namespace

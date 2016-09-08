@@ -1,14 +1,15 @@
 ﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
+using Microsoft.CodeAnalysis.Collections;
+using Microsoft.CodeAnalysis.CSharp.Symbols;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.RuntimeMembers;
+using Roslyn.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
-using Microsoft.CodeAnalysis.CSharp.Symbols;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Microsoft.CodeAnalysis.RuntimeMembers;
-using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp
 {
@@ -358,7 +359,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                         for (int i = node.RankSpecifiers.Count - 1; i >= 0; i--)
                         {
                             var a = node.RankSpecifiers[i];
-                            type = new ArrayTypeSymbol(this.Compilation.Assembly, type, ImmutableArray<CustomModifier>.Empty, a.Rank);
+                            type = ArrayTypeSymbol.CreateCSharpArray(this.Compilation.Assembly, type, ImmutableArray<CustomModifier>.Empty, a.Rank);
                         }
 
                         return type;
@@ -384,9 +385,154 @@ namespace Microsoft.CodeAnalysis.CSharp
                         return BindTypeArgument((TypeSyntax)syntax, diagnostics, basesBeingResolved);
                     }
 
+                case SyntaxKind.TupleType:
+                    {
+                        return BindTupleType((TupleTypeSyntax)syntax, diagnostics);
+                    }
+
+                case SyntaxKind.RefType:
+                    {
+                        // ref needs to be handled by the caller
+                        var refTypeSyntax = (RefTypeSyntax)syntax;
+                        var refToken = refTypeSyntax.RefKeyword;
+                        if (!syntax.HasErrors)
+                        {
+                            diagnostics.Add(ErrorCode.ERR_UnexpectedToken, refToken.GetLocation(), refToken.ToString());
+                        }
+
+                        return BindNamespaceOrTypeOrAliasSymbol(refTypeSyntax.Type, diagnostics, basesBeingResolved, suppressUseSiteDiagnostics);
+                    }
+
                 default:
                     throw ExceptionUtilities.UnexpectedValue(syntax.Kind());
             }
+        }
+
+        private TypeSymbol BindTupleType(TupleTypeSyntax syntax, DiagnosticBag diagnostics)
+        {
+            int numElements = syntax.Elements.Count;
+            var types = ArrayBuilder<TypeSymbol>.GetInstance(numElements);
+            var locations = ArrayBuilder<Location>.GetInstance(numElements);
+            ArrayBuilder<string> elementNames = null;
+
+            // set of names already used
+            var uniqueFieldNames = PooledHashSet<string>.GetInstance();
+            bool hasExplicitNames = false;
+
+            for (int i = 0; i < numElements; i++)
+            {
+                var argumentSyntax = syntax.Elements[i];
+
+                var argumentType = BindType(argumentSyntax.Type, diagnostics);
+                types.Add(argumentType);
+
+                if (argumentType.IsRestrictedType())
+                {
+                    Error(diagnostics, ErrorCode.ERR_FieldCantBeRefAny, argumentSyntax, argumentType);
+                }
+
+                string name =  null;
+                IdentifierNameSyntax nameSyntax = argumentSyntax.Name;
+
+                if (nameSyntax != null)
+                {
+                    name = nameSyntax.Identifier.ValueText;
+
+                    // validate name if we have one
+                    hasExplicitNames = true;
+                    CheckTupleMemberName(name, i, nameSyntax, diagnostics, uniqueFieldNames);
+                    locations.Add(nameSyntax.Location);
+                }
+                else
+                {
+                    locations.Add(argumentSyntax.Location);
+                }
+
+                CollectTupleFieldMemberNames(name, i + 1, numElements, ref elementNames);
+            }
+
+            uniqueFieldNames.Free();
+
+            if (hasExplicitNames)
+            {
+                // If the tuple type with names is bound in a declaration
+                // context then we must have the TupleElementNamesAttribute to emit
+                if (syntax.IsTypeInContextWhichNeedsTupleNamesAttribute())
+                {
+                    // Report diagnostics if System.String doesn't exist
+                    this.GetSpecialType(SpecialType.System_String, diagnostics, syntax);
+
+                    if (!Compilation.HasTupleNamesAttributes)
+                    {
+                        var info = new CSDiagnosticInfo(ErrorCode.ERR_TupleElementNamesAttributeMissing,
+                            AttributeDescription.TupleElementNamesAttribute.FullName);
+                        Error(diagnostics, info, syntax);
+                    }
+                }
+            }
+
+            ImmutableArray<TypeSymbol> typesArray = types.ToImmutableAndFree();
+            ImmutableArray<Location> locationsArray = locations.ToImmutableAndFree();
+
+            if (typesArray.Length < 2)
+            {
+                elementNames?.Free();
+                return new ExtendedErrorTypeSymbol(this.Compilation.Assembly.GlobalNamespace, LookupResultKind.NotCreatable, diagnostics.Add(ErrorCode.ERR_TupleTooFewElements, syntax.Location));
+            }
+
+            return TupleTypeSymbol.Create(syntax.Location,
+                                            typesArray,
+                                            locationsArray,
+                                            elementNames == null ?
+                                                default(ImmutableArray<string>) :
+                                                elementNames.ToImmutableAndFree(),
+                                            this.Compilation,
+                                            syntax,
+                                            diagnostics);
+        }
+
+        private static void CollectTupleFieldMemberNames(string name, int position, int tupleSize, ref ArrayBuilder<string> elementNames)
+        {
+            // add the name to the list
+            // names would typically all be there or none at all
+            // but in case we need to handle this in error cases
+            if (elementNames != null)
+            {
+                elementNames.Add(name);
+            }
+            else
+            {
+                if (name != null)
+                {
+                    elementNames = ArrayBuilder<string>.GetInstance(tupleSize);
+                    for (int j = 1; j < position; j++)
+                    {
+                        elementNames.Add(null);
+                    }
+                    elementNames.Add(name);
+                }
+            }
+        }
+
+        private static bool CheckTupleMemberName(string name, int index, CSharpSyntaxNode syntax, DiagnosticBag diagnostics, PooledHashSet<string> uniqueFieldNames)
+        {
+            int reserved = TupleTypeSymbol.IsElementNameReserved(name);
+            if (reserved == 0)
+            {
+                Error(diagnostics, ErrorCode.ERR_TupleReservedMemberNameAnyPosition, syntax, name);
+                return false;
+            }
+            else if (reserved > 0 && reserved != index + 1)
+            {
+                Error(diagnostics, ErrorCode.ERR_TupleReservedMemberName, syntax, name, reserved);
+                return false;
+            }
+            else if (!uniqueFieldNames.Add(name))
+            {
+                Error(diagnostics, ErrorCode.ERR_TupleDuplicateMemberName, syntax);
+                return false;
+            }
+            return true;
         }
 
         private Symbol BindPredefinedTypeSymbol(PredefinedTypeSyntax node, DiagnosticBag diagnostics)
@@ -546,8 +692,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             if (node.IsTypeInContextWhichNeedsDynamicAttribute())
             {
-                if ((object)this.Compilation.GetWellKnownTypeMember(WellKnownMember.System_Runtime_CompilerServices_DynamicAttribute__ctor) == null ||
-                    (object)this.Compilation.GetWellKnownTypeMember(WellKnownMember.System_Runtime_CompilerServices_DynamicAttribute__ctorTransformFlags) == null)
+                if (!Compilation.HasDynamicEmitAttributes())
                 {
                     // CONSIDER:    Native compiler reports error CS1980 for each syntax node which binds to dynamic type, we do the same by reporting a diagnostic here.
                     //              However, this means we generate multiple duplicate diagnostics, when a single one would suffice.
@@ -592,13 +737,13 @@ namespace Microsoft.CodeAnalysis.CSharp
             return symbol;
         }
 
-        private Symbol UnwrapAlias(Symbol symbol, DiagnosticBag diagnostics, CSharpSyntaxNode syntax, ConsList<Symbol> basesBeingResolved = null)
+        private Symbol UnwrapAlias(Symbol symbol, DiagnosticBag diagnostics, SyntaxNode syntax, ConsList<Symbol> basesBeingResolved = null)
         {
             AliasSymbol discarded;
             return UnwrapAlias(symbol, out discarded, diagnostics, syntax, basesBeingResolved);
         }
 
-        private Symbol UnwrapAlias(Symbol symbol, out AliasSymbol alias, DiagnosticBag diagnostics, CSharpSyntaxNode syntax, ConsList<Symbol> basesBeingResolved = null)
+        private Symbol UnwrapAlias(Symbol symbol, out AliasSymbol alias, DiagnosticBag diagnostics, SyntaxNode syntax, ConsList<Symbol> basesBeingResolved = null)
         {
             Debug.Assert(syntax != null);
             Debug.Assert(diagnostics != null);
@@ -703,8 +848,8 @@ namespace Microsoft.CodeAnalysis.CSharp
                         UnboundArgumentErrorTypeSymbol.CreateTypeArguments(
                             unconstructedType.TypeParameters,
                             node.Arity,
-                            errorInfo: null), 
-                        unbound:false);
+                            errorInfo: null),
+                        unbound: false);
                 }
                 else
                 {
@@ -843,7 +988,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// <remarks>
         /// Keep check and error in sync with ConstructBoundMethodGroupAndReportOmittedTypeArguments.
         /// </remarks>
-        private NamedTypeSymbol ConstructNamedTypeUnlessTypeArgumentOmitted(CSharpSyntaxNode typeSyntax, NamedTypeSymbol type, SeparatedSyntaxList<TypeSyntax> typeArgumentsSyntax, ImmutableArray<TypeSymbol> typeArguments, DiagnosticBag diagnostics)
+        private NamedTypeSymbol ConstructNamedTypeUnlessTypeArgumentOmitted(SyntaxNode typeSyntax, NamedTypeSymbol type, SeparatedSyntaxList<TypeSyntax> typeArgumentsSyntax, ImmutableArray<TypeSymbol> typeArguments, DiagnosticBag diagnostics)
         {
             if (typeArgumentsSyntax.Any(SyntaxKind.OmittedTypeArgument))
             {
@@ -869,7 +1014,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// Keep check and error in sync with ConstructNamedTypeUnlessTypeArgumentOmitted.
         /// </remarks>
         private static BoundMethodOrPropertyGroup ConstructBoundMemberGroupAndReportOmittedTypeArguments(
-            CSharpSyntaxNode syntax,
+            SyntaxNode syntax,
             SeparatedSyntaxList<TypeSyntax> typeArgumentsSyntax,
             ImmutableArray<TypeSymbol> typeArguments,
             BoundExpression receiver,
@@ -921,7 +1066,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
         private NamedTypeSymbol ConstructNamedType(
             NamedTypeSymbol type,
-            CSharpSyntaxNode typeSyntax,
+            SyntaxNode typeSyntax,
             SeparatedSyntaxList<TypeSyntax> typeArgumentsSyntax,
             ImmutableArray<TypeSymbol> typeArguments,
             ConsList<Symbol> basesBeingResolved,
@@ -934,6 +1079,8 @@ namespace Microsoft.CodeAnalysis.CSharp
             {
                 type.CheckConstraints(this.Conversions, typeSyntax, typeArgumentsSyntax, this.Compilation, basesBeingResolved, diagnostics);
             }
+
+            type = (NamedTypeSymbol)TupleTypeSymbol.TransformToTupleIfCompatible(type);
 
             return type;
         }
@@ -989,9 +1136,14 @@ namespace Microsoft.CodeAnalysis.CSharp
             return right;
         }
 
-        internal NamedTypeSymbol GetSpecialType(SpecialType typeId, DiagnosticBag diagnostics, CSharpSyntaxNode node)
+        internal NamedTypeSymbol GetSpecialType(SpecialType typeId, DiagnosticBag diagnostics, SyntaxNode node)
         {
-            NamedTypeSymbol typeSymbol = this.Compilation.GetSpecialType(typeId);
+            return GetSpecialType(this.Compilation, typeId, node, diagnostics);
+        }
+
+        internal static NamedTypeSymbol GetSpecialType(CSharpCompilation compilation, SpecialType typeId, SyntaxNode node, DiagnosticBag diagnostics)
+        {
+            NamedTypeSymbol typeSymbol = compilation.GetSpecialType(typeId);
             Debug.Assert((object)typeSymbol != null, "Expect an error type if special type isn't found");
             ReportUseSiteDiagnostics(typeSymbol, diagnostics, node);
             return typeSymbol;
@@ -1001,7 +1153,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// This is a layer on top of the Compilation version that generates a diagnostic if the special
         /// member isn't found.
         /// </summary>
-        internal Symbol GetSpecialTypeMember(SpecialMember member, DiagnosticBag diagnostics, CSharpSyntaxNode syntax)
+        internal Symbol GetSpecialTypeMember(SpecialMember member, DiagnosticBag diagnostics, SyntaxNode syntax)
         {
             Symbol memberSymbol;
             return TryGetSpecialTypeMember(this.Compilation, member, syntax, diagnostics, out memberSymbol)
@@ -1009,7 +1161,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 : null;
         }
 
-        internal static bool TryGetSpecialTypeMember<TSymbol>(CSharpCompilation compilation, SpecialMember specialMember, CSharpSyntaxNode syntax, DiagnosticBag diagnostics, out TSymbol symbol)
+        internal static bool TryGetSpecialTypeMember<TSymbol>(CSharpCompilation compilation, SpecialMember specialMember, SyntaxNode syntax, DiagnosticBag diagnostics, out TSymbol symbol)
             where TSymbol : Symbol
         {
             symbol = (TSymbol)compilation.GetSpecialTypeMember(specialMember);
@@ -1035,7 +1187,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// <returns>
         /// True if there was an error among the reported diagnostics
         /// </returns>
-        internal static bool ReportUseSiteDiagnostics(Symbol symbol, DiagnosticBag diagnostics, CSharpSyntaxNode node)
+        internal static bool ReportUseSiteDiagnostics(Symbol symbol, DiagnosticBag diagnostics, SyntaxNode node)
         {
             DiagnosticInfo info = symbol.GetUseSiteDiagnostic();
             return info != null && Symbol.ReportUseSiteDiagnostic(info, diagnostics, node.Location);
@@ -1057,7 +1209,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// This is a layer on top of the Compilation version that generates a diagnostic if the well-known
         /// type isn't found.
         /// </summary>
-        internal NamedTypeSymbol GetWellKnownType(WellKnownType type, DiagnosticBag diagnostics, CSharpSyntaxNode node)
+        internal NamedTypeSymbol GetWellKnownType(WellKnownType type, DiagnosticBag diagnostics, SyntaxNode node)
         {
             NamedTypeSymbol typeSymbol = this.Compilation.GetWellKnownType(type);
             Debug.Assert((object)typeSymbol != null, "Expect an error type if well-known type isn't found");
@@ -1069,7 +1221,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// Retrieves a well-known type member and reports diagnostics.
         /// </summary>
         /// <returns>Null if the symbol is missing.</returns>
-        internal static Symbol GetWellKnownTypeMember(CSharpCompilation compilation, WellKnownMember member, DiagnosticBag diagnostics, Location location = null, CSharpSyntaxNode syntax = null, bool isOptional = false)
+        internal static Symbol GetWellKnownTypeMember(CSharpCompilation compilation, WellKnownMember member, DiagnosticBag diagnostics, Location location = null, SyntaxNode syntax = null, bool isOptional = false)
         {
             Debug.Assert((syntax != null) ^ (location != null));
 
@@ -1156,7 +1308,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             LookupResult result,
             string simpleName,
             int arity,
-            CSharpSyntaxNode where,
+            SyntaxNode where,
             DiagnosticBag diagnostics,
             bool suppressUseSiteDiagnostics,
             out bool wasError,
@@ -1283,7 +1435,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                                 // '{0}' is an ambiguous reference between '{1}' and '{2}'
                                 info = new CSDiagnosticInfo(ErrorCode.ERR_AmbigContext, originalSymbols,
                                     new object[] {
-                                        where,
+                                        (where as NameSyntax)?.ErrorDisplayName() ?? simpleName,
                                         new FormattedSymbol(first, SymbolDisplayFormat.CSharpErrorMessageFormat),
                                         new FormattedSymbol(second, SymbolDisplayFormat.CSharpErrorMessageFormat) });
                             }
@@ -1422,14 +1574,14 @@ namespace Microsoft.CodeAnalysis.CSharp
                                 //  SPEC:   is present, and a compile-time error results.
 
                                 info = new CSDiagnosticInfo(ErrorCode.ERR_AmbiguousAttribute, originalSymbols,
-                                    new object[] { where, first, second });
+                                    new object[] { (where as NameSyntax)?.ErrorDisplayName() ?? simpleName, first, second });
                             }
                             else
                             {
                                 // '{0}' is an ambiguous reference between '{1}' and '{2}'
                                 info = new CSDiagnosticInfo(ErrorCode.ERR_AmbigContext, originalSymbols,
                                     new object[] {
-                                        where,
+                                        (where as NameSyntax)?.ErrorDisplayName() ?? simpleName,
                                         new FormattedSymbol(first, SymbolDisplayFormat.CSharpErrorMessageFormat),
                                         new FormattedSymbol(second, SymbolDisplayFormat.CSharpErrorMessageFormat) });
                             }
@@ -1514,7 +1666,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             if (result.Kind == LookupResultKind.Empty)
             {
                 string aliasOpt = null;
-                CSharpSyntaxNode node = where;
+                SyntaxNode node = where;
                 while (node is ExpressionSyntax)
                 {
                     if (node.Kind() == SyntaxKind.AliasQualifiedName)
@@ -1525,7 +1677,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                     node = node.Parent;
                 }
 
-                CSDiagnosticInfo info = NotFound(where, simpleName, arity, where.ToString(), diagnostics, aliasOpt, qualifierOpt, options);
+                CSDiagnosticInfo info = NotFound(where, simpleName, arity, (where as NameSyntax)?.ErrorDisplayName() ?? simpleName, diagnostics, aliasOpt, qualifierOpt, options);
                 return new ExtendedErrorTypeSymbol(qualifierOpt ?? Compilation.Assembly.GlobalNamespace, simpleName, arity, info);
             }
 
@@ -1740,7 +1892,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         /// <remarks>
         /// This is only intended to be called when the type isn't found (i.e. not when it is found but is inaccessible, has the wrong arity, etc).
         /// </remarks>
-        private CSDiagnosticInfo NotFound(CSharpSyntaxNode where, string simpleName, int arity, string whereText, DiagnosticBag diagnostics, string aliasOpt, NamespaceOrTypeSymbol qualifierOpt, LookupOptions options)
+        private CSDiagnosticInfo NotFound(SyntaxNode where, string simpleName, int arity, string whereText, DiagnosticBag diagnostics, string aliasOpt, NamespaceOrTypeSymbol qualifierOpt, LookupOptions options)
         {
             var location = where.Location;
             // Lookup totally ignores type forwarders, but we want the type lookup diagnostics
@@ -1750,6 +1902,13 @@ namespace Microsoft.CodeAnalysis.CSharp
             AssemblySymbol forwardedToAssembly;
             bool encounteredForwardingCycle;
             string fullName;
+
+            // for attributes, suggest both, but not for verbatim name
+            if (options.IsAttributeTypeLookup() && !options.IsVerbatimNameAttributeTypeLookup())
+            {
+                // just recurse one level, so cheat and OR verbatim name option :)
+                NotFound(where, simpleName, arity, whereText + "Attribute", diagnostics, aliasOpt, qualifierOpt, options | LookupOptions.VerbatimNameAttributeTypeOnly);
+            }
 
             if ((object)qualifierOpt != null)
             {
@@ -1813,7 +1972,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 return diagnostics.Add(ErrorCode.ERR_AliasNotFound, location, whereText);
             }
 
-            if (whereText == "var" && !options.IsAttributeTypeLookup())
+            if ((where as IdentifierNameSyntax)?.Identifier.Text == "var" && !options.IsAttributeTypeLookup())
             {
                 var code = (where.Parent is QueryClauseSyntax) ? ErrorCode.ERR_TypeVarNotFoundRangeVariable : ErrorCode.ERR_TypeVarNotFound;
                 return diagnostics.Add(code, location);
@@ -1916,14 +2075,22 @@ namespace Microsoft.CodeAnalysis.CSharp
         internal static void CheckFeatureAvailability(Location location, MessageID feature, DiagnosticBag diagnostics)
         {
             var options = (CSharpParseOptions)location.SourceTree.Options;
-            if (feature.RequiredFeature() != null)
+            if (options.IsFeatureEnabled(feature))
+            {
+                return;
+            }
+
+            string requiredFeature = feature.RequiredFeature();
+            if (requiredFeature != null)
             {
                 if (!options.IsFeatureEnabled(feature))
                 {
-                    diagnostics.Add(ErrorCode.ERR_FeatureIsExperimental, location, feature.Localize());
+                    diagnostics.Add(ErrorCode.ERR_FeatureIsExperimental, location, feature.Localize(), requiredFeature);
                 }
+
                 return;
             }
+
             LanguageVersion availableVersion = options.LanguageVersion;
             LanguageVersion requiredVersion = feature.RequiredVersion();
             if (requiredVersion > availableVersion)

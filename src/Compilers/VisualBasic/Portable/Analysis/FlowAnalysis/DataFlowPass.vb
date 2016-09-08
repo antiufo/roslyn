@@ -82,6 +82,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' </summary>
         Private _seenOnErrorOrResume As Boolean
 
+        Protected _convertInsufficientExecutionStackExceptionToCancelledByStackGuardException As Boolean = False ' By default, just let the original exception to bubble up.
+
         Friend Sub New(info As FlowAnalysisInfo, suppressConstExpressionsSupport As Boolean, Optional trackStructsWithIntrinsicTypedFields As Boolean = False)
             MyBase.New(info, suppressConstExpressionsSupport)
             Me.initiallyAssignedVariables = Nothing
@@ -187,16 +189,28 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' </summary>
         Public Overloads Shared Sub Analyze(info As FlowAnalysisInfo, diagnostics As DiagnosticBag, suppressConstExpressionsSupport As Boolean)
             Dim walker = New DataFlowPass(info, suppressConstExpressionsSupport)
+
+            If diagnostics IsNot Nothing Then
+                walker._convertInsufficientExecutionStackExceptionToCancelledByStackGuardException = True
+            End If
+
             Try
                 Dim result As Boolean = walker.Analyze()
                 Debug.Assert(result)
                 If diagnostics IsNot Nothing Then
                     diagnostics.AddRange(walker.diagnostics)
                 End If
+
+            Catch ex As CancelledByStackGuardException When diagnostics IsNot Nothing
+                ex.AddAnError(diagnostics)
             Finally
                 walker.Free()
             End Try
         End Sub
+
+        Protected Overrides Function ConvertInsufficientExecutionStackExceptionToCancelledByStackGuardException() As Boolean
+            Return _convertInsufficientExecutionStackExceptionToCancelledByStackGuardException
+        End Function
 
         Protected Overrides Sub Free()
             Me._alreadyReported = BitVector.Null
@@ -515,7 +529,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Return True
         End Function
 
-        Private Function IsTrackableStructType(symbol As TypeSymbol) As Boolean
+        Private Shared Function IsTrackableStructType(symbol As TypeSymbol) As Boolean
             If IsNonPrimitiveValueType(symbol) Then
                 Dim type = TryCast(symbol.OriginalDefinition, NamedTypeSymbol)
                 Return (type IsNot Nothing) AndAlso Not type.KnownCircularStruct
@@ -590,62 +604,30 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
         ''' <summary> Unassign a slot for a regular variable </summary>
         Private Sub SetSlotUnassigned(slot As Integer)
-            Dim id As VariableIdentifier = variableBySlot(slot)
-
-            Dim type As TypeSymbol = GetVariableType(id.Symbol)
-            Debug.Assert(Not IsEmptyStructType(type))
-
             If slot >= Me.State.Assigned.Capacity Then
                 Normalize(Me.State)
             End If
 
-            ' If the state of the slot is 'assigned' we need to clear it 
-            '    and possibly propagate it to all the parents
-            If Me.State.IsAssigned(slot) Then
-                Me.State.Unassign(slot)
-                If Me._tryState IsNot Nothing Then
-                    Dim tryState = Me._tryState.Value
-                    tryState.Unassign(slot)
-                    Me._tryState = tryState
-                End If
-
-                '  propagate to parents
-                While id.ContainingSlot > 0
-
-                    '  check the parent
-                    Dim parentSlot = id.ContainingSlot
-                    Dim parentIdentifier = variableBySlot(parentSlot)
-                    Dim parentSymbol As Symbol = parentIdentifier.Symbol
-
-                    If Not Me.State.IsAssigned(parentSlot) Then
-                        Exit While
-                    End If
-
-                    '  unassign and continue loop
-                    Me.State.Unassign(parentSlot)
-                    If Me._tryState IsNot Nothing Then
-                        Dim tryState = Me._tryState.Value
-                        tryState.Unassign(parentSlot)
-                        Me._tryState = tryState
-                    End If
-
-                    If parentSymbol.Kind = SymbolKind.Local AndAlso DirectCast(parentSymbol, LocalSymbol).IsFunctionValue Then
-                        Me.State.Unassign(SlotKind.FunctionValue)
-                        If Me._tryState IsNot Nothing Then
-                            Dim tryState = Me._tryState.Value
-                            tryState.Unassign(SlotKind.FunctionValue)
-                            Me._tryState = tryState
-                        End If
-                    End If
-
-                    id = parentIdentifier
-
-                End While
+            If Me._tryState IsNot Nothing Then
+                Dim tryState = Me._tryState.Value
+                SetSlotUnassigned(slot, tryState)
+                Me._tryState = tryState
             End If
 
-            If IsTrackableStructType(type) Then
+            SetSlotUnassigned(slot, Me.State)
+        End Sub
 
-                ' NOTE: we need to unassign the children in all cases
+        Private Sub SetSlotUnassigned(slot As Integer, ByRef state As LocalState)
+            Dim id As VariableIdentifier = variableBySlot(slot)
+            Dim type As TypeSymbol = GetVariableType(id.Symbol)
+            Debug.Assert(Not IsEmptyStructType(type))
+
+            ' If the state of the slot is 'assigned' we need to clear it 
+            '    and possibly propagate it to all the parents
+            state.Unassign(slot)
+
+            'unassign struct children (if possible)
+            If IsTrackableStructType(type) Then
                 For Each field In GetStructInstanceFields(type)
                     ' get child's slot
 
@@ -654,11 +636,31 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     Dim childSlot = VariableSlot(field, slot)
 
                     If childSlot >= SlotKind.FirstAvailable Then
-                        SetSlotUnassigned(childSlot)
+                        SetSlotUnassigned(childSlot, state)
                     End If
                 Next
-
             End If
+
+            '  propagate to parents
+            While id.ContainingSlot > 0
+                '  check the parent
+                Dim parentSlot = id.ContainingSlot
+                Dim parentIdentifier = variableBySlot(parentSlot)
+                Dim parentSymbol As Symbol = parentIdentifier.Symbol
+
+                If Not state.IsAssigned(parentSlot) Then
+                    Exit While
+                End If
+
+                '  unassign and continue loop
+                state.Unassign(parentSlot)
+
+                If parentSymbol.Kind = SymbolKind.Local AndAlso DirectCast(parentSymbol, LocalSymbol).IsFunctionValue Then
+                    state.Unassign(SlotKind.FunctionValue)
+                End If
+
+                id = parentIdentifier
+            End While
         End Sub
 
         ''' <summary>Assign a slot for a regular variable in a given state.</summary>
@@ -810,7 +812,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Return result
         End Function
 
-        Private Function GetVariableType(symbol As Symbol) As TypeSymbol
+        Private Shared Function GetVariableType(symbol As Symbol) As TypeSymbol
             Select Case symbol.Kind
 
                 Case SymbolKind.Local
@@ -866,7 +868,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <summary>
         ''' Check that the given variable is definitely assigned.  If not, produce an error.
         ''' </summary>
-        Protected Sub CheckAssigned(symbol As Symbol, node As VisualBasicSyntaxNode, Optional rwContext As ReadWriteContext = ReadWriteContext.None)
+        Protected Sub CheckAssigned(symbol As Symbol, node As SyntaxNode, Optional rwContext As ReadWriteContext = ReadWriteContext.None)
             If symbol IsNot Nothing Then
                 Dim local = TryCast(symbol, LocalSymbol)
                 If local IsNot Nothing AndAlso local.IsCompilerGenerated AndAlso Not Me.ProcessCompilerGeneratedLocals Then
@@ -902,7 +904,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Sub
 
         ''' <summary> Version of CheckAssigned for bound field access </summary>
-        Private Sub CheckAssigned(fieldAccess As BoundFieldAccess, node As VisualBasicSyntaxNode, Optional rwContext As ReadWriteContext = ReadWriteContext.None)
+        Private Sub CheckAssigned(fieldAccess As BoundFieldAccess, node As SyntaxNode, Optional rwContext As ReadWriteContext = ReadWriteContext.None)
             Dim unassignedSlot As Integer
 
             If Me.State.Reachable AndAlso Not IsAssigned(fieldAccess, unassignedSlot) Then
@@ -1005,7 +1007,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' Note that data flow API should never report compiler generated variables 
         ''' as well as those should not generate any diagnostics (like being unassigned, etc...).
         ''' 
-        ''' But when the analysis is used for iterators or anync captures it should process 
+        ''' But when the analysis is used for iterators or async captures it should process 
         ''' compiler generated locals as well...
         ''' </summary>
         Protected Overridable ReadOnly Property ProcessCompilerGeneratedLocals As Boolean
@@ -1058,7 +1060,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' reported, we suppress further reports of that variable.
         ''' </summary>
         Protected Overridable Sub ReportUnassigned(sym As Symbol,
-                                                   node As VisualBasicSyntaxNode,
+                                                   node As SyntaxNode,
                                                    rwContext As ReadWriteContext,
                                                    Optional slot As Integer = SlotKind.NotTracked,
                                                    Optional boundFieldAccess As BoundFieldAccess = Nothing)
@@ -1138,7 +1140,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
         End Sub
 
-        Private Sub CheckAssignedFunctionValue(local As LocalSymbol, node As VisualBasicSyntaxNode)
+        Private Sub CheckAssignedFunctionValue(local As LocalSymbol, node As SyntaxNode)
             If Not Me.State.FunctionAssignedValue AndAlso Not _seenOnErrorOrResume Then
                 Dim type As TypeSymbol = local.Type
                 ' NOTE: Dev11 does NOT report warning on user-defined empty value types
@@ -1152,7 +1154,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End If
         End Sub
 
-        Private Sub ReportUnassignedFunctionValue(local As LocalSymbol, node As VisualBasicSyntaxNode)
+        Private Sub ReportUnassignedFunctionValue(local As LocalSymbol, node As SyntaxNode)
             If Not _alreadyReported(SlotKind.FunctionValue) Then
 
                 Dim type As TypeSymbol = Nothing
@@ -1643,46 +1645,46 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         Public Overrides Function VisitQueryExpression(node As BoundQueryExpression) As BoundNode
-            Visit(node.LastOperator)
+            VisitRvalue(node.LastOperator)
             Return Nothing
         End Function
 
         Public Overrides Function VisitQuerySource(node As BoundQuerySource) As BoundNode
-            Visit(node.Expression)
+            VisitRvalue(node.Expression)
             Return Nothing
         End Function
 
         Public Overrides Function VisitQueryableSource(node As BoundQueryableSource) As BoundNode
-            Visit(node.Source)
+            VisitRvalue(node.Source)
             Return Nothing
         End Function
 
         Public Overrides Function VisitToQueryableCollectionConversion(node As BoundToQueryableCollectionConversion) As BoundNode
-            Visit(node.ConversionCall)
+            VisitRvalue(node.ConversionCall)
             Return Nothing
         End Function
 
         Public Overrides Function VisitQueryClause(node As BoundQueryClause) As BoundNode
-            Visit(node.UnderlyingExpression)
+            VisitRvalue(node.UnderlyingExpression)
             Return Nothing
         End Function
 
         Public Overrides Function VisitAggregateClause(node As BoundAggregateClause) As BoundNode
             If node.CapturedGroupOpt IsNot Nothing Then
-                Visit(node.CapturedGroupOpt)
+                VisitRvalue(node.CapturedGroupOpt)
             End If
 
-            Visit(node.UnderlyingExpression)
+            VisitRvalue(node.UnderlyingExpression)
             Return Nothing
         End Function
 
         Public Overrides Function VisitOrdering(node As BoundOrdering) As BoundNode
-            Visit(node.UnderlyingExpression)
+            VisitRvalue(node.UnderlyingExpression)
             Return Nothing
         End Function
 
         Public Overrides Function VisitRangeVariableAssignment(node As BoundRangeVariableAssignment) As BoundNode
-            Visit(node.Value)
+            VisitRvalue(node.Value)
             Return Nothing
         End Function
 
@@ -1864,7 +1866,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             MyBase.WriteArgument(arg, isOut)
         End Sub
 
-        Protected Sub CheckAssignedFromArgumentWrite(expr As BoundExpression, node As VisualBasicSyntaxNode)
+        Protected Sub CheckAssignedFromArgumentWrite(expr As BoundExpression, node As SyntaxNode)
             If Not Me.State.Reachable Then
                 Return
             End If
@@ -1934,7 +1936,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' is a value type. The reason is that in this case the initialization happens in place (not in a temporary) and 
         ''' the variable already got the object creation expression assigned.
         ''' </summary>
-        Private Function DeclaredVariableIsAlwaysAssignedBeforeInitializer(syntax As VisualBasicSyntaxNode, boundInitializer As BoundExpression,
+        Private Function DeclaredVariableIsAlwaysAssignedBeforeInitializer(syntax As SyntaxNode, boundInitializer As BoundExpression,
                                                                            <Out> ByRef placeholder As BoundValuePlaceholderBase) As Boolean
             placeholder = Nothing
             If boundInitializer IsNot Nothing AndAlso
@@ -2001,7 +2003,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Me.SetPlaceholderSubstitute(placeholder, New BoundLocal(localDecl.Syntax, localToUseAsSubstitute, localToUseAsSubstitute.Type))
             End If
 
-            Visit(node.Initializer)
+            VisitRvalue(node.Initializer)
             Visit(localDecl)  ' TODO: do we really need that?
 
             ' Visit all other declarations

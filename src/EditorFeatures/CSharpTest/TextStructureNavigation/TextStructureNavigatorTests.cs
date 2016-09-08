@@ -2,6 +2,7 @@
 
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Editor.CSharp.TextStructureNavigation;
 using Microsoft.CodeAnalysis.Editor.Host;
@@ -17,41 +18,41 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.TextStructureNavigation
     public class TextStructureNavigatorTests
     {
         [Fact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)]
-        public void Empty()
+        public async Task Empty()
         {
-            AssertExtent(
+            await AssertExtentAsync(
                 string.Empty,
                 pos: 0,
                 isSignificant: false,
                 start: 0, length: 0);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)]
-        public void Whitespace()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)]
+        public async Task Whitespace()
         {
-            AssertExtent(
+            await AssertExtentAsync(
                 "   ",
                 pos: 0,
                 isSignificant: false,
                 start: 0, length: 3);
 
-            AssertExtent(
+            await AssertExtentAsync(
                 "   ",
                 pos: 1,
                 isSignificant: false,
                 start: 0, length: 3);
 
-            AssertExtent(
+            await AssertExtentAsync(
                 "   ",
                 pos: 3,
                 isSignificant: false,
                 start: 0, length: 3);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)]
-        public void EndOfFile()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)]
+        public async Task EndOfFile()
         {
-            AssertExtent(
+            await AssertExtentAsync(
                 "using System;",
                 pos: 13,
                 isSignificant: true,
@@ -59,37 +60,37 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.TextStructureNavigation
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)]
-        public void NewLine()
+        public async Task NewLine()
         {
-            AssertExtent(
+            await AssertExtentAsync(
                 "class Class1 {\r\n\r\n}",
                 pos: 14,
                 isSignificant: false,
                 start: 14, length: 2);
 
-            AssertExtent(
+            await AssertExtentAsync(
                 "class Class1 {\r\n\r\n}",
                 pos: 15,
                 isSignificant: false,
                 start: 14, length: 2);
 
-            AssertExtent(
+            await AssertExtentAsync(
                 "class Class1 {\r\n\r\n}",
                 pos: 16,
                 isSignificant: false,
                 start: 16, length: 2);
 
-            AssertExtent(
+            await AssertExtentAsync(
                 "class Class1 {\r\n\r\n}",
                 pos: 17,
                 isSignificant: false,
                 start: 16, length: 2);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)]
-        public void SingleLineComment()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)]
+        public async Task SingleLineComment()
         {
-            AssertExtent(
+            await AssertExtentAsync(
                 "// Comment  ",
                 pos: 0,
                 isSignificant: true,
@@ -97,29 +98,29 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.TextStructureNavigation
 
             // It is important that this returns just the comment banner. Returning the whole comment
             // means Ctrl+Right before the slash will cause it to jump across the entire comment
-            AssertExtent(
+            await AssertExtentAsync(
                 "// Comment  ",
                 pos: 1,
                 isSignificant: true,
                 start: 0, length: 2);
 
-            AssertExtent(
+            await AssertExtentAsync(
                 "// Comment  ",
                 pos: 5,
                 isSignificant: true,
                 start: 3, length: 7);
 
-            AssertExtent(
+            await AssertExtentAsync(
                 "// () test",
                 pos: 4,
                 isSignificant: true,
                 start: 3, length: 2);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)]
-        public void MultiLineComment()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)]
+        public async Task MultiLineComment()
         {
-            AssertExtent(
+            await AssertExtentAsync(
                 "/* Comment */",
                 pos: 0,
                 isSignificant: true,
@@ -127,25 +128,25 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.TextStructureNavigation
 
             // It is important that this returns just the comment banner. Returning the whole comment
             // means Ctrl+Right before the slash will cause it to jump across the entire comment
-            AssertExtent(
+            await AssertExtentAsync(
                 "/* Comment */",
                 pos: 1,
                 isSignificant: true,
                 start: 0, length: 2);
 
-            AssertExtent(
+            await AssertExtentAsync(
                 "/* Comment */",
                 pos: 5,
                 isSignificant: true,
                 start: 3, length: 7);
 
-            AssertExtent(
+            await AssertExtentAsync(
                 "/* () test */",
                 pos: 4,
                 isSignificant: true,
                 start: 3, length: 2);
 
-            AssertExtent(
+            await AssertExtentAsync(
                "/* () test */",
                pos: 11,
                isSignificant: true,
@@ -153,25 +154,25 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.TextStructureNavigation
 
             // It is important that this returns just the comment banner. Returning the whole comment
             // means Ctrl+Left after the slash will cause it to jump across the entire comment
-            AssertExtent(
+            await AssertExtentAsync(
                "/* () test */",
                pos: 12,
                isSignificant: true,
                start: 11, length: 2);
 
-            AssertExtent(
+            await AssertExtentAsync(
                "/* () test */",
                pos: 13,
                isSignificant: true,
                start: 11, length: 2);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)]
-        public void Keyword()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)]
+        public async Task Keyword()
         {
             for (int i = 7; i <= 7 + 4; i++)
             {
-                AssertExtent(
+                await AssertExtentAsync(
                     "public class Class1",
                     pos: i,
                     isSignificant: true,
@@ -179,12 +180,12 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.TextStructureNavigation
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)]
-        public void Identifier()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)]
+        public async Task Identifier()
         {
             for (int i = 13; i <= 13 + 8; i++)
             {
-                AssertExtent(
+                await AssertExtentAsync(
                     "public class SomeClass : IDisposable",
                     pos: i,
                     isSignificant: true,
@@ -192,12 +193,12 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.TextStructureNavigation
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)]
-        public void EscapedIdentifier()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)]
+        public async Task EscapedIdentifier()
         {
             for (int i = 12; i <= 12 + 9; i++)
             {
-                AssertExtent(
+                await AssertExtentAsync(
                     "public enum @interface : int",
                     pos: i,
                     isSignificant: true,
@@ -205,12 +206,12 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.TextStructureNavigation
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)]
-        public void Number()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)]
+        public async Task Number()
         {
             for (int i = 37; i <= 37 + 10; i++)
             {
-                AssertExtent(
+                await AssertExtentAsync(
                     "class Test { private double num   = -1.234678e10; }",
                     pos: i,
                     isSignificant: true,
@@ -218,53 +219,53 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.TextStructureNavigation
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)]
-        public void String()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)]
+        public async Task String()
         {
             const string TestString = "class Test { private string s1 = \" () test  \"; }";
             int startOfString = TestString.IndexOf('"');
             int lengthOfStringIncludingQuotes = TestString.LastIndexOf('"') - startOfString + 1;
 
-            AssertExtent(
+            await AssertExtentAsync(
                 TestString,
                 pos: startOfString,
                 isSignificant: true,
                 start: startOfString, length: 1);
 
             // Selects whitespace
-            AssertExtent(
+            await AssertExtentAsync(
                 TestString,
                 pos: startOfString + 1,
                 isSignificant: false,
                 start: startOfString + 1, length: 1);
 
-            AssertExtent(
+            await AssertExtentAsync(
                 TestString,
                 pos: startOfString + 2,
                 isSignificant: true,
                 start: startOfString + 2, length: 2);
 
-            AssertExtent(
+            await AssertExtentAsync(
                 TestString,
                 pos: TestString.IndexOf("  \"", StringComparison.Ordinal),
                 isSignificant: false,
                 start: TestString.IndexOf("  \"", StringComparison.Ordinal), length: 2);
 
-            AssertExtent(
+            await AssertExtentAsync(
                 TestString,
                 pos: TestString.LastIndexOf('"'),
                 isSignificant: true,
                 start: startOfString + lengthOfStringIncludingQuotes - 1, length: 1);
 
-            AssertExtent(
+            await AssertExtentAsync(
                 TestString,
                 pos: TestString.LastIndexOf('"') + 1,
                 isSignificant: true,
                 start: TestString.LastIndexOf('"') + 1, length: 1);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)]
-        public void InterpolatedString1()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)]
+        public async Task InterpolatedString1()
         {
             const string TestString = "class Test { string x = \"hello\"; string s = $\" { x } hello\"; }";
 
@@ -274,85 +275,85 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.TextStructureNavigation
             int lengthOfStringIncludingQuotes = TestString.LastIndexOf('"') - startOfString + 1;
 
             // Selects interpolated string start token
-            AssertExtent(
+            await AssertExtentAsync(
                 TestString,
                 pos: startOfString,
                 isSignificant: true,
                 start: startOfString, length: 2);
 
             // Selects whitespace
-            AssertExtent(
+            await AssertExtentAsync(
                 TestString,
                 pos: startOfString + 2,
                 isSignificant: false,
                 start: startOfString + 2, length: 1);
 
             // Selects the opening curly brace
-            AssertExtent(
+            await AssertExtentAsync(
                 TestString,
                 pos: startOfString + 3,
                 isSignificant: true,
                 start: startOfString + 3, length: 1);
 
             // Selects whitespace
-            AssertExtent(
+            await AssertExtentAsync(
                 TestString,
                 pos: startOfString + 4,
                 isSignificant: false,
                 start: startOfString + 4, length: 1);
 
             // Selects identifier
-            AssertExtent(
+            await AssertExtentAsync(
                 TestString,
                 pos: startOfString + 5,
                 isSignificant: true,
                 start: startOfString + 5, length: 1);
 
             // Selects whitespace
-            AssertExtent(
+            await AssertExtentAsync(
                 TestString,
                 pos: startOfString + 6,
                 isSignificant: false,
                 start: startOfString + 6, length: 1);
 
             // Selects the closing curly brace
-            AssertExtent(
+            await AssertExtentAsync(
                 TestString,
                 pos: startOfString + 7,
                 isSignificant: true,
                 start: startOfString + 7, length: 1);
 
             // Selects whitespace
-            AssertExtent(
+            await AssertExtentAsync(
                 TestString,
                 pos: startOfString + 8,
                 isSignificant: false,
                 start: startOfString + 8, length: 1);
 
             // Selects hello
-            AssertExtent(
+            await AssertExtentAsync(
                 TestString,
                 pos: startOfString + 9,
                 isSignificant: true,
                 start: startOfString + 9, length: 5);
 
             // Selects closing quote
-            AssertExtent(
+            await AssertExtentAsync(
                 TestString,
                 pos: startOfString + 14,
                 isSignificant: true,
                 start: startOfString + 14, length: 1);
         }
 
-        private static void AssertExtent(string code, int pos, bool isSignificant, int start, int length)
+        private static async Task AssertExtentAsync(string code, int pos, bool isSignificant, int start, int length)
         {
-            AssertExtent(code, pos, isSignificant, start, length, null);
-            AssertExtent(code, pos, isSignificant, start, length, Options.Script);
+            await AssertExtentAsync(code, pos, isSignificant, start, length, null);
+            await AssertExtentAsync(code, pos, isSignificant, start, length, Options.Script);
         }
 
-        private static void AssertExtent(string code, int pos, bool isSignificant, int start, int length, CSharpParseOptions options)
+        private static async Task AssertExtentAsync(string code, int pos, bool isSignificant, int start, int length, CSharpParseOptions options)
         {
-            using (var workspace = CSharpWorkspaceFactory.CreateWorkspaceFromFile(code, options))
+            using (var workspace = await TestWorkspace.CreateCSharpAsync(code, options))
             {
                 var buffer = workspace.Documents.First().GetTextBuffer();
 
@@ -371,7 +372,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.TextStructureNavigation
             }
         }
 
-        private static void TestNavigator(
+        private static async Task TestNavigatorAsync(
             string code,
             Func<ITextStructureNavigator, SnapshotSpan, SnapshotSpan> func,
             int startPosition,
@@ -379,11 +380,11 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.TextStructureNavigation
             int endPosition,
             int endLength)
         {
-            TestNavigator(code, func, startPosition, startLength, endPosition, endLength, null);
-            TestNavigator(code, func, startPosition, startLength, endPosition, endLength, Options.Script);
+            await TestNavigatorAsync(code, func, startPosition, startLength, endPosition, endLength, null);
+            await TestNavigatorAsync(code, func, startPosition, startLength, endPosition, endLength, Options.Script);
         }
 
-        private static void TestNavigator(
+        private static async Task TestNavigatorAsync(
             string code,
             Func<ITextStructureNavigator, SnapshotSpan, SnapshotSpan> func,
             int startPosition,
@@ -392,7 +393,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.TextStructureNavigation
             int endLength,
             CSharpParseOptions options)
         {
-            using (var workspace = CSharpWorkspaceFactory.CreateWorkspaceFromFile(code, options))
+            using (var workspace = await TestWorkspace.CreateCSharpAsync(code, options))
             {
                 var buffer = workspace.Documents.First().GetTextBuffer();
 
@@ -409,41 +410,41 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.TextStructureNavigation
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)]
-        public void GetSpanOfEnclosingTest()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)]
+        public async Task GetSpanOfEnclosingTest()
         {
             // First operation returns span of 'Class1'
-            TestNavigator("class Class1 { }", (n, s) => n.GetSpanOfEnclosing(s), 10, 0, 6, 6);
+            await TestNavigatorAsync("class Class1 { }", (n, s) => n.GetSpanOfEnclosing(s), 10, 0, 6, 6);
 
             // Second operation returns span of 'class Class1 { }'
-            TestNavigator("class Class1 { }", (n, s) => n.GetSpanOfEnclosing(s), 6, 6, 0, 16);
+            await TestNavigatorAsync("class Class1 { }", (n, s) => n.GetSpanOfEnclosing(s), 6, 6, 0, 16);
 
             // Last operation does nothing
-            TestNavigator("class Class1 { }", (n, s) => n.GetSpanOfEnclosing(s), 0, 16, 0, 16);
+            await TestNavigatorAsync("class Class1 { }", (n, s) => n.GetSpanOfEnclosing(s), 0, 16, 0, 16);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)]
-        public void GetSpanOfFirstChildTest()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)]
+        public async Task GetSpanOfFirstChildTest()
         {
             // Go from 'class Class1 { }' to 'class'
-            TestNavigator("class Class1 { }", (n, s) => n.GetSpanOfFirstChild(s), 0, 16, 0, 5);
+            await TestNavigatorAsync("class Class1 { }", (n, s) => n.GetSpanOfFirstChild(s), 0, 16, 0, 5);
 
             // Next operation should do nothing as we're at the bottom
-            TestNavigator("class Class1 { }", (n, s) => n.GetSpanOfFirstChild(s), 0, 5, 0, 5);
+            await TestNavigatorAsync("class Class1 { }", (n, s) => n.GetSpanOfFirstChild(s), 0, 5, 0, 5);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)]
-        public void GetSpanOfNextSiblingTest()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)]
+        public async Task GetSpanOfNextSiblingTest()
         {
             // Go from 'class' to 'Class1'
-            TestNavigator("class Class1 { }", (n, s) => n.GetSpanOfNextSibling(s), 0, 5, 6, 6);
+            await TestNavigatorAsync("class Class1 { }", (n, s) => n.GetSpanOfNextSibling(s), 0, 5, 6, 6);
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)]
-        public void GetSpanOfPreviousSiblingTest()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.TextStructureNavigator)]
+        public async Task GetSpanOfPreviousSiblingTest()
         {
             // Go from '{' to 'Class1'
-            TestNavigator("class Class1 { }", (n, s) => n.GetSpanOfPreviousSibling(s), 13, 1, 6, 6);
+            await TestNavigatorAsync("class Class1 { }", (n, s) => n.GetSpanOfPreviousSibling(s), 13, 1, 6, 6);
         }
     }
 }

@@ -4,9 +4,8 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeGeneration;
-using Microsoft.CodeAnalysis.DocumentationCommentFormatting;
+using Microsoft.CodeAnalysis.DocumentationComments;
 using Microsoft.CodeAnalysis.Formatting;
 using Microsoft.CodeAnalysis.Formatting.Rules;
 using Microsoft.CodeAnalysis.LanguageServices;
@@ -100,7 +99,7 @@ namespace Microsoft.CodeAnalysis.MetadataAsSource
                 generateMethodBodies: false,
                 generateDocumentationComments: true,
                 mergeAttributes: false,
-                autoInsertionLocation: !((symbol is ITypeSymbol) && (symbol as ITypeSymbol).IsEnumType()));
+                autoInsertionLocation: false);
         }
     }
 }

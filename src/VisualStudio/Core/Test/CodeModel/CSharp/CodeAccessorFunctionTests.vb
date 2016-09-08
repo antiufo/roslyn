@@ -1,8 +1,7 @@
 ' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
-Imports System.Runtime.InteropServices
+Imports System.Threading.Tasks
 Imports Microsoft.CodeAnalysis
-Imports Microsoft.CodeAnalysis.Text
 Imports Roslyn.Test.Utilities
 
 Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel.CSharp
@@ -11,8 +10,8 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel.CSharp
 
 #Region "Access tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Access1()
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAccess1() As Task
             Dim code =
     <Code>
 class C
@@ -30,11 +29,11 @@ class C
 }
 </Code>
 
-            TestAccess(code, EnvDTE.vsCMAccess.vsCMAccessPublic)
-        End Sub
+            Await TestAccess(code, EnvDTE.vsCMAccess.vsCMAccessPublic)
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Access2()
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAccess2() As Task
             Dim code =
     <Code>
 class C
@@ -52,10 +51,30 @@ class C
 }
 </Code>
 
-            TestAccess(code, EnvDTE.vsCMAccess.vsCMAccessPrivate)
-        End Sub
+            Await TestAccess(code, EnvDTE.vsCMAccess.vsCMAccessPrivate)
+        End Function
 
 #End Region
+
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestTypeDescriptor_GetProperties() As Task
+            Dim code =
+<Code>
+class C
+{
+    int P { $$get { return 42; } }
+}
+</Code>
+
+            Dim expectedPropertyNames =
+                {"DTE", "Collection", "Name", "FullName", "ProjectItem", "Kind", "IsCodeType",
+                 "InfoLocation", "Children", "Language", "StartPoint", "EndPoint", "ExtenderNames",
+                 "ExtenderCATID", "Parent", "FunctionKind", "Type", "Parameters", "Access", "IsOverloaded",
+                 "IsShared", "MustImplement", "Overloads", "Attributes", "DocComment", "Comment",
+                 "CanOverride", "OverrideKind", "IsGeneric"}
+
+            Await TestPropertyDescriptors(code, expectedPropertyNames)
+        End Function
 
         Protected Overrides ReadOnly Property LanguageName As String
             Get

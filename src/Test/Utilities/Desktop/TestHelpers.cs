@@ -2,9 +2,17 @@
 
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using System.Text;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Test.Utilities;
+using Microsoft.Win32;
 
 namespace Roslyn.Test.Utilities
 {
@@ -85,5 +93,77 @@ namespace Roslyn.Test.Utilities
 
             return value.ToString();
         }
+
+        public static TempFile CreateCSharpAnalyzerAssemblyWithTestAnalyzer(TempDirectory dir, string assemblyName)
+        {
+            var analyzerSource = @"
+using System;
+using System.Collections.Immutable;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Diagnostics;
+
+[DiagnosticAnalyzer(LanguageNames.CSharp)]
+public class TestAnalyzer : DiagnosticAnalyzer
+{
+    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get { throw new NotImplementedException(); } }
+    public override void Initialize(AnalysisContext context) { throw new NotImplementedException(); }
+}";
+
+            var metadata = dir.CopyFile(typeof(System.Reflection.Metadata.MetadataReader).Assembly.Location);
+            var immutable = dir.CopyFile(typeof(ImmutableArray).Assembly.Location);
+            var analyzer = dir.CopyFile(typeof(DiagnosticAnalyzer).Assembly.Location);
+
+            var analyzerCompilation = CSharpCompilation.Create(
+                assemblyName,
+                new SyntaxTree[] { SyntaxFactory.ParseSyntaxTree(analyzerSource) },
+                new MetadataReference[]
+                {
+                    TestBase.SystemRuntimePP7Ref,
+                    MetadataReference.CreateFromFile(immutable.Path),
+                    MetadataReference.CreateFromFile(analyzer.Path)
+                },
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+            return dir.CreateFile(assemblyName + ".dll").WriteAllBytes(analyzerCompilation.EmitToArray());
+        }
+
+        /// <summary>
+        /// <see cref="System.Xml.Linq.XComment.Value"/> is serialized with "--" replaced by "- -"
+        /// </summary>
+        public static string AsXmlCommentText(string text)
+        {
+            var builder = new StringBuilder();
+            for (int i = 0; i < text.Length; i++)
+            {
+                var c = text[i];
+                if ((c == '-') && (i > 0) && (text[i - 1] == '-'))
+                {
+                    builder.Append(' ');
+                }
+                builder.Append(c);
+            }
+            var result = builder.ToString();
+            Debug.Assert(!result.Contains("--"));
+            return result;
+        }
+
+        public static string GetMSBuildDirectory()
+        {
+            var vsVersion = Environment.GetEnvironmentVariable("VisualStudioVersion") ?? "14.0";
+            using (var key = Registry.LocalMachine.OpenSubKey($@"SOFTWARE\Microsoft\MSBuild\ToolsVersions\{vsVersion}", false))
+            {
+                if (key != null)
+                {
+                    var toolsPath = key.GetValue("MSBuildToolsPath");
+                    if (toolsPath != null)
+                    {
+                        return toolsPath.ToString();
+                    }
+                }
+            }
+
+            return null;
+        }
+
     }
 }

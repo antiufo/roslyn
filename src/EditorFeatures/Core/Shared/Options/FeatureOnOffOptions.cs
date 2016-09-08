@@ -33,6 +33,9 @@ namespace Microsoft.CodeAnalysis.Editor.Shared.Options
         public static readonly PerLanguageOption<bool> AutoXmlDocCommentGeneration = new PerLanguageOption<bool>(OptionName, "Automatic XML Doc Comment Generation", defaultValue: true);
 
         [ExportOption]
+        public static readonly PerLanguageOption<bool> AutoInsertBlockCommentStartString = new PerLanguageOption<bool>(OptionName, "Auto Insert Block Comment Start String", defaultValue: true);
+
+        [ExportOption]
         public static readonly PerLanguageOption<bool> PrettyListing = new PerLanguageOption<bool>(OptionName, "Pretty List On Line Commit", defaultValue: true);
 
         [ExportOption]
@@ -61,5 +64,8 @@ namespace Microsoft.CodeAnalysis.Editor.Shared.Options
         /// </summary>
         [ExportOption]
         public static readonly PerLanguageOption<bool> RefactoringVerification = new PerLanguageOption<bool>(OptionName, "Refactoring Verification", defaultValue: false);
+
+        [ExportOption]
+        public static readonly PerLanguageOption<bool> StreamingFindReferences = new PerLanguageOption<bool>(OptionName, nameof(StreamingFindReferences), defaultValue: true);
     }
 }

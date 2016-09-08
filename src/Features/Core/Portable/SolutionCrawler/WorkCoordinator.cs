@@ -136,9 +136,7 @@ namespace Microsoft.CodeAnalysis.SolutionCrawler
                     return;
                 }
 
-                // TODO: remove this once prototype is done
-                //       it is here just because it was convenient to add per workspace option change monitoring 
-                //       for incremental analyzer
+                // Changing the UseV2Engine option is a no-op as we have a single engine now.
                 if (e.Option == Diagnostics.InternalDiagnosticsOptions.UseDiagnosticEngineV2)
                 {
                     _documentAndProjectWorkerProcessor.ChangeDiagnosticsEngine((bool)e.Value);
@@ -161,13 +159,13 @@ namespace Microsoft.CodeAnalysis.SolutionCrawler
                 }
             }
 
-            public void Reanalyze(IIncrementalAnalyzer analyzer, IEnumerable<DocumentId> documentIds)
+            public void Reanalyze(IIncrementalAnalyzer analyzer, IEnumerable<DocumentId> documentIds, bool highPriority = false)
             {
                 var asyncToken = _listener.BeginAsyncOperation("Reanalyze");
                 _eventProcessingQueue.ScheduleTask(
-                    () => EnqueueWorkItemAsync(analyzer, documentIds), _shutdownToken).CompletesAsyncOperation(asyncToken);
+                    () => EnqueueWorkItemAsync(analyzer, documentIds, highPriority), _shutdownToken).CompletesAsyncOperation(asyncToken);
 
-                SolutionCrawlerLogger.LogReanalyze(CorrelationId, analyzer, documentIds);
+                SolutionCrawlerLogger.LogReanalyze(CorrelationId, analyzer, documentIds, highPriority);
             }
 
             private void OnWorkspaceChanged(object sender, WorkspaceChangeEventArgs args)
@@ -435,7 +433,7 @@ namespace Microsoft.CodeAnalysis.SolutionCrawler
                 }
             }
 
-            private async Task EnqueueWorkItemAsync(IIncrementalAnalyzer analyzer, IEnumerable<DocumentId> documentIds)
+            private async Task EnqueueWorkItemAsync(IIncrementalAnalyzer analyzer, IEnumerable<DocumentId> documentIds, bool highPriority)
             {
                 var solution = _registration.CurrentSolution;
                 foreach (var documentId in documentIds)
@@ -449,8 +447,10 @@ namespace Microsoft.CodeAnalysis.SolutionCrawler
                     var priorityService = document.GetLanguageService<IWorkCoordinatorPriorityService>();
                     var isLowPriority = priorityService != null && await priorityService.IsLowPriorityAsync(document, _shutdownToken).ConfigureAwait(false);
 
+                    var invocationReasons = highPriority ? InvocationReasons.ReanalyzeHighPriority : InvocationReasons.Reanalyze;
+
                     _documentAndProjectWorkerProcessor.Enqueue(
-                        new WorkItem(documentId, document.Project.Language, InvocationReasons.Reanalyze,
+                        new WorkItem(documentId, document.Project.Language, invocationReasons,
                         isLowPriority, analyzer, _listener.BeginAsyncOperation("WorkItem")));
                 }
             }
@@ -510,10 +510,15 @@ namespace Microsoft.CodeAnalysis.SolutionCrawler
                     projectConfigurationChange = projectConfigurationChange.With(InvocationReasons.ProjectParseOptionChanged);
                 }
 
-                if (projectChanges.GetAddedMetadataReferences().Any() || projectChanges.GetAddedProjectReferences().Any() || projectChanges.GetAddedAnalyzerReferences().Any() ||
-                    projectChanges.GetRemovedMetadataReferences().Any() || projectChanges.GetRemovedProjectReferences().Any() || projectChanges.GetRemovedAnalyzerReferences().Any() ||
+                if (projectChanges.GetAddedMetadataReferences().Any() || 
+                    projectChanges.GetAddedProjectReferences().Any() ||
+                    projectChanges.GetAddedAnalyzerReferences().Any() ||
+                    projectChanges.GetRemovedMetadataReferences().Any() ||
+                    projectChanges.GetRemovedProjectReferences().Any() ||
+                    projectChanges.GetRemovedAnalyzerReferences().Any() ||
                     !object.Equals(oldProject.CompilationOptions, newProject.CompilationOptions) ||
                     !object.Equals(oldProject.AssemblyName, newProject.AssemblyName) ||
+                    !object.Equals(oldProject.Name, newProject.Name) ||
                     !object.Equals(oldProject.AnalyzerOptions, newProject.AnalyzerOptions))
                 {
                     projectConfigurationChange = projectConfigurationChange.With(InvocationReasons.ProjectConfigurationChanged);
@@ -586,8 +591,7 @@ namespace Microsoft.CodeAnalysis.SolutionCrawler
                 {
                     foreach (var document in project.Documents)
                     {
-                        list.Add(
-                            new WorkItem(document.Id, document.Project.Language, InvocationReasons.DocumentAdded, false, _listener.BeginAsyncOperation("WorkItem")));
+                        list.Add(new WorkItem(document.Id, document.Project.Language, InvocationReasons.DocumentAdded, false, EmptyAsyncToken.Instance));
                     }
                 }
 

@@ -5,15 +5,19 @@ using System.Collections.Generic;
 using System.Composition;
 using System.Linq;
 using Microsoft.CodeAnalysis.CodeFixes;
+using Microsoft.CodeAnalysis.CodeRefactorings;
 using Microsoft.CodeAnalysis.Editor.Options;
+using Microsoft.CodeAnalysis.ErrorLogger;
 using Microsoft.CodeAnalysis.Extensions;
 using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.Host.Mef;
-using Microsoft.CodeAnalysis.ErrorLogger;
+using Microsoft.CodeAnalysis.Internal.Log;
 using Microsoft.CodeAnalysis.Options;
 using Microsoft.VisualStudio.Text;
 using Roslyn.Utilities;
-using Microsoft.CodeAnalysis.CodeRefactorings;
+using static Microsoft.CodeAnalysis.Internal.Log.FunctionId;
+using static Microsoft.CodeAnalysis.Internal.Log.Logger;
+using static Microsoft.CodeAnalysis.RoslynAssemblyHelper;
 
 namespace Microsoft.CodeAnalysis.Editor
 {
@@ -65,10 +69,15 @@ namespace Microsoft.CodeAnalysis.Editor
                     {
                         base.HandleException(provider, exception);
 
-                        _errorReportingService?.ShowErrorInfoForCodeFix(
-                            provider.GetType().Name,
-                            () => EnableProvider(provider),
-                            () => { EnableProvider(provider); IgnoreProvider(provider); });
+                        _errorReportingService?.ShowErrorInfo(String.Format(WorkspacesResources._0_encountered_an_error_and_has_been_disabled,  provider.GetType().Name),
+                            new ErrorReportingUI(WorkspacesResources.Show_Stack_Trace, ErrorReportingUI.UIKind.HyperLink, () => ShowDetailedErrorInfo(exception), closeAfterAction: false),
+                            new ErrorReportingUI(WorkspacesResources.Enable, ErrorReportingUI.UIKind.Button, () => { EnableProvider(provider); LogEnableProvider(provider); }),
+                            new ErrorReportingUI(WorkspacesResources.Enable_and_ignore_future_errors, ErrorReportingUI.UIKind.Button, () => { EnableProvider(provider); LogEnableProvider(provider); }),
+                            new ErrorReportingUI(String.Empty, ErrorReportingUI.UIKind.Close, () => LogLeaveDisabled(provider)));
+                    }
+                    else
+                    {
+                        LogAction(CodefixInfobar_ErrorIgnored, provider);
                     }
                 }
                 else
@@ -83,6 +92,40 @@ namespace Microsoft.CodeAnalysis.Editor
 
                 _errorLoggerService?.LogException(provider, exception);
             }
+
+            private void ShowDetailedErrorInfo(Exception exception)
+            {
+                _errorReportingService.ShowDetailedErrorInfo(exception);
+            }
+
+            private static void LogLeaveDisabled(object provider)
+            {
+                LogAction(CodefixInfobar_LeaveDisabled, provider);
+            }
+
+            private static void LogEnableAndIgnoreProvider(object provider)
+            {
+                LogAction(CodefixInfobar_EnableAndIgnoreFutureErrors, provider);
+            }
+
+            private static void LogEnableProvider(object provider)
+            {
+                LogAction(CodefixInfobar_Enable, provider);
+            }
+
+            private static void LogAction(FunctionId functionId, object provider)
+            {
+                if (IsRoslynCodefix(provider))
+                {
+                    Log(functionId, $"Name: {provider.GetType().FullName} Assembly Version: {provider.GetType().Assembly.GetName().Version}");
+                }
+                else
+                {
+                    Log(functionId);
+                }
+            }
+
+            private static bool IsRoslynCodefix(object source) => HasRoslynPublicKey(source);
         }
     }
 }

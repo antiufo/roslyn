@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Shared.TestHooks;
 using Microsoft.CodeAnalysis.Text;
+using Roslyn.Test.Utilities;
 using Roslyn.Utilities;
 using Xunit;
 
@@ -89,7 +90,7 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Utilities
                         done = true;
                     });
                 task.CompletesAsyncOperation(asyncToken);
-                task.Start();
+                task.Start(TaskScheduler.Default);
 
                 Wait(listener, signal);
                 Assert.True(done, "The operation should have completed");
@@ -118,11 +119,11 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Utilities
                                 done = true;
                             });
                         queuedTask.CompletesAsyncOperation(asyncToken2);
-                        queuedTask.Start();
+                        queuedTask.Start(TaskScheduler.Default);
                     });
 
                 task.CompletesAsyncOperation(asyncToken1);
-                task.Start();
+                task.Start(TaskScheduler.Default);
 
                 Wait(listener, signal);
 
@@ -152,11 +153,11 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Utilities
                                 continued = true;
                             });
                         asyncToken2.Dispose();
-                        queuedTask.Start();
+                        queuedTask.Start(TaskScheduler.Default);
                         done = true;
                     });
                 task.CompletesAsyncOperation(asyncToken1);
-                task.Start();
+                task.Start(TaskScheduler.Default);
 
                 Wait(listener, signal);
 
@@ -191,7 +192,7 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Utilities
                         outerDone = true;
                     });
                 task.CompletesAsyncOperation(asyncToken1);
-                task.Start();
+                task.Start(TaskScheduler.Default);
 
                 Wait(listener, signal);
 
@@ -229,15 +230,15 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Utilities
                                         secondQueuedDone = true;
                                     });
                                 secondQueueTask.CompletesAsyncOperation(asyncToken3);
-                                secondQueueTask.Start();
+                                secondQueueTask.Start(TaskScheduler.Default);
                                 firstQueuedDone = true;
                             });
                         firstQueueTask.CompletesAsyncOperation(asyncToken2);
-                        firstQueueTask.Start();
+                        firstQueueTask.Start(TaskScheduler.Default);
                         outerDone = true;
                     });
                 task.CompletesAsyncOperation(asyncToken1);
-                task.Start();
+                task.Start(TaskScheduler.Default);
 
                 Wait(listener, signal);
 
@@ -270,7 +271,7 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Utilities
                         });
 
                         signal.Set();
-                        cancelledTask.Start();
+                        cancelledTask.Start(TaskScheduler.Default);
                     }
 
                     sleepHelper.Sleep(TimeSpan.FromMilliseconds(500));
@@ -283,11 +284,11 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Utilities
                             queuedFinished = true;
                         });
                     queuedTask.CompletesAsyncOperation(asyncToken2);
-                    queuedTask.Start();
+                    queuedTask.Start(TaskScheduler.Default);
                     done = true;
                 });
                 task.CompletesAsyncOperation(asyncToken1);
-                task.Start();
+                task.Start(TaskScheduler.Default);
 
                 Wait(listener, signal);
 

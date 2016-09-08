@@ -28,16 +28,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeFixes.RemoveUnnecessaryImports
             Dim document = context.Document
             Dim cancellationToken = context.CancellationToken
 
-            Dim model = Await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(False)
-            Dim root = Await model.SyntaxTree.GetRootAsync(cancellationToken).ConfigureAwait(False)
             Dim service = document.GetLanguageService(Of IRemoveUnnecessaryImportsService)()
-            Dim newDocument = service.RemoveUnnecessaryImports(document, model, root, cancellationToken)
+            Dim newDocument = Await service.RemoveUnnecessaryImportsAsync(document, cancellationToken).ConfigureAwait(False)
             If newDocument Is document OrElse newDocument Is Nothing Then
                 Return
             End If
 
             context.RegisterCodeFix(
-                New MyCodeAction(VBFeaturesResources.RemoveUnnecessaryImports, newDocument),
+                New MyCodeAction(VBFeaturesResources.Remove_Unnecessary_Imports, newDocument),
                 context.Diagnostics)
         End Function
 

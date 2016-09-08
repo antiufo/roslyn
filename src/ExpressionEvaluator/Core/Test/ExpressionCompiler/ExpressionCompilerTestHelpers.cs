@@ -27,8 +27,9 @@ using Microsoft.VisualStudio.Debugger.Evaluation.ClrCompilation;
 using Roslyn.Test.Utilities;
 using Xunit;
 using PDB::Roslyn.Test.MetadataUtilities;
+using PDB::Roslyn.Test.PdbUtilities;
 
-namespace Microsoft.CodeAnalysis.ExpressionEvaluator
+namespace Microsoft.CodeAnalysis.ExpressionEvaluator.UnitTests
 {
     internal sealed class Scope
     {
@@ -70,7 +71,7 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
                 target,
                 expr,
                 ImmutableArray<Alias>.Empty,
-                formatter ?? DiagnosticFormatter.Instance,
+                formatter ?? DebuggerDiagnosticFormatter.Instance,
                 out resultProperties,
                 out error,
                 out missingAssemblyIdentities,
@@ -165,7 +166,7 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
                 expr,
                 DkmEvaluationFlags.TreatAsExpression,
                 ImmutableArray<Alias>.Empty,
-                formatter ?? DiagnosticFormatter.Instance,
+                formatter ?? DebuggerDiagnosticFormatter.Instance,
                 out resultProperties,
                 out error,
                 out missingAssemblyIdentities,
@@ -190,7 +191,7 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
                 expr,
                 compilationFlags,
                 aliases,
-                formatter ?? DiagnosticFormatter.Instance,
+                formatter ?? DebuggerDiagnosticFormatter.Instance,
                 out resultProperties,
                 out error,
                 out missingAssemblyIdentities,
@@ -243,7 +244,7 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
         {
             return ExpressionCompiler.CompileWithRetry(
                 metadataBlocks,
-                DiagnosticFormatter.Instance,
+                DebuggerDiagnosticFormatter.Instance,
                 (blocks, useReferencedModulesOnly) => context,
                 compile,
                 getMetaDataBytesPtr,
@@ -253,6 +254,7 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
         internal static CompileResult CompileExpressionWithRetry(
             ImmutableArray<MetadataBlock> metadataBlocks,
             string expr,
+            ImmutableArray<Alias> aliases,
             ExpressionCompiler.CreateContextDelegate createContext,
             DkmUtilities.GetMetadataBytesPtrFunction getMetaDataBytesPtr,
             out string errorMessage,
@@ -260,7 +262,7 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
         {
             var r = ExpressionCompiler.CompileWithRetry(
                 metadataBlocks,
-                DiagnosticFormatter.Instance,
+                DebuggerDiagnosticFormatter.Instance,
                 createContext,
                 (context, diagnostics) =>
                 {
@@ -269,7 +271,7 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
                     var compileResult = context.CompileExpression(
                         expr,
                         DkmEvaluationFlags.TreatAsExpression,
-                        ImmutableArray<Alias>.Empty,
+                        aliases,
                         diagnostics,
                         out resultProperties,
                         td);
@@ -345,8 +347,7 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
             var names = ArrayBuilder<string>.GetInstance();
             foreach (var scope in scopes)
             {
-                var locals = scope.GetLocals();
-                foreach (var local in locals)
+                foreach (var local in scope.GetLocals())
                 {
                     var name = local.GetName();
                     int slot;
@@ -375,8 +376,9 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
                 throw new NotImplementedException();
             }
 
-            using (var module = new PEModule(new PEReader(assembly), metadataOpt: IntPtr.Zero, metadataSizeOpt: 0))
+            using (var metadata = ModuleMetadata.CreateFromImage(assembly))
             {
+                var module = metadata.Module;
                 var reader = module.MetadataReader;
                 var typeDef = reader.GetTypeDef(parts[0]);
                 var methodName = parts[1];
@@ -394,53 +396,12 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
             }
         }
 
-        internal static bool EmitAndGetReferences(
-            this Compilation compilation,
-            out byte[] exeBytes,
-            out byte[] pdbBytes,
-            out ImmutableArray<MetadataReference> references)
+        internal static ImmutableArray<MetadataReference> GetEmittedReferences(Compilation compilation, MetadataReader mdReader)
         {
-            using (var pdbStream = new MemoryStream())
-            {
-                using (var exeStream = new MemoryStream())
-                {
-                    var result = compilation.Emit(
-                        peStream: exeStream,
-                        pdbStream: pdbStream,
-                        xmlDocumentationStream: null,
-                        win32Resources: null,
-                        manifestResources: null,
-                        options: EmitOptions.Default,
-                        debugEntryPoint: null,
-                        testData: null,
-                        getHostDiagnostics: null,
-                        cancellationToken: default(CancellationToken));
-
-                    if (!result.Success)
-                    {
-                        result.Diagnostics.Verify();
-                        exeBytes = null;
-                        pdbBytes = null;
-                        references = default(ImmutableArray<MetadataReference>);
-                        return false;
-                    }
-
-                    exeBytes = exeStream.ToArray();
-                    pdbBytes = pdbStream.ToArray();
-                }
-            }
-
             // Determine the set of references that were actually used
             // and ignore any references that were dropped in emit.
-            HashSet<string> referenceNames;
-            using (var metadata = ModuleMetadata.CreateFromImage(exeBytes))
-            {
-                var reader = metadata.MetadataReader;
-                referenceNames = new HashSet<string>(reader.AssemblyReferences.Select(h => GetAssemblyReferenceName(reader, h)));
-            }
-
-            references = ImmutableArray.CreateRange(compilation.References.Where(r => IsReferenced(r, referenceNames)));
-            return true;
+            var referenceNames = new HashSet<string>(mdReader.AssemblyReferences.Select(h => GetAssemblyReferenceName(mdReader, h)));
+            return ImmutableArray.CreateRange(compilation.References.Where(r => IsReferenced(r, referenceNames)));
         }
 
         internal static ImmutableArray<Scope> GetScopes(this ISymUnmanagedReader symReader, int methodToken, int methodVersion, bool isEndInclusive)
@@ -452,7 +413,7 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
             }
             var scopes = ArrayBuilder<ISymUnmanagedScope>.GetInstance();
             method.GetAllScopes(scopes);
-            var result = scopes.SelectAsArray(s => new Scope(s.GetStartOffset(), s.GetEndOffset(), s.GetLocals().SelectAsArray(l => l.GetName()), isEndInclusive));
+            var result = scopes.SelectAsArray(s => new Scope(s.GetStartOffset(), s.GetEndOffset(), ImmutableArray.CreateRange(s.GetLocals().Select(l => l.GetName())), isEndInclusive));
             scopes.Free();
             return result;
         }
@@ -481,7 +442,7 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
 
         private static bool IsReferenced(MetadataReference reference, HashSet<string> referenceNames)
         {
-            var assemblyMetadata = ((PortableExecutableReference)reference).GetMetadata() as AssemblyMetadata;
+            var assemblyMetadata = ((PortableExecutableReference)reference).GetMetadataNoCopy() as AssemblyMetadata;
             if (assemblyMetadata == null)
             {
                 // Netmodule. Assume it is referenced.
@@ -491,63 +452,52 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
             return referenceNames.Contains(name);
         }
 
-        /// <summary>
-        /// Verify the set of module metadata blocks
-        /// contains all blocks referenced by the set.
-        /// </summary>
-        internal static void VerifyAllModules(this ImmutableArray<ModuleInstance> modules)
+        internal static ModuleInstance ToModuleInstance(this MetadataReference reference)
         {
-            var blocks = modules.SelectAsArray(m => m.MetadataBlock).SelectAsArray(b => ModuleMetadata.CreateFromMetadata(b.Pointer, b.Size));
-            var names = new HashSet<string>(blocks.Select(b => b.Name));
-            foreach (var block in blocks)
-            {
-                foreach (var name in block.GetModuleNames())
-                {
-                    Assert.True(names.Contains(name));
-                }
-            }
-        }
-
-        internal static ModuleMetadata GetModuleMetadata(this MetadataReference reference)
-        {
-            var metadata = ((MetadataImageReference)reference).GetMetadata();
-            var assemblyMetadata = metadata as AssemblyMetadata;
-            Assert.True((assemblyMetadata == null) || (assemblyMetadata.GetModules().Length == 1));
-            return (assemblyMetadata == null) ? (ModuleMetadata)metadata : assemblyMetadata.GetModules()[0];
+            return ModuleInstance.Create((PortableExecutableReference)reference);
         }
 
         internal static ModuleInstance ToModuleInstance(
-            this MetadataReference reference,
-            byte[] fullImage,
-            object symReader,
+            this Compilation compilation,
+            DebugInformationFormat debugFormat = DebugInformationFormat.Pdb,
             bool includeLocalSignatures = true)
         {
-            var moduleMetadata = reference.GetModuleMetadata();
-            var moduleId = moduleMetadata.Module.GetModuleVersionIdOrThrow();
-            // The Expression Compiler expects metadata only, no headers or IL.
-            var metadataBytes = moduleMetadata.Module.PEReaderOpt.GetMetadata().GetContent().ToArray();
-            return new ModuleInstance(
-                reference,
-                moduleMetadata,
-                moduleId,
-                fullImage,
-                metadataBytes,
-                symReader,
-                includeLocalSignatures && (fullImage != null));
+            var pdbStream = (debugFormat != 0) ? new MemoryStream() : null;
+            var peImage = compilation.EmitToArray(new EmitOptions(debugInformationFormat: debugFormat), pdbStream: pdbStream);
+            var symReader = (debugFormat != 0) ? SymReaderFactory.CreateReader(pdbStream, new PEReader(peImage)) : null;
+
+            return ModuleInstance.Create(peImage, symReader, includeLocalSignatures);
+        }
+
+        internal static ModuleInstance GetModuleInstanceForIL(string ilSource)
+        {
+            ImmutableArray<byte> peBytes;
+            ImmutableArray<byte> pdbBytes;
+            CommonTestBase.EmitILToArray(ilSource, appendDefaultHeader: true, includePdb: true, assemblyBytes: out peBytes, pdbBytes: out pdbBytes);
+            return ModuleInstance.Create(peBytes, SymReaderFactory.CreateReader(pdbBytes), includeLocalSignatures: true);
         }
 
         internal static AssemblyIdentity GetAssemblyIdentity(this MetadataReference reference)
         {
-            var moduleMetadata = reference.GetModuleMetadata();
-            var reader = moduleMetadata.MetadataReader;
-            return reader.ReadAssemblyIdentityOrThrow();
+            using (var moduleMetadata = GetManifestModuleMetadata(reference))
+            {
+                return moduleMetadata.MetadataReader.ReadAssemblyIdentityOrThrow();
+            }
         }
 
         internal static Guid GetModuleVersionId(this MetadataReference reference)
         {
-            var moduleMetadata = reference.GetModuleMetadata();
-            var reader = moduleMetadata.MetadataReader;
-            return reader.GetModuleVersionIdOrThrow();
+            using (var moduleMetadata = GetManifestModuleMetadata(reference))
+            {
+                return moduleMetadata.MetadataReader.GetModuleVersionIdOrThrow();
+            }
+        }
+
+        private static ModuleMetadata GetManifestModuleMetadata(MetadataReference reference)
+        {
+            // make a copy to avoid disposing shared reference metadata:
+            var metadata = ((MetadataImageReference)reference).GetMetadata();
+            return (metadata as AssemblyMetadata)?.GetModules()[0] ?? (ModuleMetadata)metadata;
         }
 
         internal static void VerifyLocal<TMethodSymbol>(
@@ -585,9 +535,9 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
             Assert.Equal(((Cci.IMethodDefinition)methodData.Method).CallingConvention, expectedGeneric ? Cci.CallingConvention.Generic : Cci.CallingConvention.Default);
         }
 
-        internal static ISymUnmanagedReader ConstructSymReaderWithImports(byte[] exeBytes, string methodName, params string[] importStrings)
+        internal static ISymUnmanagedReader ConstructSymReaderWithImports(ImmutableArray<byte> peImage, string methodName, params string[] importStrings)
         {
-            using (var peReader = new PEReader(ImmutableArray.Create(exeBytes)))
+            using (var peReader = new PEReader(peImage))
             {
                 var metadataReader = peReader.GetMetadataReader();
                 var methodHandle = metadataReader.MethodDefinitions.Single(h => metadataReader.StringComparer.Equals(metadataReader.GetMethodDefinition(h).Name, methodName));

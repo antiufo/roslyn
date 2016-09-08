@@ -47,6 +47,15 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 return (oldFieldTypes == newFieldTypes) ? previous : AnonymousTypeManager.ConstructAnonymousTypeSymbol(previous, newFieldTypes);
             }
 
+            if (previous.IsTupleType)
+            {
+                var previousTuple = (TupleTypeSymbol)previous;
+                NamedTypeSymbol oldUnderlyingType = previousTuple.TupleUnderlyingType;
+                NamedTypeSymbol newUnderlyingType = (NamedTypeSymbol)SubstituteType(oldUnderlyingType).Type;
+
+                return ((object)newUnderlyingType == (object)oldUnderlyingType) ? previous : previousTuple.WithUnderlyingType(newUnderlyingType);
+            }
+
             // TODO: we could construct the result's ConstructedFrom lazily by using a "deep"
             // construct operation here (as VB does), thereby avoiding alpha renaming in most cases.
             // Aleksey has shown that would reduce GC pressure if substitutions of deeply nested generics are common.
@@ -63,7 +72,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             for (int i = 0; i < oldTypeArguments.Length; i++)
             {
                 var oldArgument = modifiers.IsDefault ? new TypeWithModifiers(oldTypeArguments[i]) : new TypeWithModifiers(oldTypeArguments[i], modifiers[i]);
-                var newArgument = oldArgument.SubstituteType(this);
+                var newArgument = oldArgument.SubstituteTypeWithTupleUnification(this);
 
                 if (!changed && oldArgument != newArgument)
                 {
@@ -121,6 +130,27 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
             return new TypeWithModifiers(result);
         }
 
+        /// <summary>
+        /// Same as <see cref="SubstituteType"/>, but with special behavior around tuples.
+        /// In particular, if substitution makes type tuple compatible, transform it into a tuple type.
+        /// </summary>
+        internal TypeWithModifiers SubstituteTypeWithTupleUnification(TypeSymbol previous)
+        {
+            TypeWithModifiers result = SubstituteType(previous);
+
+            // Make it a tuple if it became compatible with one.
+            if ((object)result.Type != null && !previous.IsTupleCompatible())
+            {
+                var possiblyTuple = TupleTypeSymbol.TransformToTupleIfCompatible(result.Type);
+                if ((object)result.Type != possiblyTuple)
+                {
+                    result = new TypeWithModifiers(possiblyTuple, result.CustomModifiers);
+                }
+            }
+
+            return result;
+        }
+
         private static bool IsPossiblyByRefTypeParameter(TypeSymbol type)
         {
             if (type.IsTypeParameter())
@@ -145,6 +175,47 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
                 return new TypeWithModifiers(type, customModifiers).SubstituteType(this).CustomModifiers;
             }
 
+            return SubstituteCustomModifiers(customModifiers);
+        }
+
+        internal ImmutableArray<CustomModifier> SubstituteCustomModifiers(ImmutableArray<CustomModifier> customModifiers)
+        {
+            if (customModifiers.IsDefaultOrEmpty)
+            {
+                return customModifiers;
+            }
+
+            for (int i = 0; i < customModifiers.Length; i++)
+            {
+                var modifier = (NamedTypeSymbol)customModifiers[i].Modifier;
+                var substituted = SubstituteNamedType(modifier);
+
+                if (modifier != substituted)
+                {
+                    var builder = ArrayBuilder<CustomModifier>.GetInstance(customModifiers.Length);
+                    builder.AddRange(customModifiers, i);
+
+                    builder.Add(customModifiers[i].IsOptional ? CSharpCustomModifier.CreateOptional(substituted) : CSharpCustomModifier.CreateRequired(substituted));
+                    for (i++; i < customModifiers.Length; i++)
+                    {
+                        modifier = (NamedTypeSymbol)customModifiers[i].Modifier;
+                        substituted = SubstituteNamedType(modifier);
+
+                        if (modifier != substituted)
+                        {
+                            builder.Add(customModifiers[i].IsOptional ? CSharpCustomModifier.CreateOptional(substituted) : CSharpCustomModifier.CreateRequired(substituted));
+                        }
+                        else
+                        {
+                            builder.Add(customModifiers[i]);
+                        }
+                    }
+
+                    Debug.Assert(builder.Count == customModifiers.Length);
+                    return builder.ToImmutableAndFree();
+                }
+            }
+
             return customModifiers;
         }
 
@@ -161,42 +232,52 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols
         private ArrayTypeSymbol SubstituteArrayType(ArrayTypeSymbol t)
         {
             var oldElement = new TypeWithModifiers(t.ElementType, t.CustomModifiers);
-            TypeWithModifiers element = oldElement.SubstituteType(this);
+            TypeWithModifiers element = oldElement.SubstituteTypeWithTupleUnification(this);
             if (element == oldElement)
             {
                 return t;
             }
 
-            ImmutableArray<NamedTypeSymbol> interfaces = t.InterfacesNoUseSiteDiagnostics();
-            Debug.Assert(0 <= interfaces.Length && interfaces.Length <= 2);
+            if (t.IsSZArray)
+            {
+                ImmutableArray<NamedTypeSymbol> interfaces = t.InterfacesNoUseSiteDiagnostics();
+                Debug.Assert(0 <= interfaces.Length && interfaces.Length <= 2);
 
-            if (interfaces.Length == 1)
-            {
-                Debug.Assert(interfaces[0] is NamedTypeSymbol); // IList<T>
-                interfaces = ImmutableArray.Create<NamedTypeSymbol>((NamedTypeSymbol)SubstituteType(interfaces[0]).AsTypeSymbolOnly());
-            }
-            else if (interfaces.Length == 2)
-            {
-                Debug.Assert(interfaces[0] is NamedTypeSymbol); // IList<T>
-                interfaces = ImmutableArray.Create<NamedTypeSymbol>((NamedTypeSymbol)SubstituteType(interfaces[0]).AsTypeSymbolOnly(), (NamedTypeSymbol)SubstituteType(interfaces[1]).AsTypeSymbolOnly());
-            }
-            else if (interfaces.Length != 0)
-            {
-                throw ExceptionUtilities.Unreachable;
+                if (interfaces.Length == 1)
+                {
+                    Debug.Assert(interfaces[0] is NamedTypeSymbol); // IList<T>
+                    interfaces = ImmutableArray.Create<NamedTypeSymbol>((NamedTypeSymbol)SubstituteType(interfaces[0]).AsTypeSymbolOnly());
+                }
+                else if (interfaces.Length == 2)
+                {
+                    Debug.Assert(interfaces[0] is NamedTypeSymbol); // IList<T>
+                    interfaces = ImmutableArray.Create<NamedTypeSymbol>((NamedTypeSymbol)SubstituteType(interfaces[0]).AsTypeSymbolOnly(), (NamedTypeSymbol)SubstituteType(interfaces[1]).AsTypeSymbolOnly());
+                }
+                else if (interfaces.Length != 0)
+                {
+                    throw ExceptionUtilities.Unreachable;
+                }
+
+                return ArrayTypeSymbol.CreateSZArray(
+                    element.Type,
+                    t.BaseTypeNoUseSiteDiagnostics,
+                    interfaces,
+                    element.CustomModifiers);
             }
 
-            return new ArrayTypeSymbol(
+            return ArrayTypeSymbol.CreateMDArray(
                 element.Type,
                 t.Rank,
+                t.Sizes,
+                t.LowerBounds,
                 t.BaseTypeNoUseSiteDiagnostics,
-                interfaces,
                 element.CustomModifiers);
         }
 
         private PointerTypeSymbol SubstitutePointerType(PointerTypeSymbol t)
         {
             var oldPointedAtType = new TypeWithModifiers(t.PointedAtType, t.CustomModifiers);
-            TypeWithModifiers pointedAtType = oldPointedAtType.SubstituteType(this);
+            TypeWithModifiers pointedAtType = oldPointedAtType.SubstituteTypeWithTupleUnification(this);
             if (pointedAtType == oldPointedAtType)
             {
                 return t;

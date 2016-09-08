@@ -8,18 +8,19 @@ using System.Linq;
 using Microsoft.CodeAnalysis.Collections;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Semantics;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.CSharp
 {
-    internal sealed class AwaitExpressionSpiller : BoundTreeRewriter
+    internal sealed class AwaitExpressionSpiller : BoundTreeRewriterWithStackGuard
     {
         private const BoundKind SpillSequenceBuilder = BoundKind.SequencePoint; // NOTE: this bound kind is hijacked during this phase to represent BoundSpillSequenceBuilder
 
         private readonly SyntheticBoundNodeFactory _F;
         private readonly PooledDictionary<LocalSymbol, LocalSymbol> _tempSubstitution;
 
-        private AwaitExpressionSpiller(MethodSymbol method, CSharpSyntaxNode syntaxNode, TypeCompilationState compilationState, PooledDictionary<LocalSymbol, LocalSymbol> tempSubstitution, DiagnosticBag diagnostics)
+        private AwaitExpressionSpiller(MethodSymbol method, SyntaxNode syntaxNode, TypeCompilationState compilationState, PooledDictionary<LocalSymbol, LocalSymbol> tempSubstitution, DiagnosticBag diagnostics)
         {
             _F = new SyntheticBoundNodeFactory(method, syntaxNode, compilationState, diagnostics);
             _tempSubstitution = tempSubstitution;
@@ -53,6 +54,18 @@ namespace Microsoft.CodeAnalysis.CSharp
                 {
                     return _locals != null;
                 }
+            }
+
+            protected override OperationKind ExpressionKind => OperationKind.None;
+
+            public override void Accept(OperationVisitor visitor)
+            {
+                throw ExceptionUtilities.Unreachable;
+            }
+
+            public override TResult Accept<TArgument, TResult>(OperationVisitor<TArgument, TResult> visitor, TArgument argument)
+            {
+                throw ExceptionUtilities.Unreachable;
             }
 
             public ImmutableArray<LocalSymbol> GetLocals()
@@ -153,14 +166,6 @@ namespace Microsoft.CodeAnalysis.CSharp
                 _statements.Add(statement);
             }
 
-            internal void AddStatements(ImmutableArray<BoundStatement> statements)
-            {
-                foreach (var statement in statements)
-                {
-                    AddStatement(statement);
-                }
-            }
-
             internal void AddExpressions(ImmutableArray<BoundExpression> expressions)
             {
                 foreach (var expression in expressions)
@@ -184,11 +189,12 @@ namespace Microsoft.CodeAnalysis.CSharp
 #endif
         }
 
-        private sealed class LocalSubstituter : BoundTreeRewriter
+        private sealed class LocalSubstituter : BoundTreeRewriterWithStackGuardWithoutRecursionOnTheLeftOfBinaryOperator
         {
             private readonly PooledDictionary<LocalSymbol, LocalSymbol> _tempSubstitution;
 
-            public LocalSubstituter(PooledDictionary<LocalSymbol, LocalSymbol> tempSubstitution)
+            public LocalSubstituter(PooledDictionary<LocalSymbol, LocalSymbol> tempSubstitution, int recursionDepth)
+                : base(recursionDepth)
             {
                 _tempSubstitution = tempSubstitution;
             }
@@ -301,7 +307,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 builder.AddStatement(statement);
             }
 
-            var substituterOpt = (substituteTemps && _tempSubstitution.Count > 0) ? new LocalSubstituter(_tempSubstitution) : null;
+            var substituterOpt = (substituteTemps && _tempSubstitution.Count > 0) ? new LocalSubstituter(_tempSubstitution, RecursionDepth) : null;
             var result = _F.Block(builder.GetLocals(), builder.GetStatements(substituterOpt));
 
             builder.Free();
@@ -385,6 +391,16 @@ namespace Microsoft.CodeAnalysis.CSharp
                             // save the receiver; can get the field later.
                             var receiver = Spill(builder, field.ReceiverOpt, (refKind != RefKind.None && field.FieldSymbol.Type.IsReferenceType) ? refKind : RefKind.None, sideEffectsOnly);
                             return field.Update(receiver, field.FieldSymbol, field.ConstantValueOpt, field.ResultKind, field.Type);
+                        }
+                        goto default;
+
+                    case BoundKind.Call:
+                        var call = (BoundCall)expression;
+                        if (refKind != RefKind.None)
+                        {
+                            Debug.Assert(call.Method.RefKind != RefKind.None);
+                            _F.Diagnostics.Add(ErrorCode.ERR_RefReturningCallAndAwait, _F.Syntax.Location, call.Method);
+                            refKind = RefKind.None; // Switch the RefKind to avoid asserting later in the pipeline
                         }
                         goto default;
 
@@ -494,9 +510,10 @@ namespace Microsoft.CodeAnalysis.CSharp
             EnterStatement(node);
 
             BoundSpillSequenceBuilder builder = null;
-            var boundExpression = VisitExpression(ref builder, node.BoundExpression);
+            var preambleOpt = (BoundStatement)this.Visit(node.LoweredPreambleOpt);
+            var boundExpression = VisitExpression(ref builder, node.Expression);
             var switchSections = this.VisitList(node.SwitchSections);
-            return UpdateStatement(builder, node.Update(boundExpression, node.ConstantTargetOpt, node.InnerLocals, switchSections, node.BreakLabel, node.StringEquality), substituteTemps: true);
+            return UpdateStatement(builder, node.Update(preambleOpt, boundExpression, node.ConstantTargetOpt, node.InnerLocals, node.InnerLocalFunctions, switchSections, node.BreakLabel, node.StringEquality), substituteTemps: true);
         }
 
         public override BoundNode VisitThrowStatement(BoundThrowStatement node)
@@ -547,7 +564,7 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             BoundSpillSequenceBuilder builder = null;
             var expression = VisitExpression(ref builder, node.ExpressionOpt);
-            return UpdateStatement(builder, node.Update(expression), substituteTemps: true);
+            return UpdateStatement(builder, node.Update(node.RefKind, expression), substituteTemps: true);
         }
 
 #if DEBUG
@@ -768,6 +785,9 @@ namespace Microsoft.CodeAnalysis.CSharp
                     case BoundKind.RefValueOperator:
                     case BoundKind.FieldAccess:
                         return RefKind.Ref;
+
+                    case BoundKind.Call:
+                        return ((BoundCall)receiver).Method.RefKind;
                 }
             }
 
@@ -826,14 +846,10 @@ namespace Microsoft.CodeAnalysis.CSharp
                 builder,
                 node.Update(
                     operand,
-                    node.ConversionKind,
-                    node.ResultKind,
+                    node.Conversion,
                     isBaseConversion: node.IsBaseConversion,
-                    symbolOpt: node.SymbolOpt,
                     @checked: node.Checked,
                     explicitCastInCode: node.ExplicitCastInCode,
-                    isExtensionMethod: node.IsExtensionMethod,
-                    isArrayIndex: node.IsArrayIndex,
                     constantValueOpt: node.ConstantValueOpt,
                     type: node.Type));
         }
@@ -949,7 +965,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 // isNotCalss || {clone = receiver; (object)clone != null}
                 condition = _F.LogicalOr(
                                     isNotClass,
-                                    _F.Sequence(
+                                    _F.MakeSequence(
                                         _F.AssignmentExpression(_F.Local(clone), receiver),
                                         _F.ObjectNotEqual(
                                             _F.Convert(_F.SpecialType(SpecialType.System_Object), _F.Local(clone)),
@@ -962,7 +978,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             if (node.Type.SpecialType == SpecialType.System_Void)
             {
                 var whenNotNullStatement = UpdateStatement(whenNotNullBuilder, _F.ExpressionStatement(whenNotNull), substituteTemps: false);
-                whenNotNullStatement = ConditionalReceiverReplacer.Replace(whenNotNullStatement, receiver, node.Id);
+                whenNotNullStatement = ConditionalReceiverReplacer.Replace(whenNotNullStatement, receiver, node.Id, RecursionDepth);
 
                 Debug.Assert(whenNullOpt == null || !LocalRewriter.ReadIsSideeffecting(whenNullOpt));
 
@@ -975,7 +991,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 Debug.Assert(_F.Syntax.IsKind(SyntaxKind.AwaitExpression));
                 var tmp = _F.SynthesizedLocal(node.Type, kind: SynthesizedLocalKind.AwaitSpill, syntax: _F.Syntax);
                 var whenNotNullStatement = UpdateStatement(whenNotNullBuilder, _F.Assignment(_F.Local(tmp), whenNotNull), substituteTemps: false);
-                whenNotNullStatement = ConditionalReceiverReplacer.Replace(whenNotNullStatement, receiver, node.Id);
+                whenNotNullStatement = ConditionalReceiverReplacer.Replace(whenNotNullStatement, receiver, node.Id, RecursionDepth);
 
                 whenNullOpt = whenNullOpt ?? _F.Default(node.Type);
 
@@ -989,7 +1005,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        private class ConditionalReceiverReplacer : BoundTreeRewriter
+        private sealed class ConditionalReceiverReplacer : BoundTreeRewriterWithStackGuardWithoutRecursionOnTheLeftOfBinaryOperator
         {
             private readonly BoundExpression _receiver;
             private readonly int _receiverId;
@@ -999,15 +1015,16 @@ namespace Microsoft.CodeAnalysis.CSharp
             private int _replaced;
 #endif
 
-            private ConditionalReceiverReplacer(BoundExpression receiver, int receiverId)
+            private ConditionalReceiverReplacer(BoundExpression receiver, int receiverId, int recursionDepth)
+                : base(recursionDepth)
             {
                 _receiver = receiver;
                 _receiverId = receiverId;
             }
 
-            public static BoundStatement Replace(BoundNode node, BoundExpression receiver, int receiverID)
+            public static BoundStatement Replace(BoundNode node, BoundExpression receiver, int receiverID, int recursionDepth)
             {
-                var replacer = new ConditionalReceiverReplacer(receiver, receiverID);
+                var replacer = new ConditionalReceiverReplacer(receiver, receiverID, recursionDepth);
                 var result = (BoundStatement)replacer.Visit(node);
 #if DEBUG
                 Debug.Assert(replacer._replaced == 1, "should have replaced exactly one node");
@@ -1107,11 +1124,8 @@ namespace Microsoft.CodeAnalysis.CSharp
                 else
                 {
                     Debug.Assert(_F.Syntax.IsKind(SyntaxKind.AwaitExpression));
-
-                    SynthesizedLocal shortLived = (SynthesizedLocal)local;
-                    SynthesizedLocal longLived = shortLived.WithSynthesizedLocalKindAndSyntax(SynthesizedLocalKind.AwaitSpill, _F.Syntax);
-                    _tempSubstitution.Add(shortLived, longLived);
-
+                    LocalSymbol longLived = local.WithSynthesizedLocalKindAndSyntax(SynthesizedLocalKind.AwaitSpill, _F.Syntax);
+                    _tempSubstitution.Add(local, longLived);
                     builder.AddLocal(longLived, _F.Diagnostics);
                 }
             }

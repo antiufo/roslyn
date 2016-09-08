@@ -10,6 +10,7 @@ using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
 using Microsoft.VisualStudio.Utilities;
 using Moq;
+using Roslyn.Test.Utilities;
 using Roslyn.Utilities;
 using Xunit;
 

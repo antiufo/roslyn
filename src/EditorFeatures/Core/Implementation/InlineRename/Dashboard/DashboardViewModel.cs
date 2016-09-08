@@ -1,21 +1,18 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using Microsoft.CodeAnalysis.Rename;
-using Microsoft.CodeAnalysis.Rename.ConflictEngine;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Editor.Implementation.InlineRename
 {
     internal class DashboardViewModel : INotifyPropertyChanged, IDisposable
     {
-        private const int SymbolDescriptionTextLength = 15;
         private readonly Visibility _renameOverloadsVisibility;
 
         private DashboardSeverity _severity = DashboardSeverity.None;
@@ -47,6 +44,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.InlineRename
 
             _session.ReferenceLocationsChanged += OnReferenceLocationsChanged;
             _session.ReplacementsComputed += OnReplacementsComputed;
+            _session.ReplacementTextChanged += OnReplacementTextChanged;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
@@ -86,20 +84,26 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.InlineRename
             {
                 _errorText = string.IsNullOrEmpty(session.ReplacementText)
                     ? null
-                    : string.Format(EditorFeaturesResources.IsNotAValidIdentifier, GetTruncatedName(session.ReplacementText));
+                    : EditorFeaturesResources.The_new_name_is_not_a_valid_identifier;
             }
 
             UpdateSeverity();
             AllPropertiesChanged();
         }
 
+        private void OnReplacementTextChanged(object sender, EventArgs args)
+        {
+            // When the new name changes, we need to update the display of the new name or the
+            // instructional text, depending on whether the new name and the original name are
+            // distinct.
+            NotifyPropertyChanged(nameof(ShouldShowInstructions));
+            NotifyPropertyChanged(nameof(ShouldShowNewName));
+            NotifyPropertyChanged(nameof(NewNameDescription));
+        }
+
         private void NotifyPropertyChanged([CallerMemberName] string name = null)
         {
-            var handler = this.PropertyChanged;
-            if (handler != null)
-            {
-                handler(this, new PropertyChangedEventArgs(name));
-            }
+            this.PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
 
         private void AllPropertiesChanged()
@@ -111,15 +115,15 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.InlineRename
         {
             if (referenceCount == 1 && fileCount == 1)
             {
-                _searchText = EditorFeaturesResources.FoundReferenceInFile;
+                _searchText = EditorFeaturesResources.Rename_will_update_1_reference_in_1_file;
             }
             else if (fileCount == 1)
             {
-                _searchText = string.Format(EditorFeaturesResources.FoundReferencesInFile, referenceCount);
+                _searchText = string.Format(EditorFeaturesResources.Rename_will_update_0_references_in_1_file, referenceCount);
             }
             else
             {
-                _searchText = string.Format(EditorFeaturesResources.FoundReferencesInMultipleFiles, referenceCount, fileCount);
+                _searchText = string.Format(EditorFeaturesResources.Rename_will_update_0_references_in_1_files, referenceCount, fileCount);
             }
 
             NotifyPropertyChanged("SearchText");
@@ -152,19 +156,36 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.InlineRename
             get { return _severity; }
         }
 
-        public string Description
+        public string HeaderText
         {
             get
             {
-                return string.Format(EditorFeaturesResources.Rename1, GetTruncatedName(Session.OriginalSymbolName));
+                return string.Format(EditorFeaturesResources.Rename_colon_0, Session.OriginalSymbolName);
             }
         }
 
-        private static string GetTruncatedName(string fullName)
+        public string NewNameDescription
         {
-            return fullName.Length < SymbolDescriptionTextLength
-                ? fullName
-                : fullName.Substring(0, SymbolDescriptionTextLength) + "...";
+            get
+            {
+                return string.Format(EditorFeaturesResources.New_name_colon_0, Session.ReplacementText);
+            }
+        }
+
+        public bool ShouldShowInstructions
+        {
+            get
+            {
+                return Session.OriginalSymbolName == Session.ReplacementText;
+            }
+        }
+
+        public bool ShouldShowNewName
+        {
+            get
+            {
+                return !ShouldShowInstructions;
+            }
         }
 
         public string SearchText
@@ -182,7 +203,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.InlineRename
             get
             {
                 return _resolvableConflictCount >= 1
-                    ? string.Format(EditorFeaturesResources.ConflictsWillBeResolved, _resolvableConflictCount)
+                    ? string.Format(EditorFeaturesResources._0_conflict_s_will_be_resolved, _resolvableConflictCount)
                     : null;
             }
         }
@@ -197,7 +218,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.InlineRename
             get
             {
                 return _unresolvableConflictCount >= 1
-                   ? string.Format(EditorFeaturesResources.UnresolvableConflicts, _unresolvableConflictCount)
+                   ? string.Format(EditorFeaturesResources._0_unresolvable_conflict_s, _unresolvableConflictCount)
                    : null;
             }
         }
@@ -283,6 +304,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.InlineRename
 
         public void Dispose()
         {
+            _session.ReplacementTextChanged -= OnReplacementTextChanged;
             _session.ReferenceLocationsChanged -= OnReferenceLocationsChanged;
             _session.ReplacementsComputed -= OnReplacementsComputed;
         }

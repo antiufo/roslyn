@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.ExtractMethod;
 using Microsoft.CodeAnalysis.Editor.CSharp.ExtractMethod;
@@ -122,16 +123,16 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
             Assert.Equal(expected, rootWithTriviaRestored.ToFullString());
         }
 
-        [Fact]
+        [WpfFact]
         [Trait(Traits.Feature, Traits.Features.ExtractMethod)]
-        public void TestExtractMethodCommandHandlerErrorMessage()
+        public async Task TestExtractMethodCommandHandlerErrorMessage()
         {
             var markupCode = @"class A
 {
     [|void Method() {}|]
 }";
 
-            using (var workspace = CSharpWorkspaceFactory.CreateWorkspaceFromLines(new[] { markupCode }))
+            using (var workspace = await TestWorkspace.CreateCSharpAsync(markupCode))
             {
                 var testDocument = workspace.Documents.Single();
                 var container = testDocument.GetOpenTextContainer();
@@ -178,7 +179,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.ExtractMethod
             {
                 Assert.Equal(typeof(TLanguageService), typeof(ISyntaxFactsService));
 
-                return (TLanguageService)((object)new CSharpSyntaxFactsService());
+                return (TLanguageService)((object)CSharpSyntaxFactsService.Instance);
             }
         }
     }

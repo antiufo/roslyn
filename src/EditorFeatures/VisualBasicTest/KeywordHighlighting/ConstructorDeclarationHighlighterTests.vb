@@ -11,33 +11,33 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.KeywordHighlightin
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestConstructorExample1_1()
-            Test(<Text>
+        Public Async Function TestConstructorExample1_1() As Task
+            Await TestAsync(<Text>
 Class C
 {|Cursor:[|Public Sub New|]|}()
     [|Exit Sub|]
 [|End Sub|]
 End Class</Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestConstructorExample1_2()
-            Test(<Text>
+        Public Async Function TestConstructorExample1_2() As Task
+            Await TestAsync(<Text>
 Class C
 [|Public Sub New|]()
     {|Cursor:[|Exit Sub|]|}
 [|End Sub|]
 End Class</Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestConstructorExample1_3()
-            Test(<Text>
+        Public Async Function TestConstructorExample1_3() As Task
+            Await TestAsync(<Text>
 Class C
 [|Public Sub New|]()
     [|Exit Sub|]
 {|Cursor:[|End Sub|]|}
 End Class</Text>)
-        End Sub
+        End Function
     End Class
 End Namespace

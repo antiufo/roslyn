@@ -1,20 +1,22 @@
 // Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Editor;
-using Microsoft.CodeAnalysis.Editor.Implementation.Outlining;
+using Microsoft.CodeAnalysis.Editor.Implementation.Structure;
 using Microsoft.CodeAnalysis.Editor.Shared.Utilities;
 using Microsoft.CodeAnalysis.GeneratedCodeRecognition;
 using Microsoft.CodeAnalysis.Navigation;
+using Microsoft.CodeAnalysis.Options;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
 using Microsoft.VisualStudio.ComponentModelHost;
 using Microsoft.VisualStudio.Editor;
+using Microsoft.VisualStudio.LanguageServices.Implementation.Extensions;
+using Microsoft.VisualStudio.LanguageServices.Implementation.Library;
 using Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
@@ -33,35 +35,36 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation
         private readonly ITextEditorFactoryService _textEditorFactoryService;
         private readonly ITextDocumentFactoryService _textDocumentFactoryService;
         private readonly IMetadataAsSourceFileService _metadataAsSourceFileService;
-        private readonly OutliningTaggerProvider _outliningTaggerProvider;
+        private readonly VisualStudio14StructureTaggerProvider _outliningTaggerProvider;
 
         public VisualStudioSymbolNavigationService(
             SVsServiceProvider serviceProvider,
-            OutliningTaggerProvider outliningTaggerProvider)
+            VisualStudio14StructureTaggerProvider outliningTaggerProvider)
         {
             _serviceProvider = serviceProvider;
             _outliningTaggerProvider = outliningTaggerProvider;
 
-            var componentModel = GetService<SComponentModel, IComponentModel>();
+            var componentModel = _serviceProvider.GetService<SComponentModel, IComponentModel>();
             _editorAdaptersFactory = componentModel.GetService<IVsEditorAdaptersFactoryService>();
             _textEditorFactoryService = componentModel.GetService<ITextEditorFactoryService>();
             _textDocumentFactoryService = componentModel.GetService<ITextDocumentFactoryService>();
             _metadataAsSourceFileService = componentModel.GetService<IMetadataAsSourceFileService>();
         }
 
-        public bool TryNavigateToSymbol(ISymbol symbol, Project project, bool usePreviewTab = false)
+        public bool TryNavigateToSymbol(ISymbol symbol, Project project, OptionSet options, CancellationToken cancellationToken)
         {
             if (project == null || symbol == null)
             {
                 return false;
             }
 
+            options = options ?? project.Solution.Workspace.Options;
             symbol = symbol.OriginalDefinition;
 
             // Prefer visible source locations if possible.
             var sourceLocations = symbol.Locations.Where(loc => loc.IsInSource);
             var visibleSourceLocations = sourceLocations.Where(loc => loc.IsVisibleSourceLocation());
-            var sourceLocation = visibleSourceLocations.Any() ? visibleSourceLocations.First() : sourceLocations.FirstOrDefault();
+            var sourceLocation = visibleSourceLocations.FirstOrDefault() ?? sourceLocations.FirstOrDefault();
 
             if (sourceLocation != null)
             {
@@ -70,7 +73,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation
                 {
                     var editorWorkspace = targetDocument.Project.Solution.Workspace;
                     var navigationService = editorWorkspace.Services.GetService<IDocumentNavigationService>();
-                    return navigationService.TryNavigateToSpan(editorWorkspace, targetDocument.Id, sourceLocation.SourceSpan, usePreviewTab);
+                    return navigationService.TryNavigateToSpan(editorWorkspace, targetDocument.Id, sourceLocation.SourceSpan, options);
                 }
             }
 
@@ -82,13 +85,38 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation
                 return false;
             }
 
-            // Generate new source or retrieve existing source for the symbol in question
-            var result = _metadataAsSourceFileService.GetGeneratedFileAsync(project, symbol).WaitAndGetResult(CancellationToken.None);
+            // Should we prefer navigating to the Object Browser over metadata-as-source?
+            if (options.GetOption(VisualStudioNavigationOptions.NavigateToObjectBrowser, project.Language))
+            {
+                var libraryService = project.LanguageServices.GetService<ILibraryService>();
+                if (libraryService == null)
+                {
+                    return false;
+                }
 
-            var vsRunningDocumentTable4 = GetService<SVsRunningDocumentTable, IVsRunningDocumentTable4>();
+                var compilation = project.GetCompilationAsync(cancellationToken).WaitAndGetResult(cancellationToken);
+                var navInfo = libraryService.NavInfoFactory.CreateForSymbol(symbol, project, compilation);
+                if (navInfo == null)
+                {
+                    navInfo = libraryService.NavInfoFactory.CreateForProject(project);
+                }
+
+                if (navInfo != null)
+                {
+                    var navigationTool = _serviceProvider.GetService<SVsObjBrowser, IVsNavigationTool>();
+                    return navigationTool.NavigateToNavInfo(navInfo) == VSConstants.S_OK;
+                }
+
+                // Note: we'll fallback to Metadata-As-Source if we fail to get IVsNavInfo, but that should never happen.
+            }
+
+            // Generate new source or retrieve existing source for the symbol in question
+            var result = _metadataAsSourceFileService.GetGeneratedFileAsync(project, symbol, cancellationToken).WaitAndGetResult(cancellationToken);
+
+            var vsRunningDocumentTable4 = _serviceProvider.GetService<SVsRunningDocumentTable, IVsRunningDocumentTable4>();
             var fileAlreadyOpen = vsRunningDocumentTable4.IsMonikerValid(result.FilePath);
 
-            var openDocumentService = GetService<SVsUIShellOpenDocument, IVsUIShellOpenDocument>();
+            var openDocumentService = _serviceProvider.GetService<SVsUIShellOpenDocument, IVsUIShellOpenDocument>();
 
             IVsUIHierarchy hierarchy;
             uint itemId;
@@ -115,7 +143,12 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation
             {
                 var editorWorkspace = openedDocument.Project.Solution.Workspace;
                 var navigationService = editorWorkspace.Services.GetService<IDocumentNavigationService>();
-                return navigationService.TryNavigateToSpan(editorWorkspace, openedDocument.Id, result.IdentifierLocation.SourceSpan, usePreviewTab: true);
+
+                return navigationService.TryNavigateToSpan(
+                    workspace: editorWorkspace,
+                    documentId: openedDocument.Id,
+                    textSpan: result.IdentifierLocation.SourceSpan,
+                    options: options.WithChangedOption(NavigationOptions.PreferProvisionalTab, true));
             }
 
             return true;
@@ -290,16 +323,9 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation
             return false;
         }
 
-        private I GetService<S, I>()
-        {
-            var service = (I)_serviceProvider.GetService(typeof(S));
-            Debug.Assert(service != null);
-            return service;
-        }
-
         private IVsRunningDocumentTable GetRunningDocumentTable()
         {
-            var runningDocumentTable = GetService<SVsRunningDocumentTable, IVsRunningDocumentTable>();
+            var runningDocumentTable = _serviceProvider.GetService<SVsRunningDocumentTable, IVsRunningDocumentTable>();
             Debug.Assert(runningDocumentTable != null);
             return runningDocumentTable;
         }

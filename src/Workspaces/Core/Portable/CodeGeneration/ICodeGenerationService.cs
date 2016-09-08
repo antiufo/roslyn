@@ -1,11 +1,9 @@
 ﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Host;
-using Microsoft.CodeAnalysis.Text;
 
 namespace Microsoft.CodeAnalysis.CodeGeneration
 {
@@ -34,12 +32,12 @@ namespace Microsoft.CodeAnalysis.CodeGeneration
         /// <summary>
         /// Returns a newly created named type declaration node from the provided named type.
         /// </summary>
-        SyntaxNode CreateNamedTypeDeclaration(INamedTypeSymbol namedType, CodeGenerationDestination destination = CodeGenerationDestination.Unspecified, CodeGenerationOptions options = null);
+        SyntaxNode CreateNamedTypeDeclaration(INamedTypeSymbol namedType, CodeGenerationDestination destination = CodeGenerationDestination.Unspecified, CodeGenerationOptions options = null, CancellationToken cancellationToken = default(CancellationToken));
 
         /// <summary>
         /// Returns a newly created namespace declaration node from the provided namespace.
         /// </summary>
-        SyntaxNode CreateNamespaceDeclaration(INamespaceSymbol @namespace, CodeGenerationDestination destination = CodeGenerationDestination.Unspecified, CodeGenerationOptions options = null);
+        SyntaxNode CreateNamespaceDeclaration(INamespaceSymbol @namespace, CodeGenerationDestination destination = CodeGenerationDestination.Unspecified, CodeGenerationOptions options = null, CancellationToken cancellationToken = default(CancellationToken));
 
         /// <summary>
         /// Adds an event into destination.

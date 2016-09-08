@@ -1,5 +1,6 @@
 // Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using Microsoft.CodeAnalysis.Editor.Host;
@@ -40,6 +41,11 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Peek
 
         public void AugmentPeekSession(IPeekSession session, IList<IPeekableItem> peekableItems)
         {
+            if (!string.Equals(session.RelationshipName, PredefinedPeekRelationships.Definitions.Name, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
             var triggerPoint = session.GetTriggerPoint(_textBuffer.CurrentSnapshot);
             if (!triggerPoint.HasValue)
             {
@@ -52,7 +58,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Peek
                 return;
             }
 
-            _waitIndicator.Wait(EditorFeaturesResources.Peek, EditorFeaturesResources.LoadingPeekInformation, allowCancel: true, action: context =>
+            _waitIndicator.Wait(EditorFeaturesResources.Peek, EditorFeaturesResources.Loading_Peek_information, allowCancel: true, action: context =>
             {
                 var cancellationToken = context.CancellationToken;
 
@@ -71,11 +77,11 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Peek
                 else
                 {
                     var semanticModel = document.GetSemanticModelAsync(cancellationToken).WaitAndGetResult(cancellationToken);
-                    var symbol = SymbolFinder.FindSymbolAtPosition(semanticModel,
+                    var symbol = SymbolFinder.FindSymbolAtPositionAsync(semanticModel,
                                                                    triggerPoint.Value.Position,
                                                                    document.Project.Solution.Workspace,
                                                                    bindLiteralsToUnderlyingType: true,
-                                                                   cancellationToken: cancellationToken);
+                                                                   cancellationToken: cancellationToken).WaitAndGetResult(cancellationToken);
 
                     if (symbol == null)
                     {

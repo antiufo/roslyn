@@ -61,20 +61,7 @@ namespace Microsoft.CodeAnalysis.Text.Shared.Extensions
         /// </summary>
         public static int? GetLastNonWhitespacePosition(this ITextSnapshotLine line)
         {
-            Contract.ThrowIfNull(line);
-
-            int startPosition = line.Start;
-            var text = line.GetText();
-
-            for (int i = text.Length - 1; i >= 0; i--)
-            {
-                if (!char.IsWhiteSpace(text[i]))
-                {
-                    return startPosition + i;
-                }
-            }
-
-            return null;
+            return line.AsTextLine().GetLastNonWhitespacePosition();
         }
 
         /// <summary>
@@ -140,6 +127,38 @@ namespace Microsoft.CodeAnalysis.Text.Shared.Extensions
         public static int GetLineOffsetFromColumn(this ITextSnapshotLine line, int column, IEditorOptions editorOptions)
         {
             return line.GetText().GetLineOffsetFromColumn(column, editorOptions.GetTabSize());
+        }
+
+        /// <summary>
+        /// Checks if the given line at the given snapshot index starts with the provided value.
+        /// </summary>
+        public static bool StartsWith(this ITextSnapshotLine line, int index, string value, bool ignoreCase)
+        {
+            var snapshot = line.Snapshot;
+            if (index + value.Length > snapshot.Length)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < value.Length; i++)
+            {
+                var snapshotIndex = index + i;
+                var actualCharacter = snapshot[snapshotIndex];
+                var expectedCharacter = value[i];
+
+                if (ignoreCase)
+                {
+                    actualCharacter = char.ToLowerInvariant(actualCharacter);
+                    expectedCharacter = char.ToLowerInvariant(expectedCharacter);
+                }
+
+                if (actualCharacter != expectedCharacter)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
     }
 }

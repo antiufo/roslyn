@@ -3,19 +3,21 @@
 using Microsoft.CodeAnalysis.Editor.Commands;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Test.EditorUtilities;
+using Roslyn.Test.Utilities;
 using Xunit;
 
 namespace Microsoft.CodeAnalysis.Editor.UnitTests.Commands
 {
     public class TypeCharCommandArgsTests
     {
-        [Fact]
+        [WpfFact]
         public void TestTypedCharProperty()
         {
-            var view = EditorFactory.CreateView(TestExportProvider.ExportProviderWithCSharpAndVisualBasic, "class C { }");
-
-            var args = new TypeCharCommandArgs(view, view.TextBuffer, 'c');
-            Assert.Equal('c', args.TypedChar);
+            using (var disposableView = EditorFactory.CreateView(TestExportProvider.ExportProviderWithCSharpAndVisualBasic, "class C { }"))
+            {
+                var args = new TypeCharCommandArgs(disposableView.TextView, disposableView.TextView.TextBuffer, 'c');
+                Assert.Equal('c', args.TypedChar);
+            }
         }
     }
 }

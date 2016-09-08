@@ -49,7 +49,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ERR_LibNotFound = 2017
         'ERR_MaximumErrors = 2020       unused in Roslyn.
         ERR_IconFileAndWin32ResFile = 2023
-        'WRN_ReservedReference = 2024       'unissued by native compiler due to bug. 
+        'WRN_ReservedReference = 2024       ' unused by native compiler due to bug. 
         WRN_NoConfigInResponseFile = 2025
         ' WRN_InvalidWarningId = 2026       ' unused in Roslyn.
         'ERR_WatsonSendNotOptedIn = 2027
@@ -81,9 +81,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         '//in other contexts, please make sure to appropriately modify Bindable::ResolveOverloadingShouldSkipBadMember
         ERR_UnreferencedAssemblyEvent3 = 30005
         ERR_UnreferencedModuleEvent3 = 30006
-        ERR_UnreferencedAssemblyBase3 = 30007
+        ' ERR_UnreferencedAssemblyBase3 = 30007
         ERR_UnreferencedModuleBase3 = 30008
-        ERR_UnreferencedAssemblyImplements3 = 30009
+        ' ERR_UnreferencedAssemblyImplements3 = 30009
         ERR_UnreferencedModuleImplements3 = 30010
 
         'ERR_CodegenError = 30011
@@ -668,7 +668,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ERR_RequiredNonObsoleteNewCall4 = 30920
         ERR_InheritsTypeArgAccessMismatch7 = 30921
         ERR_InheritsTypeArgAccessMismatchOutside5 = 30922
-        'ERR_AccessMismatchTypeArgImplEvent7 = 30923    unsued in Roslyn
+        'ERR_AccessMismatchTypeArgImplEvent7 = 30923    unused in Roslyn
         'ERR_AccessMismatchTypeArgImplEvent5 = 30924    unused in Roslyn
         ERR_PartialTypeAccessMismatch3 = 30925
         ERR_PartialTypeBadMustInherit1 = 30926
@@ -944,7 +944,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ERR_MustOverridesInClass1 = 31411
         ERR_HandlesSyntaxInClass = 31412
         ERR_SynthMemberShadowsMustOverride5 = 31413
-        'ERR_CantImplementNonVirtual3 = 31415   unsued in Roslyn
+        'ERR_CantImplementNonVirtual3 = 31415   unused in Roslyn
         ' ERR_MemberShadowsSynthMustOverride5 = 31416   unused in Roslyn
         ERR_CannotOverrideInAccessibleMember = 31417
         ERR_HandlesSyntaxInModule = 31418
@@ -1451,7 +1451,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ERR_MultilineLambdasCannotContainOnError = 36668
         'ERR_BranchOutOfMultilineLambda = 36669 obsolete - was not even reported in Dev10 any more.
         ERR_LambdaBindingMismatch2 = 36670
-        ERR_MultilineLambdaShadowLocal1 = 36671
+        'ERR_MultilineLambdaShadowLocal1 = 36671 'unused in Roslyn
         ERR_StaticInLambda = 36672
         ERR_MultilineLambdaMissingSub = 36673
         ERR_MultilineLambdaMissingFunction = 36674
@@ -1468,7 +1468,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ERR_OverloadCandidate1 = 36712
         ERR_AutoPropertyInitializedInStructure = 36713
         ERR_InitializedExpandedProperty = 36714
-        ERR_NewExpandedProperty = 36715
+        'ERR_NewExpandedProperty = 36715 'unused in Roslyn
 
         ERR_LanguageVersion = 36716
         ERR_ArrayInitNoType = 36717
@@ -1545,7 +1545,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ERR_CannotUseGenericBaseTypeAcrossAssemblyBoundaries = 36925
         ERR_BadAsyncByRefParam = 36926
         ERR_BadIteratorByRefParam = 36927
-        ERR_BadAsyncExpressionLambda = 36928
+        'ERR_BadAsyncExpressionLambda = 36928 'unused in Roslyn
         ERR_BadAsyncInQuery = 36929
         ERR_BadGetAwaiterMethod1 = 36930
         'ERR_ExpressionTreeContainsAwait = 36931
@@ -1561,7 +1561,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         '// unused 36941
         ERR_BadReturnValueInIterator = 36942
         ERR_BadAwaitInTryHandler = 36943
-        ERR_BadAwaitObject = 36944
+        'ERR_BadAwaitObject = 36944 'unused in Roslyn
         ERR_BadAsyncReturn = 36945
         ERR_BadResumableAccessReturnVariable = 36946
         ERR_BadIteratorExpressionLambda = 36947
@@ -1570,7 +1570,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ERR_ConstructorAsync = 36950
         ERR_InvalidLambdaModifier = 36951
         ERR_ReturnFromNonGenericTaskAsync = 36952
-        ERR_BadAutoPropertyFlags1 = 36953
+        'ERR_BadAutoPropertyFlags1 = 36953 'unused in Roslyn
 
         ERR_BadOverloadCandidates2 = 36954
         ERR_BadStaticInitializerInResumable = 36955
@@ -1581,7 +1581,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ERR_SignButNoPrivateKey = 36961
         ERR_InvalidVersionFormat = 36962
 
-        ERR_NoScriptsSpecified = 36963
+        ERR_ExpectedSingleScript = 36963
         ERR_ReferenceDirectiveOnlyAllowedInScripts = 36964
         ERR_NamespaceNotAllowedInScript = 36965
         ERR_KeywordNotAllowedInScript = 36966
@@ -1605,6 +1605,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ERR_PublicKeyContainerFailure = 36981
 
         ERR_InvalidAssemblyCulture = 36982
+        ERR_EncUpdateFailedMissingAttribute = 36983
 
         ERR_CantAwaitAsyncSub1 = 37001
         ERR_ResumableLambdaInExpressionTree = 37050
@@ -1679,9 +1680,27 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ERR_InterpolationAlignmentOutOfRange = 37250
         ERR_InterpolatedStringFactoryError = 37251
         ERR_DebugEntryPointNotSourceMethodDefinition = 37252
+        ERR_InvalidPathMap = 37253
+        ERR_PublicSignNoKey = 37254
+        ERR_TooManyUserStrings = 37255
+        ERR_PeWritingFailure = 37256
 
-        ERR_LastPlusOne
+        ERR_OptionMustBeAbsolutePath = 37257
 
+        ERR_TupleExplicitNamesOnAllMembersOrNone = 37258
+        ERR_TupleTooFewElements = 37259
+        ERR_TupleReservedMemberNameAnyPosition = 37260
+        ERR_TupleReservedMemberName = 37261
+        ERR_TupleDuplicateMemberName = 37262
+
+        ERR_RefReturningCallInExpressionTree = 37263
+
+        ERR_SourceLinkRequiresPortablePdb = 37264
+        ERR_CannotEmbedWithoutPdb = 37265
+
+        ERR_InvalidInstrumentationKind = 37266
+
+        ERR_ValueTupleTypeRefResolutionError = 37267
 
         '// WARNINGS BEGIN HERE
         WRN_UseOfObsoleteSymbol2 = 40000
@@ -1879,7 +1898,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         'WRN_PDBConstantStringValueTooLong = 42363  we gave up on this warning. See comments in commonCompilation.Emit()
         WRN_ReturnTypeAttributeOnWriteOnlyProperty = 42364
 
-        WRN_UnreachableCode = 42365
+        ' // AVAILABLE 42365
+
         WRN_InvalidVersionFormat = 42366
         WRN_MainIgnored = 42367
         WRN_EmptyPrefixAndXmlnsLocalName = 42368
@@ -1913,7 +1933,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         IDS_ProjectSettingsLocationName = 56000
         IDS_FunctionReturnType = 56001
         IDS_TheSystemCannotFindThePathSpecified = 56002
-        IDS_UnrecognizedFileFormat = 56003
+        ' available: 56003
         IDS_MSG_ADDMODULE = 56004
         IDS_MSG_ADDLINKREFERENCE = 56005
         IDS_MSG_ADDREFERENCE = 56006
@@ -1936,5 +1956,20 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         FEATURE_GlobalNamespace
         FEATURE_NullPropagatingOperator
         FEATURE_NameOfExpressions
+        FEATURE_ReadonlyAutoProperties
+        FEATURE_RegionsEverywhere
+        FEATURE_MultilineStringLiterals
+        FEATURE_CObjInAttributeArguments
+        FEATURE_LineContinuationComments
+        FEATURE_TypeOfIsNot
+        FEATURE_YearFirstDateLiterals
+        FEATURE_WarningDirectives
+        FEATURE_PartialModules
+        FEATURE_PartialInterfaces
+        FEATURE_ImplementingReadonlyOrWriteonlyPropertyWithReadwrite
+        FEATURE_DigitSeparators
+        FEATURE_BinaryLiterals
+        FEATURE_Tuples
+        FEATURE_IOperation
     End Enum
 End Namespace

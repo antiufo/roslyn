@@ -3,7 +3,6 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Threading;
 using System.Xml;
 using XmlNames = Roslyn.Utilities.DocumentationCommentXmlNames;
 
@@ -60,7 +59,7 @@ namespace Microsoft.CodeAnalysis.Shared.Utilities
         public ImmutableArray<string> ExceptionTypes { get; private set; }
 
         /// <summary>
-        /// The item named named in the &lt;completionlist&gt; tag's cref attribute.
+        /// The item named in the &lt;completionlist&gt; tag's cref attribute.
         /// Null if the tag or cref attribute didn't exist.
         /// </summary>
         public string CompletionListCref { get; private set; }

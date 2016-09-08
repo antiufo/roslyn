@@ -1,19 +1,24 @@
 ' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 Imports Microsoft.CodeAnalysis.Completion
+Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
 Imports Microsoft.CodeAnalysis.VisualBasic.Completion.Providers
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Completion.CompletionProviders
     Public Class ObjectCreationCompletionProviderTests
         Inherits AbstractVisualBasicCompletionProviderTests
 
-        Friend Overrides Function CreateCompletionProvider() As CompletionListProvider
+        Public Sub New(workspaceFixture As VisualBasicTestWorkspaceFixture)
+            MyBase.New(workspaceFixture)
+        End Sub
+
+        Friend Overrides Function CreateCompletionProvider() As CompletionProvider
             Return New ObjectCreationCompletionProvider()
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        <WorkItem(827897)>
-        Public Sub InYieldReturn()
+        <WorkItem(827897, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/827897")>
+        Public Async Function TestInYieldReturn() As Task
             Dim markup = <Text><![CDATA[
 Imports System
 Imports System.Collections.Generic
@@ -25,12 +30,12 @@ Class C
 End Class
 ]]></Text>.Value
 
-            VerifyItemExists(markup, "EntryPointNotFoundException")
-        End Sub
+            Await VerifyItemExistsAsync(markup, "EntryPointNotFoundException")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        <WorkItem(827897)>
-        Public Sub InAsyncMethodReturnStatement()
+        <WorkItem(827897, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/827897")>
+        Public Async Function TestInAsyncMethodReturnStatement() As Task
             Dim markup = <Text><![CDATA[
 Imports System
 Imports System.Threading.Tasks
@@ -43,12 +48,12 @@ Class C
 End Class
 ]]></Text>.Value
 
-            VerifyItemExists(markup, "EntryPointNotFoundException")
-        End Sub
+            Await VerifyItemExistsAsync(markup, "EntryPointNotFoundException")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        <WorkItem(892209)>
-        Public Sub UnwrapNullable()
+        <WorkItem(892209, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/892209")>
+        Public Async Function TestUnwrapNullable() As Task
             Dim markup = <Text><![CDATA[
 Public Class C
   Sub M1(arg As N.S?)
@@ -68,11 +73,11 @@ End Namespace
 
 ]]></Text>.Value
 
-            VerifyItemExists(markup, "N.S")
-        End Sub
+            Await VerifyItemExistsAsync(markup, "N.S")
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Completion)>
-        Public Sub NotInTrivia()
+        Public Async Function TestNotInTrivia() As Task
             Dim markup = <Text><![CDATA[
 Public Class C
   Sub M1(arg As N.S?)
@@ -92,7 +97,7 @@ End Namespace
 
 ]]></Text>.Value
 
-            VerifyItemExists(markup, "N.S")
-        End Sub
+            Await VerifyItemExistsAsync(markup, "N.S")
+        End Function
     End Class
 End Namespace

@@ -49,6 +49,7 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
         internal string GetErrorMessageAndMissingAssemblyIdentities(DiagnosticBag diagnostics, DiagnosticFormatter formatter, CultureInfo preferredUICulture, AssemblyIdentity linqLibrary, out bool useReferencedModulesOnly, out ImmutableArray<AssemblyIdentity> missingAssemblyIdentities)
         {
             var errors = diagnostics.AsEnumerable().Where(d => d.Severity == DiagnosticSeverity.Error);
+            missingAssemblyIdentities = default(ImmutableArray<AssemblyIdentity>);
             foreach (var error in errors)
             {
                 missingAssemblyIdentities = this.GetMissingAssemblyIdentities(error, linqLibrary);
@@ -119,6 +120,11 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
                 get { return DiagnosticSeverity.Error; }
             }
 
+            public override bool IsSuppressed
+            {
+                get { return false; }
+            }
+
             public override int WarningLevel
             {
                 get { throw new NotImplementedException(); }
@@ -150,6 +156,11 @@ namespace Microsoft.CodeAnalysis.ExpressionEvaluator
             }
 
             internal override Diagnostic WithSeverity(DiagnosticSeverity severity)
+            {
+                throw new NotImplementedException();
+            }
+
+            internal override Diagnostic WithIsSuppressed(bool isSuppressed)
             {
                 throw new NotImplementedException();
             }

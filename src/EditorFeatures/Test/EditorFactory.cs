@@ -1,10 +1,15 @@
 // Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System.Text;
+using System.Threading;
+using Microsoft.CodeAnalysis.Editor.Shared.Utilities;
+using Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces;
 using Microsoft.VisualStudio.Composition;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
 using Microsoft.VisualStudio.Utilities;
+using Roslyn.Test.Utilities;
+using Microsoft.CodeAnalysis.Editor.UnitTests;
 
 namespace Roslyn.Test.EditorUtilities
 {
@@ -29,27 +34,23 @@ namespace Roslyn.Test.EditorUtilities
             return buffer;
         }
 
-        public static IWpfTextView CreateView(
+        public static DisposableTextView CreateView(
             ExportProvider exportProvider,
             params string[] lines)
         {
             return CreateView("text", exportProvider, lines);
         }
 
-        public static IWpfTextView CreateView(
+        public static DisposableTextView CreateView(
             string contentType,
             ExportProvider exportProvider,
             params string[] lines)
         {
-            var buffer = CreateBuffer(contentType, exportProvider, lines);
-            return exportProvider.GetExportedValue<ITextEditorFactoryService>().CreateTextView(buffer);
-        }
+            TestWorkspace.ResetThreadAffinity();
+            WpfTestCase.RequireWpfFact($"Creates an IWpfTextView through {nameof(EditorFactory)}.{nameof(CreateView)}");
 
-        public static IWpfTextView CreateView(
-            ExportProvider exportProvider,
-            ITextBuffer buffer)
-        {
-            return exportProvider.GetExportedValue<ITextEditorFactoryService>().CreateTextView(buffer);
+            var buffer = CreateBuffer(contentType, exportProvider, lines);
+            return exportProvider.GetExportedValue<ITextEditorFactoryService>().CreateDisposableTextView(buffer);
         }
 
         public static string LinesToFullText(params string[] lines)

@@ -5,7 +5,10 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CodeFixes;
+using Microsoft.CodeAnalysis.Editor.Host;
 using Microsoft.CodeAnalysis.Internal.Log;
+using Microsoft.CodeAnalysis.Shared.TestHooks;
+using Microsoft.CodeAnalysis.Shared.Utilities;
 using Microsoft.VisualStudio.Language.Intellisense;
 using Microsoft.VisualStudio.Text;
 using Roslyn.Utilities;
@@ -23,15 +26,17 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
             Workspace workspace,
             ITextBuffer subjectBuffer,
             ICodeActionEditHandlerService editHandler,
+            IWaitIndicator waitIndicator,
             FixAllCodeAction codeAction,
             FixAllProvider provider,
-            Diagnostic originalFixedDiagnostic)
-            : base(workspace, subjectBuffer, editHandler, codeAction, provider)
+            Diagnostic originalFixedDiagnostic,
+            IAsynchronousOperationListener operationListener)
+            : base(workspace, subjectBuffer, editHandler, waitIndicator, codeAction, provider, operationListener)
         {
             _fixedDiagnostic = originalFixedDiagnostic;
         }
 
-        public string GetDiagnosticID()
+        public virtual string GetDiagnosticID()
         {
             // we log diagnostic id as it is if it is from us
             if (_fixedDiagnostic.Descriptor.CustomTags.Any(t => t == WellKnownDiagnosticTags.Telemetry))
@@ -62,11 +67,13 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
             return SpecializedTasks.Default<object>();
         }
 
-        public override void Invoke(CancellationToken cancellationToken)
+        protected override async Task InvokeAsync(
+            IProgressTracker progressTracker, CancellationToken cancellationToken)
         {
+            this.AssertIsForeground();
             using (Logger.LogBlock(FunctionId.CodeFixes_FixAllOccurrencesSession, cancellationToken))
             {
-                base.Invoke(cancellationToken);
+                await base.InvokeAsync(progressTracker, cancellationToken).ConfigureAwait(false);
             }
         }
     }

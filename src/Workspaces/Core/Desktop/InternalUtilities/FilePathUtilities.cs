@@ -2,7 +2,6 @@
 
 using System;
 using System.IO;
-using Microsoft.CodeAnalysis;
 
 namespace Roslyn.Utilities
 {
@@ -10,7 +9,10 @@ namespace Roslyn.Utilities
     {
         public static bool IsNestedPath(string basePath, string fullPath)
         {
-            return fullPath.StartsWith(basePath, StringComparison.OrdinalIgnoreCase);
+            return basePath.Length > 0
+                && fullPath.Length > basePath.Length
+                && fullPath.StartsWith(basePath, StringComparison.OrdinalIgnoreCase)
+                && (PathUtilities.IsDirectorySeparator(basePath[basePath.Length - 1]) || PathUtilities.IsDirectorySeparator(fullPath[basePath.Length]));
         }
 
         public static string GetNestedPath(string baseDirectory, string fullPath)
@@ -84,19 +86,6 @@ namespace Roslyn.Utilities
             }
 
             return relativePath;
-        }
-
-        internal static void RequireAbsolutePath(string path, string argumentName)
-        {
-            if (path == null)
-            {
-                throw new ArgumentNullException(argumentName);
-            }
-
-            if (!PathUtilities.IsAbsolute(path))
-            {
-                throw new ArgumentException(WorkspacesResources.AbsolutePathExpected, argumentName);
-            }
         }
 
         public static bool PathsEqual(string path1, string path2)

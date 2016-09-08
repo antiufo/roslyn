@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.IO;
 using System.Reflection.Metadata;
 using System.Runtime.InteropServices;
 using Roslyn.Utilities;
@@ -99,23 +100,25 @@ namespace Microsoft.CodeAnalysis
             TypeSymbol type;
             HandleKind tokenType = token.Kind;
 
-            if (tokenType == HandleKind.TypeDefinition)
+            switch (tokenType)
             {
-                type = GetTypeOfTypeDef((TypeDefinitionHandle)token, out isNoPiaLocalType, isContainingType: false);
-            }
-            else if (tokenType == HandleKind.TypeSpecification)
-            {
-                isNoPiaLocalType = false;
-                type = GetTypeOfTypeSpec((TypeSpecificationHandle)token);
-            }
-            else if (tokenType == HandleKind.TypeReference)
-            {
-                type = GetTypeOfTypeRef((TypeReferenceHandle)token, out isNoPiaLocalType);
-            }
-            else
-            {
-                isNoPiaLocalType = false;
-                type = GetUnsupportedMetadataTypeSymbol();
+                case HandleKind.TypeDefinition:
+                    type = GetTypeOfTypeDef((TypeDefinitionHandle)token, out isNoPiaLocalType, isContainingType: false);
+                    break;
+
+                case HandleKind.TypeSpecification:
+                    isNoPiaLocalType = false;
+                    type = GetTypeOfTypeSpec((TypeSpecificationHandle)token);
+                    break;
+
+                case HandleKind.TypeReference:
+                    type = GetTypeOfTypeRef((TypeReferenceHandle)token, out isNoPiaLocalType);
+                    break;
+
+                default:
+                    isNoPiaLocalType = false;
+                    type = GetUnsupportedMetadataTypeSymbol();
+                    break;
             }
 
             Debug.Assert(type != null);
@@ -188,27 +191,50 @@ namespace Microsoft.CodeAnalysis
                     break;
 
                 case SignatureTypeCode.TypeHandle:
-                    typeSymbol = ResolveSignatureTypeHandleOrThrow(ref ppSig, out refersToNoPiaLocalType);
+                    // Spec (6th edition): In II.23.2.12 and II.23.2.14, it is implied that the token in (CLASS | VALUETYPE) TypeDefOrRefOrSpecEncoded 
+                    // can be a TypeSpec, when in fact it must be a TypeDef or TypeRef.
+                    // See https://github.com/dotnet/roslyn/issues/7970
+                    typeSymbol = GetSymbolForTypeHandleOrThrow(ppSig.ReadTypeHandle(), out refersToNoPiaLocalType, allowTypeSpec: false, requireShortForm: true);
                     break;
 
                 case SignatureTypeCode.Array:
                     int countOfDimensions;
-                    int countOfBounds;
+                    int countOfSizes;
                     int countOfLowerBounds;
 
                     modifiers = DecodeModifiersOrThrow(ref ppSig, out typeCode);
                     typeSymbol = DecodeTypeOrThrow(ref ppSig, typeCode, out refersToNoPiaLocalType);
                     if (!ppSig.TryReadCompressedInteger(out countOfDimensions) ||
-                        !ppSig.TryReadCompressedInteger(out countOfBounds))
+                        !ppSig.TryReadCompressedInteger(out countOfSizes))
                     {
                         throw new UnsupportedSignatureContent();
                     }
 
-                    // If bounds are specified, ignore them -- we don't support it
-                    for (int i = 0; i < countOfBounds; i++)
+                    // The most common case is when countOfSizes is 0.
+                    ImmutableArray<int> sizes;
+
+                    if (countOfSizes == 0)
                     {
-                        int _;
-                        ppSig.TryReadCompressedInteger(out _);
+                        sizes = ImmutableArray<int>.Empty;
+                    }
+                    else
+                    {
+                        var builder = ArrayBuilder<int>.GetInstance(countOfSizes);
+
+                        for (int i = 0; i < countOfSizes; i++)
+                        {
+                            int size;
+                            if (ppSig.TryReadCompressedInteger(out size))
+                            {
+                                builder.Add(size);
+                            }
+                            else
+                            {
+                                throw new UnsupportedSignatureContent();
+                            }
+                        }
+
+                        sizes = builder.ToImmutableAndFree();
                     }
 
                     if (!ppSig.TryReadCompressedInteger(out countOfLowerBounds))
@@ -216,14 +242,46 @@ namespace Microsoft.CodeAnalysis
                         throw new UnsupportedSignatureContent();
                     }
 
-                    // Also ignore lower bounds since we don't support anything but zero
-                    for (int i = 0; i < countOfLowerBounds; i++)
+                    // The most common case is when countOfLowerBounds == countOfDimensions and they are all 0.
+                    // This is what Default will stand for.
+                    ImmutableArray<int> lowerBounds = default(ImmutableArray<int>);
+
+                    if (countOfLowerBounds == 0)
                     {
-                        int _;
-                        ppSig.TryReadCompressedInteger(out _);
+                        lowerBounds = ImmutableArray<int>.Empty;
+                    }
+                    else
+                    {
+                        ArrayBuilder<int> builder = countOfLowerBounds != countOfDimensions ? ArrayBuilder<int>.GetInstance(countOfLowerBounds, 0) : null;
+
+                        for (int i = 0; i < countOfLowerBounds; i++)
+                        {
+                            int lowerBound;
+                            if (ppSig.TryReadCompressedSignedInteger(out lowerBound))
+                            {
+                                if (lowerBound != 0)
+                                {
+                                    if (builder == null)
+                                    {
+                                        builder = ArrayBuilder<int>.GetInstance(countOfLowerBounds, 0);
+                                    }
+
+                                    builder[i] = lowerBound;
+                                }
+                            }
+                            else
+                            {
+                                throw new UnsupportedSignatureContent();
+                            }
+                        }
+
+                        if (builder != null)
+                        {
+                            lowerBounds = builder.ToImmutableAndFree();
+                        }
                     }
 
-                    typeSymbol = GetArrayTypeSymbol(countOfDimensions, typeSymbol, modifiers);
+                    typeSymbol = GetMDArrayTypeSymbol(countOfDimensions, typeSymbol, modifiers, sizes, lowerBounds);
                     break;
 
                 case SignatureTypeCode.SZArray:
@@ -257,49 +315,7 @@ namespace Microsoft.CodeAnalysis
                     break;
 
                 case SignatureTypeCode.GenericTypeInstance:
-                    SignatureTypeCode elementTypeCode = ppSig.ReadSignatureTypeCode();
-                    if (elementTypeCode != SignatureTypeCode.TypeHandle)
-                    {
-                        throw new UnsupportedSignatureContent();
-                    }
-
-                    EntityHandle tokenGeneric = ppSig.ReadTypeHandle();
-                    int argumentCount;
-                    if (!ppSig.TryReadCompressedInteger(out argumentCount))
-                    {
-                        throw new UnsupportedSignatureContent();
-                    }
-
-                    TypeSymbol generic = GetTypeOfToken(tokenGeneric, out refersToNoPiaLocalType);
-                    Debug.Assert(!refersToNoPiaLocalType || generic.TypeKind == TypeKind.Error);
-
-                    var argumentsBuilder = ArrayBuilder<KeyValuePair<TypeSymbol, ImmutableArray<ModifierInfo<TypeSymbol>>>>.GetInstance(argumentCount);
-                    var argumentRefersToNoPiaLocalTypeBuilder = ArrayBuilder<bool>.GetInstance(argumentCount);
-
-                    for (int argumentIndex = 0; argumentIndex < argumentCount; argumentIndex++)
-                    {
-                        bool argumentRefersToNoPia;
-                        modifiers = DecodeModifiersOrThrow(ref ppSig, out typeCode);
-                        argumentsBuilder.Add(KeyValuePair.Create(DecodeTypeOrThrow(ref ppSig, typeCode, out argumentRefersToNoPia), modifiers));
-                        argumentRefersToNoPiaLocalTypeBuilder.Add(argumentRefersToNoPia);
-                    }
-
-                    // The instantiated type might have a generic parent, in which case some or all of the type
-                    // arguments might actually be for the parent.
-
-                    var arguments = argumentsBuilder.ToImmutableAndFree();
-                    var argumentRefersToNoPiaLocalType = argumentRefersToNoPiaLocalTypeBuilder.ToImmutableAndFree();
-                    typeSymbol = SubstituteTypeParameters(generic, arguments, argumentRefersToNoPiaLocalType);
-
-                    foreach (bool flag in argumentRefersToNoPiaLocalType)
-                    {
-                        if (flag)
-                        {
-                            refersToNoPiaLocalType = true;
-                            break;
-                        }
-                    }
-
+                    typeSymbol = DecodeGenericTypeInstanceOrThrow(ref ppSig, out refersToNoPiaLocalType);
                     break;
 
                 default:
@@ -309,30 +325,88 @@ namespace Microsoft.CodeAnalysis
             return typeSymbol;
         }
 
+        private TypeSymbol DecodeGenericTypeInstanceOrThrow(ref BlobReader ppSig, out bool refersToNoPiaLocalType)
+        {
+            SignatureTypeCode elementTypeCode = ppSig.ReadSignatureTypeCode();
+            if (elementTypeCode != SignatureTypeCode.TypeHandle)
+            {
+                throw new UnsupportedSignatureContent();
+            }
+
+            EntityHandle tokenGeneric = ppSig.ReadTypeHandle();
+            int argumentCount;
+            if (!ppSig.TryReadCompressedInteger(out argumentCount))
+            {
+                throw new UnsupportedSignatureContent();
+            }
+
+            TypeSymbol generic = GetTypeOfToken(tokenGeneric, out refersToNoPiaLocalType);
+            Debug.Assert(!refersToNoPiaLocalType || generic.TypeKind == TypeKind.Error);
+
+            var argumentsBuilder = ArrayBuilder<KeyValuePair<TypeSymbol, ImmutableArray<ModifierInfo<TypeSymbol>>>>.GetInstance(argumentCount);
+            var argumentRefersToNoPiaLocalTypeBuilder = ArrayBuilder<bool>.GetInstance(argumentCount);
+
+            for (int argumentIndex = 0; argumentIndex < argumentCount; argumentIndex++)
+            {
+                bool argumentRefersToNoPia;
+                SignatureTypeCode typeCode;
+                ImmutableArray<ModifierInfo<TypeSymbol>> modifiers = DecodeModifiersOrThrow(ref ppSig, out typeCode);
+                argumentsBuilder.Add(KeyValuePair.Create(DecodeTypeOrThrow(ref ppSig, typeCode, out argumentRefersToNoPia), modifiers));
+                argumentRefersToNoPiaLocalTypeBuilder.Add(argumentRefersToNoPia);
+            }
+
+            // The instantiated type might have a generic parent, in which case some or all of the type
+            // arguments might actually be for the parent.
+
+            var arguments = argumentsBuilder.ToImmutableAndFree();
+            var argumentRefersToNoPiaLocalType = argumentRefersToNoPiaLocalTypeBuilder.ToImmutableAndFree();
+            TypeSymbol typeSymbol = SubstituteTypeParameters(generic, arguments, argumentRefersToNoPiaLocalType);
+
+            foreach (bool flag in argumentRefersToNoPiaLocalType)
+            {
+                if (flag)
+                {
+                    refersToNoPiaLocalType = true;
+                    break;
+                }
+            }
+
+            return typeSymbol;
+        }
+
         /// <exception cref="UnsupportedSignatureContent">If the encoded type is invalid.</exception>
         /// <exception cref="BadImageFormatException">An exception from metadata reader.</exception>
-        private TypeSymbol ResolveSignatureTypeHandleOrThrow(ref BlobReader ppSig, out bool isNoPiaLocalType)
+        internal TypeSymbol GetSymbolForTypeHandleOrThrow(EntityHandle handle, out bool isNoPiaLocalType, bool allowTypeSpec, bool requireShortForm)
         {
+            if (handle.IsNil)
+            {
+                throw new UnsupportedSignatureContent();
+            }
+
             TypeSymbol typeSymbol;
-
-            EntityHandle token = ppSig.ReadTypeHandle();
-            HandleKind tokenType = token.Kind;
-
-            if (tokenType == HandleKind.TypeDefinition)
+            switch (handle.Kind)
             {
-                typeSymbol = GetTypeOfTypeDef((TypeDefinitionHandle)token, out isNoPiaLocalType, isContainingType: false);
-            }
-            else if (tokenType == HandleKind.TypeReference)
-            {
-                typeSymbol = GetTypeOfTypeRef((TypeReferenceHandle)token, out isNoPiaLocalType);
-            }
-            else
-            {
-                isNoPiaLocalType = false;
-                typeSymbol = GetTypeOfTypeSpec((TypeSpecificationHandle)token);
-            }
+                case HandleKind.TypeDefinition:
+                    typeSymbol = GetTypeOfTypeDef((TypeDefinitionHandle)handle, out isNoPiaLocalType, isContainingType: false);
+                    break;
 
-            Debug.Assert(typeSymbol != null);
+                case HandleKind.TypeReference:
+                    typeSymbol = GetTypeOfTypeRef((TypeReferenceHandle)handle, out isNoPiaLocalType);
+                    break;
+
+                case HandleKind.TypeSpecification:
+                    if (!allowTypeSpec)
+                    {
+                        throw new UnsupportedSignatureContent();
+                    }
+
+                    isNoPiaLocalType = false;
+                    typeSymbol = GetTypeOfTypeSpec((TypeSpecificationHandle)handle);
+                    break;
+
+                default:
+                    throw ExceptionUtilities.UnexpectedValue(handle.Kind);
+            }
 
             // tomat: Breaking change
             // Metadata spec II.23.2.16 (Short form signatures) requires primitive types to be encoded using a short form:
@@ -354,7 +428,7 @@ namespace Microsoft.CodeAnalysis
             // 
             // Rather then producing broken code we report an error at compile time.
 
-            if (typeSymbol.SpecialType.HasShortFormSignatureEncoding())
+            if (requireShortForm && typeSymbol.SpecialType.HasShortFormSignatureEncoding())
             {
                 throw new UnsupportedSignatureContent();
             }
@@ -422,8 +496,11 @@ namespace Microsoft.CodeAnalysis
             // The resolution scope should be either a type ref, an assembly or a module.
             if (tokenType == HandleKind.TypeReference)
             {
+                if (tokenResolutionScope.IsNil)
+                {
+                    throw new BadImageFormatException();
+                }
                 TypeSymbol psymContainer = GetTypeOfToken(tokenResolutionScope);
-
                 Debug.Assert(fullName.NamespaceName.Length == 0);
                 isNoPiaLocalType = false;
                 return LookupNestedTypeDefSymbol(psymContainer, ref fullName);
@@ -431,15 +508,24 @@ namespace Microsoft.CodeAnalysis
 
             if (tokenType == HandleKind.AssemblyReference)
             {
-                // TODO: Can refer to the containing assembly?
                 isNoPiaLocalType = false;
-                return LookupTopLevelTypeDefSymbol(Module.GetAssemblyReferenceIndexOrThrow((AssemblyReferenceHandle)tokenResolutionScope), ref fullName);
+                var assemblyRef = (AssemblyReferenceHandle)tokenResolutionScope;
+                if (assemblyRef.IsNil)
+                {
+                    throw new BadImageFormatException();
+                }
+                return LookupTopLevelTypeDefSymbol(Module.GetAssemblyReferenceIndexOrThrow(assemblyRef), ref fullName);
             }
 
             if (tokenType == HandleKind.ModuleReference)
             {
+                var moduleRef = (ModuleReferenceHandle)tokenResolutionScope;
+                if (moduleRef.IsNil)
+                {
+                    throw new BadImageFormatException();
+                }
                 return LookupTopLevelTypeDefSymbol(
-                    Module.GetModuleRefNameOrThrow((ModuleReferenceHandle)tokenResolutionScope),
+                    Module.GetModuleRefNameOrThrow(moduleRef),
                     ref fullName,
                     out isNoPiaLocalType);
             }
@@ -601,13 +687,7 @@ namespace Microsoft.CodeAnalysis
 
                 if (typeCode == SignatureTypeCode.OptionalModifier)
                 {
-                    EntityHandle token = signatureReader.ReadTypeHandle();
-                    ModifierInfo<TypeSymbol> modifier = new ModifierInfo<TypeSymbol>(true, GetTypeOfToken(token));
-
-                    if (!IsAcceptableModOptModifier(token, modifier.Modifier))
-                    {
-                        throw new UnsupportedSignatureContent();
-                    }
+                    ModifierInfo<TypeSymbol> modifier = new ModifierInfo<TypeSymbol>(true, DecodeModifierTypeOrThrow(ref signatureReader));
 
                     if (modifiers == null)
                     {
@@ -624,48 +704,83 @@ namespace Microsoft.CodeAnalysis
             return modifiers?.ToImmutableAndFree() ?? default(ImmutableArray<ModifierInfo<TypeSymbol>>);
         }
 
-        /// <summary>
-        /// According to ECMA spec:
-        ///  The CMOD_OPT or CMOD_REQD is followed by a metadata token that
-        ///  indexes a row in the TypeDef table or the TypeRef table.
-        /// i.e. No modopt in DecodeType (though it still works in DecodeModifier).
-        /// </summary>
-        private static bool IsAcceptableModOptModifier(EntityHandle token, TypeSymbol modifier)
+        private TypeSymbol DecodeModifierTypeOrThrow(ref BlobReader signatureReader)
         {
+            EntityHandle token = signatureReader.ReadTypeHandle();
+            TypeSymbol type;
+            bool isNoPiaLocalType;
+
+        // According to ECMA spec:
+        //  The CMOD_OPT or CMOD_REQD is followed by a metadata token that
+        //  indexes a row in the TypeDef table or the TypeRef table.
+        tryAgain:
             switch (token.Kind)
             {
                 case HandleKind.TypeDefinition:
+                    type = GetTypeOfTypeDef((TypeDefinitionHandle)token, out isNoPiaLocalType, isContainingType: false);
+                    // it is valid for a modifier to refer to an unconstructed type, we need to preserve this fact
+                    type = SubstituteWithUnboundIfGeneric(type);
+                    break;
+
                 case HandleKind.TypeReference:
-                    return true;
+                    type = GetTypeOfTypeRef((TypeReferenceHandle)token, out isNoPiaLocalType);
+                    // it is valid for a modifier to refer to an unconstructed type, we need to preserve this fact
+                    type = SubstituteWithUnboundIfGeneric(type);
+                    break;
+
                 case HandleKind.TypeSpecification:
                     // Section 23.2.7 of the CLI spec specifically says that this is not allowed (see comment on method),
                     // but, apparently, ilasm turns modopt(int32) into a TypeSpec.
-                    if (modifier != null)
+                    // In addition, managed C++ compiler can use constructed generic types as modifiers, for example Nullable<bool>, etc.
+                    // We will support only cases like these even though it looks like CLR allows any types that can be encoded through a TypeSpec.
+
+                    BlobReader memoryReader = this.Module.GetTypeSpecificationSignatureReaderOrThrow((TypeSpecificationHandle)token);
+
+                    SignatureTypeCode typeCode = memoryReader.ReadSignatureTypeCode();
+                    bool refersToNoPiaLocalType;
+
+                    switch (typeCode)
                     {
-                        switch (modifier.SpecialType)
-                        {
-                            case SpecialType.System_Void:
-                            case SpecialType.System_Boolean:
-                            case SpecialType.System_SByte:
-                            case SpecialType.System_Byte:
-                            case SpecialType.System_Int16:
-                            case SpecialType.System_UInt16:
-                            case SpecialType.System_Int32:
-                            case SpecialType.System_UInt32:
-                            case SpecialType.System_Int64:
-                            case SpecialType.System_UInt64:
-                            case SpecialType.System_Single:
-                            case SpecialType.System_Double:
-                            case SpecialType.System_Char:
-                            case SpecialType.System_String:
-                            case SpecialType.System_Object:
-                                return true;
-                        }
+                        case SignatureTypeCode.Void:
+                        case SignatureTypeCode.Boolean:
+                        case SignatureTypeCode.SByte:
+                        case SignatureTypeCode.Byte:
+                        case SignatureTypeCode.Int16:
+                        case SignatureTypeCode.UInt16:
+                        case SignatureTypeCode.Int32:
+                        case SignatureTypeCode.UInt32:
+                        case SignatureTypeCode.Int64:
+                        case SignatureTypeCode.UInt64:
+                        case SignatureTypeCode.Single:
+                        case SignatureTypeCode.Double:
+                        case SignatureTypeCode.Char:
+                        case SignatureTypeCode.String:
+                        case SignatureTypeCode.IntPtr:
+                        case SignatureTypeCode.UIntPtr:
+                        case SignatureTypeCode.Object:
+                        case SignatureTypeCode.TypedReference:
+                            type = GetSpecialType(typeCode.ToSpecialType());
+                            break;
+
+                        case SignatureTypeCode.TypeHandle:
+
+                            token = memoryReader.ReadTypeHandle();
+                            goto tryAgain;
+
+                        case SignatureTypeCode.GenericTypeInstance:
+                            type = DecodeGenericTypeInstanceOrThrow(ref memoryReader, out refersToNoPiaLocalType);
+                            break;
+
+                        default:
+                            throw new UnsupportedSignatureContent();
                     }
-                    return false;
+                    break;
+
                 default:
-                    return false;
+                    throw new UnsupportedSignatureContent();
             }
+
+            return type;
         }
 
         /// <exception cref="UnsupportedSignatureContent">If the encoded local variable type is invalid.</exception>
@@ -768,6 +883,146 @@ namespace Microsoft.CodeAnalysis
             return new LocalInfo<TypeSymbol>(typeSymbol, customModifiers, constraints, signatureOpt: null);
         }
 
+        internal void DecodeLocalConstantBlobOrThrow(ref BlobReader sigReader, out TypeSymbol type, out ConstantValue value)
+        {
+            SignatureTypeCode typeCode;
+
+            var customModifiers = DecodeModifiersOrThrow(ref sigReader, out typeCode);
+
+            if (typeCode == SignatureTypeCode.TypeHandle)
+            {
+                // TypeDefOrRefOrSpec encoded
+                bool refersToNoPiaLocalType;
+                type = GetSymbolForTypeHandleOrThrow(sigReader.ReadTypeHandle(), out refersToNoPiaLocalType, allowTypeSpec: true, requireShortForm: true);
+
+                if (type.SpecialType == SpecialType.System_Decimal)
+                {
+                    value = ConstantValue.Create(sigReader.ReadDecimal());
+                }
+                else if (type.SpecialType == SpecialType.System_DateTime)
+                {
+                    value = ConstantValue.Create(sigReader.ReadDateTime());
+                }
+                else if (sigReader.RemainingBytes == 0)
+                {
+                    // default(T)
+                    value = (type.IsReferenceType || type is IPointerTypeSymbol) ? ConstantValue.Null : ConstantValue.Bad;
+                }
+                else
+                {
+                    value = ConstantValue.Bad;
+                }
+            }
+            else
+            {
+                bool isEnumTypeCode;
+                value = DecodePrimitiveConstantValue(ref sigReader, typeCode, out isEnumTypeCode);
+                var specialType = typeCode.ToSpecialType();
+
+                if (isEnumTypeCode && sigReader.RemainingBytes > 0)
+                {
+                    bool refersToNoPiaLocalType;
+                    type = GetSymbolForTypeHandleOrThrow(sigReader.ReadTypeHandle(), out refersToNoPiaLocalType, allowTypeSpec: true, requireShortForm: true);
+
+                    if (GetEnumUnderlyingType(type)?.SpecialType != specialType)
+                    {
+                        throw new UnsupportedSignatureContent();
+                    }
+                }
+                else
+                {
+                    type = GetSpecialType(specialType);
+                }
+
+                if (sigReader.RemainingBytes > 0)
+                {
+                    throw new UnsupportedSignatureContent();
+                }
+            }
+        }
+
+        private static ConstantValue DecodePrimitiveConstantValue(ref BlobReader sigReader, SignatureTypeCode typeCode, out bool isEnumTypeCode)
+        {
+            switch (typeCode)
+            {
+                case SignatureTypeCode.Boolean:
+                    isEnumTypeCode = true;
+                    return ConstantValue.Create(sigReader.ReadBoolean());
+
+                case SignatureTypeCode.Char:
+                    isEnumTypeCode = true;
+                    return ConstantValue.Create(sigReader.ReadChar());
+
+                case SignatureTypeCode.SByte:
+                    isEnumTypeCode = true;
+                    return ConstantValue.Create(sigReader.ReadSByte());
+
+                case SignatureTypeCode.Byte:
+                    isEnumTypeCode = true;
+                    return ConstantValue.Create(sigReader.ReadByte());
+
+                case SignatureTypeCode.Int16:
+                    isEnumTypeCode = true;
+                    return ConstantValue.Create(sigReader.ReadInt16());
+
+                case SignatureTypeCode.UInt16:
+                    isEnumTypeCode = true;
+                    return ConstantValue.Create(sigReader.ReadUInt16());
+
+                case SignatureTypeCode.Int32:
+                    isEnumTypeCode = true;
+                    return ConstantValue.Create(sigReader.ReadInt32());
+
+                case SignatureTypeCode.UInt32:
+                    isEnumTypeCode = true;
+                    return ConstantValue.Create(sigReader.ReadUInt32());
+
+                case SignatureTypeCode.Int64:
+                    isEnumTypeCode = true;
+                    return ConstantValue.Create(sigReader.ReadInt64());
+
+                case SignatureTypeCode.UInt64:
+                    isEnumTypeCode = true;
+                    return ConstantValue.Create(sigReader.ReadUInt64());
+
+                case SignatureTypeCode.Single:
+                    isEnumTypeCode = false;
+                    return ConstantValue.Create(sigReader.ReadSingle());
+
+                case SignatureTypeCode.Double:
+                    isEnumTypeCode = false;
+                    return ConstantValue.Create(sigReader.ReadDouble());
+
+                case SignatureTypeCode.String:
+                    isEnumTypeCode = false;
+
+                    if (sigReader.RemainingBytes == 1)
+                    {
+                        if (sigReader.ReadByte() != 0xff)
+                        {
+                            return ConstantValue.Bad;
+                        }
+
+                        return ConstantValue.Null;
+                    }
+
+                    if (sigReader.RemainingBytes % 2 != 0)
+                    {
+                        return ConstantValue.Bad;
+                    }
+
+                    return ConstantValue.Create(sigReader.ReadUTF16(sigReader.RemainingBytes));
+
+                case SignatureTypeCode.Object:
+                    // null reference
+                    isEnumTypeCode = false;
+                    return ConstantValue.Null;
+
+                default:
+                    throw new UnsupportedSignatureContent();
+            }
+        }
+
         internal bool TryGetLocals(MethodDefinitionHandle handle, out ImmutableArray<LocalInfo<TypeSymbol>> localInfo)
         {
             try
@@ -786,18 +1041,53 @@ namespace Microsoft.CodeAnalysis
                     localInfo = ImmutableArray<LocalInfo<TypeSymbol>>.Empty;
                 }
             }
-            catch (UnsupportedSignatureContent)
-            {
-                localInfo = ImmutableArray<LocalInfo<TypeSymbol>>.Empty;
-                return false;
-            }
-            catch (BadImageFormatException)
+            catch (Exception e) when (e is UnsupportedSignatureContent || e is BadImageFormatException || e is IOException)
             {
                 localInfo = ImmutableArray<LocalInfo<TypeSymbol>>.Empty;
                 return false;
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// Used to decode signatures of local constants returned by SymReader.
+        /// </summary>
+        internal unsafe TypeSymbol DecodeLocalVariableTypeOrThrow(ImmutableArray<byte> signature)
+        {
+            if (signature.IsDefaultOrEmpty)
+            {
+                throw new UnsupportedSignatureContent();
+            }
+
+            fixed (byte* ptr = ImmutableByteArrayInterop.DangerousGetUnderlyingArray(signature))
+            {
+                var blobReader = new BlobReader(ptr, signature.Length);
+                var info = DecodeLocalVariableOrThrow(ref blobReader);
+
+                if (info.IsByRef || info.IsPinned)
+                {
+                    throw new UnsupportedSignatureContent();
+                }
+
+                return info.Type;
+            }
+        }
+
+        /// <summary>
+        /// Returns the local info for all locals indexed by slot.
+        /// </summary>
+        internal ImmutableArray<LocalInfo<TypeSymbol>> GetLocalInfo(StandaloneSignatureHandle localSignatureHandle)
+        {
+            if (localSignatureHandle.IsNil)
+            {
+                return ImmutableArray<LocalInfo<TypeSymbol>>.Empty;
+            }
+
+            var reader = Module.MetadataReader;
+            var signature = reader.GetStandaloneSignature(localSignatureHandle).Signature;
+            var blobReader = reader.GetBlobReader(signature);
+            return DecodeLocalSignatureOrThrow(ref blobReader);
         }
 
         /// <exception cref="UnsupportedSignatureContent">If the encoded parameter type is invalid.</exception>
@@ -840,7 +1130,7 @@ namespace Microsoft.CodeAnalysis
         }
 
         // MetaImport::DecodeMethodSignature
-        internal ParamInfo<TypeSymbol>[] GetSignatureForMethod(MethodDefinitionHandle methodDef, out SignatureHeader signatureHeader, out BadImageFormatException metadataException, bool setParamHandles = true)
+        internal ParamInfo<TypeSymbol>[] GetSignatureForMethod(MethodDefinitionHandle methodDef, out SignatureHeader signatureHeader, out BadImageFormatException metadataException, bool allowByRefReturn, bool setParamHandles = true)
         {
             ParamInfo<TypeSymbol>[] paramInfo = null;
             signatureHeader = default(SignatureHeader);
@@ -851,7 +1141,7 @@ namespace Microsoft.CodeAnalysis
                 BlobReader signatureReader = DecodeSignatureHeaderOrThrow(signature, out signatureHeader);
 
                 int typeParameterCount; //CONSIDER: expose to caller?
-                paramInfo = DecodeSignatureParametersOrThrow(ref signatureReader, signatureHeader, out typeParameterCount);
+                paramInfo = DecodeSignatureParametersOrThrow(ref signatureReader, signatureHeader, out typeParameterCount, allowByRefReturn);
 
                 if (setParamHandles)
                 {
@@ -898,7 +1188,7 @@ namespace Microsoft.CodeAnalysis
             GetSignatureCountsOrThrow(ref signatureReader, signatureHeader, out parameterCount, out typeParameterCount);
         }
 
-        internal ParamInfo<TypeSymbol>[] GetSignatureForProperty(PropertyDefinitionHandle handle, out SignatureHeader signatureHeader, out BadImageFormatException BadImageFormatException)
+        internal ParamInfo<TypeSymbol>[] GetSignatureForProperty(PropertyDefinitionHandle handle, out SignatureHeader signatureHeader, out BadImageFormatException BadImageFormatException, bool allowByRefReturn)
         {
             ParamInfo<TypeSymbol>[] paramInfo = null;
             signatureHeader = default(SignatureHeader);
@@ -909,7 +1199,7 @@ namespace Microsoft.CodeAnalysis
                 BlobReader signatureReader = DecodeSignatureHeaderOrThrow(signature, out signatureHeader);
 
                 int typeParameterCount; //CONSIDER: expose to caller?
-                paramInfo = DecodeSignatureParametersOrThrow(ref signatureReader, signatureHeader, out typeParameterCount);
+                paramInfo = DecodeSignatureParametersOrThrow(ref signatureReader, signatureHeader, out typeParameterCount, allowByRefReturn);
                 BadImageFormatException = null;
             }
             catch (BadImageFormatException mrEx)
@@ -1000,7 +1290,7 @@ namespace Microsoft.CodeAnalysis
                 case SignatureTypeCode.TypeHandle:
                     // The type of the parameter can either be an enum type or System.Type.
                     bool isNoPiaLocalType;
-                    type = ResolveSignatureTypeHandleOrThrow(ref sigReader, out isNoPiaLocalType);
+                    type = GetSymbolForTypeHandleOrThrow(sigReader.ReadTypeHandle(), out isNoPiaLocalType, allowTypeSpec: true, requireShortForm: true);
 
                     var underlyingEnumType = GetEnumUnderlyingType(type);
 
@@ -1494,7 +1784,7 @@ namespace Microsoft.CodeAnalysis
         }
 
         /// <exception cref="BadImageFormatException">An exception from metadata reader.</exception>
-        protected ParamInfo<TypeSymbol>[] DecodeSignatureParametersOrThrow(ref BlobReader signatureReader, SignatureHeader signatureHeader, out int typeParameterCount)
+        protected ParamInfo<TypeSymbol>[] DecodeSignatureParametersOrThrow(ref BlobReader signatureReader, SignatureHeader signatureHeader, out int typeParameterCount, bool allowByRefReturn)
         {
             int paramCount;
             GetSignatureCountsOrThrow(ref signatureReader, signatureHeader, out paramCount, out typeParameterCount);
@@ -1528,7 +1818,7 @@ namespace Microsoft.CodeAnalysis
                 }
             }
 
-            if (paramInfo[0].IsByRef)
+            if (paramInfo[0].IsByRef && !allowByRefReturn)
             {
                 paramInfo[0].IsByRef = false; // Info reflected in the error type.
                 paramInfo[0].Type = GetByRefReturnTypeSymbol(paramInfo[0].Type, paramInfo[0].CountOfCustomModifiersPrecedingByRef);
@@ -1593,13 +1883,22 @@ namespace Microsoft.CodeAnalysis
                     if (typeCode == SignatureTypeCode.OptionalModifier ||
                         typeCode == SignatureTypeCode.RequiredModifier)
                     {
-                        EntityHandle token = signatureReader.ReadTypeHandle();
-                        ModifierInfo<TypeSymbol> modifier = new ModifierInfo<TypeSymbol>((typeCode == SignatureTypeCode.OptionalModifier), GetTypeOfToken(token));
+                        TypeSymbol type;
 
-                        if (!IsAcceptableModOptModifier(token, modifier.Modifier))
+                        try
+                        {
+                            type = DecodeModifierTypeOrThrow(ref signatureReader);
+                        }
+                        catch (BadImageFormatException mrEx)
+                        {
+                            return GetUnsupportedMetadataTypeSymbol(mrEx); // an exception from metadata reader.
+                        }
+                        catch (UnsupportedSignatureContent)
                         {
                             return GetUnsupportedMetadataTypeSymbol(); // unsupported signature content
                         }
+
+                        ModifierInfo<TypeSymbol> modifier = new ModifierInfo<TypeSymbol>((typeCode == SignatureTypeCode.OptionalModifier), type);
 
                         if (IsVolatileModifierType(modifier.Modifier))
                         {
@@ -1661,24 +1960,24 @@ namespace Microsoft.CodeAnalysis
             {
                 foreach (var methodImpl in Module.GetMethodImplementationsOrThrow(implementingTypeDef))
                 {
-                    EntityHandle methodBodyHandle;
+                    EntityHandle methodDebugHandle;
                     EntityHandle implementedMethodHandle;
-                    Module.GetMethodImplPropsOrThrow(methodImpl, out methodBodyHandle, out implementedMethodHandle);
+                    Module.GetMethodImplPropsOrThrow(methodImpl, out methodDebugHandle, out implementedMethodHandle);
 
                     // Though it is rare in practice, the spec allows the MethodImpl table to represent
                     // methods defined in the current module as MemberRefs rather than MethodDefs.
-                    if (methodBodyHandle.Kind == HandleKind.MemberReference)
+                    if (methodDebugHandle.Kind == HandleKind.MemberReference)
                     {
-                        MethodSymbol methodBodySymbol = GetMethodSymbolForMemberRef((MemberReferenceHandle)methodBodyHandle, implementingTypeSymbol);
+                        MethodSymbol methodBodySymbol = GetMethodSymbolForMemberRef((MemberReferenceHandle)methodDebugHandle, implementingTypeSymbol);
                         if (methodBodySymbol != null)
                         {
                             // Note: this might have a nil row ID, but that won't cause a problem
                             // since it will simply fail to be equal to the implementingMethodToken.
-                            methodBodyHandle = GetMethodHandle(methodBodySymbol);
+                            methodDebugHandle = GetMethodHandle(methodBodySymbol);
                         }
                     }
 
-                    if (methodBodyHandle == implementingMethodDef)
+                    if (methodDebugHandle == implementingMethodDef)
                     {
                         if (!implementedMethodHandle.IsNil)
                         {

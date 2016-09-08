@@ -16,8 +16,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' Perform a first analysis pass in preparation for removing all lambdas from a method body.  The entry point is Analyze.
         ''' The results of analysis are placed in the fields seenLambda, blockParent, variableBlock, captured, and captures.
         ''' </summary>
-        Friend Class Analysis
-            Inherits BoundTreeWalker
+        Friend NotInheritable Class Analysis
+            Inherits BoundTreeWalkerWithStackGuardWithoutRecursionOnTheLeftOfBinaryOperator
 
             Private ReadOnly _diagnostics As DiagnosticBag
             Private ReadOnly _method As MethodSymbol
@@ -130,7 +130,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End Sub
 
             ''' <summary>
-            ''' Analyses method body that belongs to the given method symbol.
+            ''' Analyzes method body that belongs to the given method symbol.
             ''' </summary>
             Public Shared Function AnalyzeMethodBody(node As BoundBlock, method As MethodSymbol, symbolsCapturedWithoutCtor As ISet(Of Symbol), diagnostics As DiagnosticBag) As Analysis
                 Debug.Assert(Not node.HasErrors)
@@ -207,7 +207,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     '   and outermost scope is -1
                     '   Such lambda will be placed in a closure frame that corresponds to the method's outer block
                     '   and this frame will also lift original Me as a field when created by its parent.
-                    '   Note that is is completely irrelevant how deeply the lexical scope of the lambda was originally nested.
+                    '   Note that it is completely irrelevant how deeply the lexical scope of the lambda was originally nested.
                     If innermostScope IsNot Nothing Then
                         lambdaScopes.Add(kvp.Key, innermostScope)
 
@@ -398,7 +398,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             ''' It checks for cases where variable is declared outside of the lambda in which it is being accessed
             ''' If capture is detected, than it marks variable as capturED and all lambdas involved as capturING
             ''' </summary>
-            Private Sub ReferenceVariable(variableOrParameter As Symbol, syntax As VisualBasicSyntaxNode)
+            Private Sub ReferenceVariable(variableOrParameter As Symbol, syntax As SyntaxNode)
                 ' No need to do anything if we are not in a lambda.
                 If _currentParent.MethodKind <> MethodKind.LambdaMethod Then
                     Return
@@ -437,7 +437,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 End If
             End Sub
 
-            Private Sub VerifyCaptured(variableOrParameter As Symbol, syntax As VisualBasicSyntaxNode)
+            Private Sub VerifyCaptured(variableOrParameter As Symbol, syntax As SyntaxNode)
                 Dim type As TypeSymbol
                 Dim asParameter = TryCast(variableOrParameter, ParameterSymbol)
 
@@ -497,7 +497,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End Function
 
             Public Overrides Function VisitConditionalGoto(node As BoundConditionalGoto) As BoundNode
-                ' if whe have seen this label already
+                ' if we have seen this label already
                 ' it is a back-branch
                 If labelBlock.ContainsKey(node.Label) Then
                     seenBackBranches = True
@@ -510,19 +510,19 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             ''' For performance reason we may not want to check if synthetic gotos are legal.
             ''' Those are the majority, but should not be ever illegal (how user would fix them?).
             ''' </summary>
-            Private Function MayParticipateInIllegalBranch(node As BoundGotoStatement) As Boolean
+            Private Shared Function MayParticipateInIllegalBranch(node As BoundGotoStatement) As Boolean
 #If DEBUG Then
                 ' Validate synthetic branches in debug too.
                 Return True
 #Else
                 'TODO:  synthetic gotos should be marked as compiler generated. 
-                '       Tere are lots of them and they are not supposed to be ever illegal.
+                '       There are lots of them and they are not supposed to be ever illegal.
                 Return Not node.WasCompilerGenerated
 #End If
             End Function
 
             Public Overrides Function VisitGotoStatement(node As BoundGotoStatement) As BoundNode
-                ' if whe have seen this label already
+                ' if we have seen this label already
                 ' it is a back-branch
                 If labelBlock.ContainsKey(node.Label) Then
                     seenBackBranches = True

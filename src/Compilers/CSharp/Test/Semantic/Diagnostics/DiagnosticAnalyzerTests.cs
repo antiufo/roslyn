@@ -4,11 +4,12 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using System.Runtime.Serialization;
+using System.Text;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Diagnostics.CSharp;
+using Microsoft.CodeAnalysis.Test.Utilities;
 using Roslyn.Test.Utilities;
 using Roslyn.Utilities;
 using Xunit;
@@ -19,119 +20,6 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
 {
     public partial class DiagnosticAnalyzerTests : CompilingTestBase
     {
-        [Serializable]
-        private class TestDiagnostic : Diagnostic, ISerializable
-        {
-            private readonly string _kind;
-            private readonly DiagnosticSeverity _severity;
-            private readonly Location _location;
-            private readonly string _message;
-            private readonly object[] _arguments;
-            private readonly DiagnosticDescriptor _descriptor;
-            private static readonly Location[] s_emptyLocations = new Location[0];
-
-            public TestDiagnostic(string id, string kind, DiagnosticSeverity severity, Location location, string message, params object[] arguments)
-                : this(new DiagnosticDescriptor(id, string.Empty, message, id, severity, isEnabledByDefault: true), kind, severity, location, message, arguments)
-            {
-            }
-
-            public TestDiagnostic(DiagnosticDescriptor descriptor, string kind, DiagnosticSeverity severity, Location location, string message, params object[] arguments)
-            {
-                _descriptor = descriptor;
-                _kind = kind;
-                _severity = severity;
-                _location = location;
-                _message = message;
-                _arguments = arguments;
-            }
-
-            public override IReadOnlyList<Location> AdditionalLocations { get { return s_emptyLocations; } }
-
-            public override string Id { get { return _descriptor.Id; } }
-
-            public override DiagnosticDescriptor Descriptor { get { return _descriptor; } }
-
-            public override Location Location { get { return _location; } }
-
-            internal override IReadOnlyList<object> Arguments { get { return _arguments; } }
-
-            public override DiagnosticSeverity Severity { get { return _severity; } }
-
-            public override DiagnosticSeverity DefaultSeverity { get { return _descriptor.DefaultSeverity; } }
-
-            public override int WarningLevel { get { return 2; } }
-
-            public override int GetHashCode()
-            {
-                return Hash.Combine(_descriptor.Id.GetHashCode(), _kind.GetHashCode());
-            }
-
-            public override bool Equals(object obj)
-            {
-                return Equals(obj as TestDiagnostic);
-            }
-
-            public override bool Equals(Diagnostic obj)
-            {
-                return Equals(obj as TestDiagnostic);
-            }
-
-            public bool Equals(TestDiagnostic other)
-            {
-                if (other == null || this.GetType() != other.GetType()) return false;
-                return
-                    _descriptor.Id == other._descriptor.Id &&
-                    _kind == other._kind &&
-                    _location == other._location &&
-                    _message == other._message &&
-                    SameData(_arguments, other._arguments);
-            }
-
-            private static bool SameData(object[] d1, object[] d2)
-            {
-                return (d1 == null) == (d2 == null) && (d1 == null || d1.SequenceEqual(d2));
-            }
-
-            public override string GetMessage(IFormatProvider formatProvider = null)
-            {
-                return string.Format(_message, _arguments);
-            }
-
-            private TestDiagnostic(SerializationInfo info, StreamingContext context)
-            {
-                var id = info.GetString("id");
-                _kind = info.GetString("kind");
-                _message = info.GetString("message");
-                _location = (Location)info.GetValue("location", typeof(Location));
-                _severity = (DiagnosticSeverity)info.GetValue("severity", typeof(DiagnosticSeverity));
-                var defaultSeverity = (DiagnosticSeverity)info.GetValue("defaultSeverity", typeof(DiagnosticSeverity));
-                _arguments = (object[])info.GetValue("arguments", typeof(object[]));
-                _descriptor = new DiagnosticDescriptor(id, string.Empty, _message, id, defaultSeverity, isEnabledByDefault: true);
-            }
-
-            void ISerializable.GetObjectData(SerializationInfo info, StreamingContext context)
-            {
-                info.AddValue("id", _descriptor.Id);
-                info.AddValue("kind", _kind);
-                info.AddValue("message", _message);
-                info.AddValue("location", _location, typeof(Location));
-                info.AddValue("severity", _severity, typeof(DiagnosticSeverity));
-                info.AddValue("defaultSeverity", _descriptor.DefaultSeverity, typeof(DiagnosticSeverity));
-                info.AddValue("arguments", _arguments, typeof(object[]));
-            }
-
-            internal override Diagnostic WithLocation(Location location)
-            {
-                // We do not implement "additional locations"
-                throw new NotImplementedException();
-            }
-
-            internal override Diagnostic WithSeverity(DiagnosticSeverity severity)
-            {
-                return new TestDiagnostic(_descriptor, _kind, severity, _location, _message, _arguments);
-            }
-        }
-
         private class ComplainAboutX : DiagnosticAnalyzer
         {
             private static readonly DiagnosticDescriptor s_CA9999_UseOfVariableThatStartsWithX =
@@ -160,7 +48,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
             }
         }
 
-        [WorkItem(892467, "DevDiv")]
+        [WorkItem(892467, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/892467")]
         [Fact]
         public void SimplestDiagnosticAnalyzerTest()
         {
@@ -192,7 +80,7 @@ namespace Microsoft.CodeAnalysis.CSharp.UnitTests
                 );
         }
 
-        [WorkItem(892467, "DevDiv")]
+        [WorkItem(892467, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/892467")]
         [Fact]
         public void SimplestDiagnosticAnalyzerTestInInitializer()
         {
@@ -227,7 +115,7 @@ public class C : NotFound
                 );
         }
 
-        [WorkItem(892467, "DevDiv")]
+        [WorkItem(892467, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/892467")]
         [Fact]
         public void DiagnosticAnalyzerSuppressDiagnostic()
         {
@@ -250,7 +138,7 @@ public class C : NotFound
                 Diagnostic(ErrorCode.ERR_SingleTypeNameNotFound, "NotFound").WithArguments("NotFound"));
         }
 
-        [WorkItem(892467, "DevDiv")]
+        [WorkItem(892467, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/892467")]
         [Fact]
         public void DiagnosticAnalyzerWarnAsError()
         {
@@ -284,7 +172,7 @@ public class C : NotFound
                 );
         }
 
-        [WorkItem(892467, "DevDiv")]
+        [WorkItem(892467, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/892467")]
         [Fact]
         public void DiagnosticAnalyzerWarnAsErrorGlobal()
         {
@@ -316,7 +204,7 @@ public class C : NotFound
                 Diagnostic("CA9999_UseOfVariableThatStartsWithX", "x3").WithArguments("x3").WithWarningAsError(true));
         }
 
-        [Fact, WorkItem(1038025)]
+        [Fact, WorkItem(1038025, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1038025")]
         public void TestImplicitlyDeclaredSymbolsNotAnalyzed()
         {
             string source = @"
@@ -374,7 +262,7 @@ public class C
             }
         }
 
-        [WorkItem(914236, "DevDiv")]
+        [WorkItem(914236, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/914236")]
         [Fact]
         public void DiagnosticAnalyzerSyntaxNodeAndSymbolAnalysis()
         {
@@ -398,7 +286,7 @@ public class C { }").WithArguments("ClassDeclaration").WithWarningAsError(true))
         }
         [Fact]
 
-        private void TestGetEffectiveDiagnostics()
+        public void TestGetEffectiveDiagnostics()
         {
             var noneDiagDescriptor = new DiagnosticDescriptor("XX0001", "DummyDescription", "DummyMessage", "DummyCategory", DiagnosticSeverity.Hidden, isEnabledByDefault: true);
             var infoDiagDescriptor = new DiagnosticDescriptor("XX0002", "DummyDescription", "DummyMessage", "DummyCategory", DiagnosticSeverity.Info, isEnabledByDefault: true);
@@ -537,7 +425,7 @@ public class C { }").WithArguments("ClassDeclaration").WithWarningAsError(true))
         }
         [Fact]
 
-        private void TestDisabledDiagnostics()
+        public void TestDisabledDiagnostics()
         {
             var disabledDiagDescriptor = new DiagnosticDescriptor("XX001", "DummyDescription", "DummyMessage", "DummyCategory", DiagnosticSeverity.Warning, isEnabledByDefault: false);
             var enabledDiagDescriptor = new DiagnosticDescriptor("XX002", "DummyDescription", "DummyMessage", "DummyCategory", DiagnosticSeverity.Warning, isEnabledByDefault: true);
@@ -618,7 +506,7 @@ public class C { }").WithArguments("ClassDeclaration").WithWarningAsError(true))
         }
 
         [Fact]
-        private void TestDisabledAnalyzers()
+        public void TestDisabledAnalyzers()
         {
             var fullyDisabledAnalyzer = new FullyDisabledAnalyzer();
             var partiallyDisabledAnalyzer = new PartiallyDisabledAnalyzer();
@@ -642,8 +530,8 @@ public class C { }").WithArguments("ClassDeclaration").WithWarningAsError(true))
             Assert.True(fullyDisabledAnalyzer.IsDiagnosticAnalyzerSuppressed(options));
         }
 
-        [Fact, WorkItem(1008059)]
-        private void TestCodeBlockAnalyzersForNoExecutableCode()
+        [Fact, WorkItem(1008059, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1008059")]
+        public void TestCodeBlockAnalyzersForNoExecutableCode()
         {
             string noExecutableCodeSource = @"
 public abstract class C
@@ -659,8 +547,8 @@ public abstract class C
                 .VerifyAnalyzerDiagnostics(analyzers);
         }
 
-        [Fact, WorkItem(1008059)]
-        private void TestCodeBlockAnalyzersForBaseConstructorInitializer()
+        [Fact, WorkItem(1008059, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1008059")]
+        public void TestCodeBlockAnalyzersForBaseConstructorInitializer()
         {
             string baseCtorSource = @"
 public class B
@@ -682,8 +570,8 @@ public class C : B
                     Diagnostic("CodeBlockDiagnostic"));
         }
 
-        [Fact, WorkItem(1067286)]
-        private void TestCodeBlockAnalyzersForExpressionBody()
+        [Fact, WorkItem(1067286, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1067286")]
+        public void TestCodeBlockAnalyzersForExpressionBody()
         {
             string source = @"
 public class B
@@ -705,8 +593,8 @@ public class B
                     Diagnostic("MethodExpressionBodyDiagnostic"));
         }
 
-        [Fact, WorkItem(592)]
-        private void TestSyntaxNodeAnalyzersForExpressionBody()
+        [Fact, WorkItem(592, "https://github.com/dotnet/roslyn/issues/592")]
+        public void TestSyntaxNodeAnalyzersForExpressionBody()
         {
             string source = @"
 public class B
@@ -725,8 +613,8 @@ public class B
                     Diagnostic("MethodExpressionBodyDiagnostic"));
         }
 
-        [Fact, WorkItem(592)]
-        private void TestMethodSymbolAnalyzersForExpressionBody()
+        [Fact, WorkItem(592, "https://github.com/dotnet/roslyn/issues/592")]
+        public void TestMethodSymbolAnalyzersForExpressionBody()
         {
             string source = @"
 public class B
@@ -771,7 +659,7 @@ public class B
         }
 
         [Fact]
-        private void TestNoDuplicateCallbacksForFieldDeclaration()
+        public void TestNoDuplicateCallbacksForFieldDeclaration()
         {
             string source = @"
 public class B
@@ -786,8 +674,8 @@ public class B
                      Diagnostic("MyFieldDiagnostic", @"public string field = ""field"";").WithLocation(4, 5));
         }
 
-        [Fact, WorkItem(565)]
-        private void TestCallbacksForFieldDeclarationWithMultipleVariables()
+        [Fact, WorkItem(565, "https://github.com/dotnet/roslyn/issues/565")]
+        public void TestCallbacksForFieldDeclarationWithMultipleVariables()
         {
             string source = @"
 public class B
@@ -806,8 +694,8 @@ public class B
                      Diagnostic("MyFieldDiagnostic", @"public int field5, field6 = 1;").WithLocation(6, 5));
         }
 
-        [Fact, WorkItem(1096600)]
-        private void TestDescriptorForConfigurableCompilerDiagnostics()
+        [Fact, WorkItem(1096600, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1096600")]
+        public void TestDescriptorForConfigurableCompilerDiagnostics()
         {
             // Verify that all configurable compiler diagnostics, i.e. all non-error diagnostics,
             // have a non-null and non-empty Title and Category.
@@ -999,6 +887,64 @@ public class B
                      .WithLocation(1, 1));
         }
 
+        [Fact, WorkItem(7173, "https://github.com/dotnet/roslyn/issues/7173")]
+        public void TestReportingDiagnosticWithInvalidLocation()
+        {
+            var source1 = @"class C1 { void M() { int i = 0; i++; } }";
+            var source2 = @"class C2 { void M() { int i = 0; i++; } }";
+            var compilation = CreateCompilationWithMscorlib45(source1, parseOptions: TestOptions.RegularWithIOperationFeature);
+            var anotherCompilation = CreateCompilationWithMscorlib45(source2);
+            var treeInAnotherCompilation = anotherCompilation.SyntaxTrees.Single();
+
+            string message = new ArgumentException(
+                string.Format(CodeAnalysisResources.InvalidDiagnosticLocationReported, AnalyzerWithInvalidDiagnosticLocation.Descriptor.Id, treeInAnotherCompilation.FilePath), "diagnostic").Message;
+
+            compilation.VerifyDiagnostics();
+
+            foreach (AnalyzerWithInvalidDiagnosticLocation.ActionKind actionKind in Enum.GetValues(typeof(AnalyzerWithInvalidDiagnosticLocation.ActionKind)))
+            {
+                var analyzer = new AnalyzerWithInvalidDiagnosticLocation(treeInAnotherCompilation, actionKind);
+                var analyzers = new DiagnosticAnalyzer[] { analyzer };
+                compilation
+                    .VerifyAnalyzerDiagnostics(analyzers, null, null, logAnalyzerExceptionAsDiagnostics: true,
+                        expected:
+                        Diagnostic("AD0001")
+                            .WithArguments("Microsoft.CodeAnalysis.CommonDiagnosticAnalyzers+AnalyzerWithInvalidDiagnosticLocation", "System.ArgumentException", message)
+                            .WithLocation(1, 1)
+                    );
+            }
+        }
+
+        [Fact, WorkItem(13120, "https://github.com/dotnet/roslyn/issues/13120")]
+        public void TestRegisteringAsyncAnalyzerMethod()
+        {
+            string source = @"";
+            var analyzers = new DiagnosticAnalyzer[] { new AnalyzerWithAsyncMethodRegistration() };
+            string message = new ArgumentException(string.Format(CodeAnalysisResources.AsyncAnalyzerActionCannotBeRegistered), "action").Message;
+
+            CreateCompilationWithMscorlib45(source)
+                .VerifyDiagnostics()
+                .VerifyAnalyzerDiagnostics(analyzers, null, null, logAnalyzerExceptionAsDiagnostics: true,
+                     expected: Diagnostic("AD0001")
+                     .WithArguments("Microsoft.CodeAnalysis.CommonDiagnosticAnalyzers+AnalyzerWithAsyncMethodRegistration", "System.ArgumentException", message)
+                     .WithLocation(1, 1));
+        }
+
+        [Fact, WorkItem(13120, "https://github.com/dotnet/roslyn/issues/13120")]
+        public void TestRegisteringAsyncAnalyzerLambda()
+        {
+            string source = @"";
+            var analyzers = new DiagnosticAnalyzer[] { new AnalyzerWithAsyncLambdaRegistration() };
+            string message = new ArgumentException(string.Format(CodeAnalysisResources.AsyncAnalyzerActionCannotBeRegistered), "action").Message;
+
+            CreateCompilationWithMscorlib45(source)
+                .VerifyDiagnostics()
+                .VerifyAnalyzerDiagnostics(analyzers, null, null, logAnalyzerExceptionAsDiagnostics: true,
+                     expected: Diagnostic("AD0001")
+                     .WithArguments("Microsoft.CodeAnalysis.CommonDiagnosticAnalyzers+AnalyzerWithAsyncLambdaRegistration", "System.ArgumentException", message)
+                     .WithLocation(1, 1));
+        }
+
         [Fact, WorkItem(1473, "https://github.com/dotnet/roslyn/issues/1473")]
         public void TestReportingNotConfigurableDiagnostic()
         {
@@ -1096,6 +1042,20 @@ namespace ConsoleApplication1
                     expected: Diagnostic(CSharpGenericNameAnalyzer.DiagnosticId, @"Nullable<int>").WithLocation(9, 17));
         }
 
+        [Fact, WorkItem(4745, "https://github.com/dotnet/roslyn/issues/4745")]
+        public void TestNamespaceDeclarationAnalyzer()
+        {
+            var source = @"
+namespace Foo.Bar.FooBar { }
+";
+            var analyzers = new DiagnosticAnalyzer[] { new CSharpNamespaceDeclarationAnalyzer() };
+
+            // Verify, no duplicate diagnostics on qualified name.
+            CreateCompilationWithMscorlib45(source)
+                .VerifyAnalyzerDiagnostics(analyzers, null, null, logAnalyzerExceptionAsDiagnostics: false,
+                    expected: Diagnostic(CSharpNamespaceDeclarationAnalyzer.DiagnosticId, @"namespace Foo.Bar.FooBar { }").WithLocation(2, 1));
+        }
+
         [Fact, WorkItem(2980, "https://github.com/dotnet/roslyn/issues/2980")]
         public void TestAnalyzerWithNoActions()
         {
@@ -1149,7 +1109,7 @@ class MyClass
         }
 
         [Fact]
-        [WorkItem(1107500, "DevDiv")]
+        [WorkItem(1107500, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1107500")]
         [WorkItem(2598, "https://github.com/dotnet/roslyn/issues/2598")]
         public void EffectiveSeverity_DiagnosticDefault1()
         {
@@ -1157,7 +1117,7 @@ class MyClass
         }
 
         [Fact]
-        [WorkItem(1107500, "DevDiv")]
+        [WorkItem(1107500, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1107500")]
         [WorkItem(2598, "https://github.com/dotnet/roslyn/issues/2598")]
         public void EffectiveSeverity_DiagnosticDefault2()
         {
@@ -1168,7 +1128,7 @@ class MyClass
         }
 
         [Fact]
-        [WorkItem(1107500, "DevDiv")]
+        [WorkItem(1107500, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1107500")]
         [WorkItem(2598, "https://github.com/dotnet/roslyn/issues/2598")]
         public void EffectiveSeverity_GeneralOption()
         {
@@ -1177,7 +1137,7 @@ class MyClass
         }
 
         [Fact]
-        [WorkItem(1107500, "DevDiv")]
+        [WorkItem(1107500, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1107500")]
         [WorkItem(2598, "https://github.com/dotnet/roslyn/issues/2598")]
         public void EffectiveSeverity_SpecificOption()
         {
@@ -1189,7 +1149,7 @@ class MyClass
         }
 
         [Fact]
-        [WorkItem(1107500, "DevDiv")]
+        [WorkItem(1107500, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1107500")]
         [WorkItem(2598, "https://github.com/dotnet/roslyn/issues/2598")]
         public void EffectiveSeverity_GeneralOptionDoesNotEnableDisabledDiagnostic()
         {
@@ -1201,7 +1161,7 @@ class MyClass
 
 
         [Fact()]
-        [WorkItem(1107500, "DevDiv")]
+        [WorkItem(1107500, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1107500")]
         [WorkItem(2598, "https://github.com/dotnet/roslyn/issues/2598")]
         public void EffectiveSeverity_SpecificOptionEnablesDisabledDiagnostic()
         {
@@ -1211,6 +1171,489 @@ class MyClass
             var enabledByDefault = false;
 
             TestEffectiveSeverity(DiagnosticSeverity.Warning, expectedEffectiveSeverity: specificOption, specificOptions: specificOptions, generalOption: generalOption, isEnabledByDefault: enabledByDefault);
+        }
+
+        [Fact, WorkItem(5463, "https://github.com/dotnet/roslyn/issues/5463")]
+        public void TestObjectCreationInCodeBlockAnalyzer()
+        {
+            string source = @"
+class C { }
+class D
+{
+    public C x = new C();
+}";
+            var analyzers = new DiagnosticAnalyzer[] { new CSharpCodeBlockObjectCreationAnalyzer() };
+
+            // Verify, code block action diagnostics.
+            CreateCompilationWithMscorlib45(source)
+                .VerifyDiagnostics()
+                .VerifyAnalyzerDiagnostics(analyzers, null, null, logAnalyzerExceptionAsDiagnostics: false,
+                    expected: new[] {
+                        Diagnostic(CSharpCodeBlockObjectCreationAnalyzer.DiagnosticDescriptor.Id, "new C()").WithLocation(5, 18)
+                    });
+        }
+
+        private static Compilation GetCompilationWithConcurrentBuildEnabled(string source)
+        {
+            var compilation = CreateCompilationWithMscorlib45(source);
+
+            // NOTE: We set the concurrentBuild option to true after creating the compilation as CreateCompilationWithMscorlib
+            //       always sets concurrentBuild to false if debugger is attached, even if we had passed options with concurrentBuild = true to that API.
+            //       We want the tests using GetCompilationWithConcurrentBuildEnabled to have identical behavior with and without debugger being attached.
+            var options = compilation.Options.WithConcurrentBuild(true);
+            return compilation.WithOptions(options);
+        }
+
+        [Fact, WorkItem(6737, "https://github.com/dotnet/roslyn/issues/6737")]
+        public void TestNonConcurrentAnalyzer()
+        {
+            var builder = new StringBuilder();
+            var typeCount = 100;
+            for (int i = 1; i <= typeCount; i++)
+            {
+                var typeName = $"C{i}";
+                builder.Append($"\r\nclass {typeName} {{ }}");
+            }
+
+            var source = builder.ToString();
+            var analyzers = new DiagnosticAnalyzer[] { new NonConcurrentAnalyzer() };
+
+            // Verify no diagnostics.
+            var compilation = GetCompilationWithConcurrentBuildEnabled(source);
+            compilation.VerifyDiagnostics();
+            compilation.VerifyAnalyzerDiagnostics(analyzers);
+        }
+
+        [Fact, WorkItem(6737, "https://github.com/dotnet/roslyn/issues/6737")]
+        public void TestConcurrentAnalyzer()
+        {
+            if (Environment.ProcessorCount <= 1)
+            {
+                // Don't test for non-concurrent environment.
+                return;
+            }
+
+            var builder = new StringBuilder();
+            var typeCount = 100;
+            var typeNames = new string[typeCount];
+            for (int i = 1; i <= typeCount; i++)
+            {
+                var typeName = $"C{i}";
+                typeNames[i - 1] = typeName;
+                builder.Append($"\r\nclass {typeName} {{ }}");
+            }
+
+            var source = builder.ToString();
+            var compilation = GetCompilationWithConcurrentBuildEnabled(source);
+            compilation.VerifyDiagnostics();
+
+            // Verify analyzer diagnostics for Concurrent analyzer only.
+            var analyzers = new DiagnosticAnalyzer[] { new ConcurrentAnalyzer(typeNames) };
+            var expected = new DiagnosticDescription[typeCount];
+            for (int i = 0; i < typeCount; i++)
+            {
+                var typeName = $"C{i + 1}";
+                expected[i] = Diagnostic(ConcurrentAnalyzer.Descriptor.Id, typeName)
+                    .WithArguments(typeName)
+                    .WithLocation(i + 2, 7);
+            }
+
+            compilation.VerifyAnalyzerDiagnostics(analyzers, expected: expected);
+
+            // Verify analyzer diagnostics for Concurrent and NonConcurrent analyzer together (latter reports diagnostics only for error cases).
+            analyzers = new DiagnosticAnalyzer[] { new ConcurrentAnalyzer(typeNames), new NonConcurrentAnalyzer() };
+            compilation.VerifyAnalyzerDiagnostics(analyzers, expected: expected);
+        }
+
+        [Fact, WorkItem(6998, "https://github.com/dotnet/roslyn/issues/6998")]
+        public void TestGeneratedCodeAnalyzer()
+        {
+            string source = @"
+[System.CodeDom.Compiler.GeneratedCodeAttribute(""tool"", ""version"")]
+class GeneratedCode{0}
+{{
+    private class Nested{0} {{ }}
+}}
+
+class NonGeneratedCode{0}
+{{
+    [System.CodeDom.Compiler.GeneratedCodeAttribute(""tool"", ""version"")]
+    private class NestedGeneratedCode{0} {{ }}
+}}
+";
+            var generatedFileNames = new string[]
+            {
+                "TemporaryGeneratedFile_036C0B5B-1481-4323-8D20-8F5ADCB23D92.cs",
+                "Test.designer.cs",
+                "Test.Designer.cs",
+                "Test.generated.cs",
+                "Test.g.cs",
+                "Test.g.i.cs"
+            };
+
+            var builder = ImmutableArray.CreateBuilder<SyntaxTree>();
+            int treeNum = 0;
+
+            // Trees with non-generated code file names
+            var tree = CSharpSyntaxTree.ParseText(string.Format(source, treeNum++), path: "SourceFileRegular.cs");
+            builder.Add(tree);
+            tree = CSharpSyntaxTree.ParseText(string.Format(source, treeNum++), path: "AssemblyInfo.cs");
+            builder.Add(tree);
+
+            // Trees with generated code file names
+            foreach (var fileName in generatedFileNames)
+            {
+                tree = CSharpSyntaxTree.ParseText(string.Format(source, treeNum++), path: fileName);
+                builder.Add(tree);
+            }
+
+            var autoGeneratedPrefixes = new[] { @"// <auto-generated>", @"// <autogenerated>", @"/* <auto-generated> */" };
+
+            for (var i = 0; i < autoGeneratedPrefixes.Length; i++)
+            {
+                // Tree with '<auto-generated>' comment
+                var autoGeneratedPrefix = autoGeneratedPrefixes[i];
+                tree = CSharpSyntaxTree.ParseText(string.Format(autoGeneratedPrefix + source, treeNum++), path: $"SourceFileWithAutoGeneratedComment{i++}.cs");
+                builder.Add(tree);
+            }
+
+            // Verify no compiler diagnostics.
+            var trees = builder.ToImmutable();
+            var compilation = CreateCompilationWithMscorlib45(trees, new MetadataReference[] { SystemRef });
+            compilation.VerifyDiagnostics();
+
+            Func<string, bool> isGeneratedFile = fileName => fileName.Contains("SourceFileWithAutoGeneratedComment") || generatedFileNames.Contains(fileName);
+
+            // (1) Verify default mode of analysis when there is no generated code configuration.
+            VerifyGeneratedCodeAnalyzerDiagnostics(compilation, isGeneratedFile, generatedCodeAnalysisFlagsOpt: null);
+
+            // (2) Verify ConfigureGeneratedCodeAnalysis with different combinations of GeneratedCodeAnalysisFlags.
+            VerifyGeneratedCodeAnalyzerDiagnostics(compilation, isGeneratedFile, GeneratedCodeAnalysisFlags.None);
+            VerifyGeneratedCodeAnalyzerDiagnostics(compilation, isGeneratedFile, AnalyzerDriver.DefaultGeneratedCodeAnalysisFlags);
+            VerifyGeneratedCodeAnalyzerDiagnostics(compilation, isGeneratedFile, GeneratedCodeAnalysisFlags.Analyze);
+            VerifyGeneratedCodeAnalyzerDiagnostics(compilation, isGeneratedFile, GeneratedCodeAnalysisFlags.ReportDiagnostics);
+            VerifyGeneratedCodeAnalyzerDiagnostics(compilation, isGeneratedFile, GeneratedCodeAnalysisFlags.Analyze | GeneratedCodeAnalysisFlags.ReportDiagnostics);
+
+            // (4) Ensure warnaserror doesn't produce noise in generated files.
+            var options = compilation.Options.WithGeneralDiagnosticOption(ReportDiagnostic.Error);
+            var warnAsErrorCompilation = compilation.WithOptions(options);
+            VerifyGeneratedCodeAnalyzerDiagnostics(warnAsErrorCompilation, isGeneratedFile, generatedCodeAnalysisFlagsOpt: null);
+        }
+
+        [Fact, WorkItem(6998, "https://github.com/dotnet/roslyn/issues/6998")]
+        public void TestGeneratedCodeAnalyzerPartialType()
+        {
+            string source = @"
+[System.CodeDom.Compiler.GeneratedCodeAttribute(""tool"", ""version"")]
+partial class PartialType
+{
+}
+
+partial class PartialType
+{
+}
+";
+            var tree = CSharpSyntaxTree.ParseText(source, path: "SourceFileRegular.cs");
+            var compilation = CreateCompilationWithMscorlib45(new[] { tree }, new MetadataReference[] { SystemRef });
+            compilation.VerifyDiagnostics();
+
+            var builder = ArrayBuilder<DiagnosticDescription>.GetInstance();
+
+            // Expected symbol diagnostics
+            var squiggledText = "PartialType";
+            var diagnosticArgument = squiggledText;
+            var line = 3;
+            var column = 15;
+            AddExpectedLocalDiagnostics(builder, false, squiggledText, line, column, GeneratedCodeAnalysisFlags.ReportDiagnostics, diagnosticArgument);
+
+            // Expected tree diagnostics
+            squiggledText = "}";
+            diagnosticArgument = tree.FilePath;
+            line = 9;
+            column = 1;
+            AddExpectedLocalDiagnostics(builder, false, squiggledText, line, column, GeneratedCodeAnalysisFlags.ReportDiagnostics, diagnosticArgument);
+
+            // Expected compilation diagnostics
+            AddExpectedNonLocalDiagnostic(builder, "PartialType", compilation.SyntaxTrees[0].FilePath);
+
+            var expected = builder.ToArrayAndFree();
+
+            VerifyGeneratedCodeAnalyzerDiagnostics(compilation, expected, generatedCodeAnalysisFlagsOpt: null);
+            VerifyGeneratedCodeAnalyzerDiagnostics(compilation, expected, GeneratedCodeAnalysisFlags.None);
+            VerifyGeneratedCodeAnalyzerDiagnostics(compilation, expected, AnalyzerDriver.DefaultGeneratedCodeAnalysisFlags);
+            VerifyGeneratedCodeAnalyzerDiagnostics(compilation, expected, GeneratedCodeAnalysisFlags.Analyze);
+            VerifyGeneratedCodeAnalyzerDiagnostics(compilation, expected, GeneratedCodeAnalysisFlags.ReportDiagnostics);
+            VerifyGeneratedCodeAnalyzerDiagnostics(compilation, expected, GeneratedCodeAnalysisFlags.Analyze | GeneratedCodeAnalysisFlags.ReportDiagnostics);
+        }
+
+        [Fact, WorkItem(11217, "https://github.com/dotnet/roslyn/issues/11217")]
+        public void TestGeneratedCodeAnalyzerNoReportDiagnostics()
+        {
+            string source1 = @"
+class TypeInUserFile { }
+";
+            string source2 = @"
+class TypeInGeneratedFile { }
+";
+            var tree1 = CSharpSyntaxTree.ParseText(source1, path: "SourceFileRegular.cs");
+            var tree2 = CSharpSyntaxTree.ParseText(source2, path: "SourceFileRegular.Designer.cs");
+            var compilation = CreateCompilationWithMscorlib45(new[] { tree1, tree2 }, new MetadataReference[] { SystemRef });
+            compilation.VerifyDiagnostics();
+
+            var analyzers = new DiagnosticAnalyzer[] { new GeneratedCodeAnalyzer2() };
+            compilation.VerifyAnalyzerDiagnostics(analyzers,
+                expected: Diagnostic("GeneratedCodeAnalyzer2Warning", "TypeInUserFile").WithArguments("TypeInUserFile", "2").WithLocation(2, 7));
+        }
+
+        internal class OwningSymbolTestAnalyzer : DiagnosticAnalyzer
+        {
+            public static readonly DiagnosticDescriptor ExpressionDescriptor = new DiagnosticDescriptor(
+                "Expression",
+                "Expression",
+                "Expression found.",
+                "Testing",
+                DiagnosticSeverity.Warning,
+                isEnabledByDefault: true);
+
+            public sealed override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
+            {
+                get { return ImmutableArray.Create(ExpressionDescriptor); }
+            }
+
+            public sealed override void Initialize(AnalysisContext context)
+            {
+                context.RegisterSyntaxNodeAction(
+                     (nodeContext) =>
+                     {
+                         if (nodeContext.ContainingSymbol.Name.StartsWith("Funky") && nodeContext.Compilation.Language == "C#")
+                         {
+                             nodeContext.ReportDiagnostic(CodeAnalysis.Diagnostic.Create(ExpressionDescriptor, nodeContext.Node.GetLocation()));
+                         }
+                     },
+                     SyntaxKind.IdentifierName,
+                     SyntaxKind.NumericLiteralExpression);
+            }
+        }
+
+        [Fact]
+        public void OwningSymbolTest()
+        {
+            const string source = @"
+class C
+{
+    public void UnFunkyMethod()
+    {
+        int x = 0;
+        int y = x;
+    }
+
+    public void FunkyMethod()
+    {
+        int x = 0;
+        int y = x;
+    }
+
+    public int FunkyField = 12;
+    public int UnFunkyField = 12;
+}
+";
+            CreateCompilationWithMscorlib45(source)
+            .VerifyDiagnostics()
+            .VerifyAnalyzerDiagnostics(new DiagnosticAnalyzer[] { new OwningSymbolTestAnalyzer() }, null, null, false,
+                Diagnostic(OwningSymbolTestAnalyzer.ExpressionDescriptor.Id, "0").WithLocation(12, 17),
+                Diagnostic(OwningSymbolTestAnalyzer.ExpressionDescriptor.Id, "x").WithLocation(13, 17),
+                Diagnostic(OwningSymbolTestAnalyzer.ExpressionDescriptor.Id, "12").WithLocation(16, 29)
+                );
+        }
+
+        private static void VerifyGeneratedCodeAnalyzerDiagnostics(Compilation compilation, Func<string, bool> isGeneratedFileName, GeneratedCodeAnalysisFlags? generatedCodeAnalysisFlagsOpt)
+        {
+            var expected = GetExpectedGeneratedCodeAnalyzerDiagnostics(compilation, isGeneratedFileName, generatedCodeAnalysisFlagsOpt);
+            VerifyGeneratedCodeAnalyzerDiagnostics(compilation, expected, generatedCodeAnalysisFlagsOpt);
+        }
+
+        private static void VerifyGeneratedCodeAnalyzerDiagnostics(Compilation compilation, DiagnosticDescription[] expected, GeneratedCodeAnalysisFlags? generatedCodeAnalysisFlagsOpt)
+        {
+            var analyzers = new DiagnosticAnalyzer[] { new GeneratedCodeAnalyzer(generatedCodeAnalysisFlagsOpt) };
+            compilation.VerifyAnalyzerDiagnostics(analyzers, null, null, logAnalyzerExceptionAsDiagnostics: false, expected: expected);
+        }
+
+        private static DiagnosticDescription[] GetExpectedGeneratedCodeAnalyzerDiagnostics(Compilation compilation, Func<string, bool> isGeneratedFileName, GeneratedCodeAnalysisFlags? generatedCodeAnalysisFlagsOpt)
+        {
+            var analyzers = new DiagnosticAnalyzer[] { new GeneratedCodeAnalyzer(generatedCodeAnalysisFlagsOpt) };
+            var files = compilation.SyntaxTrees.Select(t => t.FilePath).ToImmutableArray();
+            var sortedCallbackSymbolNames = new SortedSet<string>();
+            var sortedCallbackTreePaths = new SortedSet<string>();
+            var builder = ArrayBuilder<DiagnosticDescription>.GetInstance();
+            for (int i = 0; i < compilation.SyntaxTrees.Count(); i++)
+            {
+                var file = files[i];
+                var isGeneratedFile = isGeneratedFileName(file);
+
+                // Type "GeneratedCode{0}"
+                var squiggledText = string.Format("GeneratedCode{0}", i);
+                var diagnosticArgument = squiggledText;
+                var line = 3;
+                var column = 7;
+                var isGeneratedCode = true;
+                AddExpectedLocalDiagnostics(builder, isGeneratedCode, squiggledText, line, column, generatedCodeAnalysisFlagsOpt, diagnosticArgument);
+
+                // Type "Nested{0}"
+                squiggledText = string.Format("Nested{0}", i);
+                diagnosticArgument = squiggledText;
+                line = 5;
+                column = 19;
+                isGeneratedCode = true;
+                AddExpectedLocalDiagnostics(builder, isGeneratedCode, squiggledText, line, column, generatedCodeAnalysisFlagsOpt, diagnosticArgument);
+
+                // Type "NonGeneratedCode{0}"
+                squiggledText = string.Format("NonGeneratedCode{0}", i);
+                diagnosticArgument = squiggledText;
+                line = 8;
+                column = 7;
+                isGeneratedCode = isGeneratedFile;
+                AddExpectedLocalDiagnostics(builder, isGeneratedCode, squiggledText, line, column, generatedCodeAnalysisFlagsOpt, diagnosticArgument);
+
+                // Type "NestedGeneratedCode{0}"
+                squiggledText = string.Format("NestedGeneratedCode{0}", i);
+                diagnosticArgument = squiggledText;
+                line = 11;
+                column = 19;
+                isGeneratedCode = true;
+                AddExpectedLocalDiagnostics(builder, isGeneratedCode, squiggledText, line, column, generatedCodeAnalysisFlagsOpt, diagnosticArgument);
+
+                // File diagnostic
+                squiggledText = "}"; // last token in file.
+                diagnosticArgument = file;
+                line = 12;
+                column = 1;
+                isGeneratedCode = isGeneratedFile;
+                AddExpectedLocalDiagnostics(builder, isGeneratedCode, squiggledText, line, column, generatedCodeAnalysisFlagsOpt, diagnosticArgument);
+
+                // Compilation end summary diagnostic (verify callbacks into analyzer)
+                // Analyzer always called for generated code, unless generated code analysis is explicitly disabled.
+                if (generatedCodeAnalysisFlagsOpt == null || (generatedCodeAnalysisFlagsOpt & GeneratedCodeAnalysisFlags.Analyze) != 0)
+                {
+                    sortedCallbackSymbolNames.Add(string.Format("GeneratedCode{0}", i));
+                    sortedCallbackSymbolNames.Add(string.Format("Nested{0}", i));
+                    sortedCallbackSymbolNames.Add(string.Format("NonGeneratedCode{0}", i));
+                    sortedCallbackSymbolNames.Add(string.Format("NestedGeneratedCode{0}", i));
+
+                    sortedCallbackTreePaths.Add(file);
+                }
+                else if (!isGeneratedFile)
+                {
+                    // Analyzer always called for non-generated code.
+                    sortedCallbackSymbolNames.Add(string.Format("NonGeneratedCode{0}", i));
+                    sortedCallbackTreePaths.Add(file);
+                }
+            }
+
+            // Compilation end summary diagnostic (verify callbacks into analyzer)
+            var arg1 = sortedCallbackSymbolNames.Join(",");
+            var arg2 = sortedCallbackTreePaths.Join(",");
+            AddExpectedNonLocalDiagnostic(builder, arguments: new[] { arg1, arg2 });
+
+            if (compilation.Options.GeneralDiagnosticOption == ReportDiagnostic.Error)
+            {
+                for (int i = 0; i < builder.Count; i++)
+                {
+                    if (((string)builder[i].Code) != GeneratedCodeAnalyzer.Error.Id)
+                    {
+                        builder[i] = builder[i].WithWarningAsError(true);
+                    }
+                }
+            }
+
+            return builder.ToArrayAndFree();
+        }
+
+        private static void AddExpectedLocalDiagnostics(
+            ArrayBuilder<DiagnosticDescription> builder,
+            bool isGeneratedCode,
+            string squiggledText,
+            int line,
+            int column,
+            GeneratedCodeAnalysisFlags? generatedCodeAnalysisFlagsOpt,
+            params string[] arguments)
+        {
+            // Always report diagnostics in generated code, unless explicitly suppressed or we are not even analyzing generated code.
+            var reportInGeneratedCode = generatedCodeAnalysisFlagsOpt == null ||
+                ((generatedCodeAnalysisFlagsOpt & GeneratedCodeAnalysisFlags.ReportDiagnostics) != 0 &&
+                 (generatedCodeAnalysisFlagsOpt & GeneratedCodeAnalysisFlags.Analyze) != 0);
+
+            if (!isGeneratedCode || reportInGeneratedCode)
+            {
+                var diagnostic = Diagnostic(GeneratedCodeAnalyzer.Warning.Id, squiggledText).WithArguments(arguments).WithLocation(line, column);
+                builder.Add(diagnostic);
+
+                diagnostic = Diagnostic(GeneratedCodeAnalyzer.Error.Id, squiggledText).WithArguments(arguments).WithLocation(line, column);
+                builder.Add(diagnostic);
+            }
+        }
+
+        private static void AddExpectedNonLocalDiagnostic(ArrayBuilder<DiagnosticDescription> builder, params string[] arguments)
+        {
+            AddExpectedDiagnostic(builder, GeneratedCodeAnalyzer.Summary.Id, squiggledText: null, line: 1, column: 1, arguments: arguments);
+        }
+
+        private static void AddExpectedDiagnostic(ArrayBuilder<DiagnosticDescription> builder, string diagnosticId, string squiggledText, int line, int column, params string[] arguments)
+        {
+            var diagnostic = Diagnostic(diagnosticId, squiggledText).WithArguments(arguments).WithLocation(line, column);
+            builder.Add(diagnostic);
+        }
+
+        [Fact]
+        public void TestEnsureNoMergedNamespaceSymbolAnalyzer()
+        {
+            var source = @"namespace N1.N2 { }";
+
+            var metadataReference = CreateCompilationWithMscorlib(source).ToMetadataReference();
+            var compilation = CreateCompilationWithMscorlib(source, new[] { metadataReference });
+            compilation.VerifyDiagnostics();
+
+            // Analyzer reports a diagnostic if it receives a merged namespace symbol across assemblies in compilation.
+            var analyzers = new DiagnosticAnalyzer[] { new EnsureNoMergedNamespaceSymbolAnalyzer() };
+            compilation.VerifyAnalyzerDiagnostics(analyzers);
+        }
+
+        [Fact, WorkItem(6324, "https://github.com/dotnet/roslyn/issues/6324")]
+        public void TestSharedStateAnalyzer()
+        {
+            string source1 = @"
+public partial class C { }
+";
+            string source2 = @"
+public partial class C2 { }
+";
+            string source3 = @"
+public partial class C33 { }
+";
+            var tree1 = CSharpSyntaxTree.ParseText(source1, path: "Source1_File1.cs");
+            var tree2 = CSharpSyntaxTree.ParseText(source1, path: "Source1_File2.cs");
+            var tree3 = CSharpSyntaxTree.ParseText(source2, path: "Source2_File3.cs");
+            var tree4 = CSharpSyntaxTree.ParseText(source3, path: "Source3_File4.generated.cs");
+            var tree5 = CSharpSyntaxTree.ParseText(source3, path: "Source3_File5.designer.cs");
+
+            var compilation = CreateCompilationWithMscorlib45(new[] { tree1, tree2, tree3, tree4, tree5 });
+            compilation.VerifyDiagnostics();
+
+            var analyzers = new DiagnosticAnalyzer[] { new SharedStateAnalyzer() };
+            compilation.VerifyAnalyzerDiagnostics(analyzers, null, null, true,
+                Diagnostic("UserCodeDiagnostic").WithArguments("Source1_File1.cs").WithLocation(1, 1),
+                Diagnostic("UniqueTextFileDiagnostic").WithArguments("Source1_File1.cs").WithLocation(1, 1),
+                Diagnostic("GeneratedCodeDiagnostic", "C33").WithArguments("C33").WithLocation(2, 22),
+                Diagnostic("UserCodeDiagnostic", "C2").WithArguments("C2").WithLocation(2, 22),
+                Diagnostic("UserCodeDiagnostic", "C").WithArguments("C").WithLocation(2, 22),
+                Diagnostic("UserCodeDiagnostic").WithArguments("Source1_File2.cs").WithLocation(1, 1),
+                Diagnostic("UniqueTextFileDiagnostic").WithArguments("Source1_File2.cs").WithLocation(1, 1),
+                Diagnostic("UserCodeDiagnostic").WithArguments("Source2_File3.cs").WithLocation(1, 1),
+                Diagnostic("UniqueTextFileDiagnostic").WithArguments("Source2_File3.cs").WithLocation(1, 1),
+                Diagnostic("GeneratedCodeDiagnostic").WithArguments("Source3_File4.generated.cs").WithLocation(1, 1),
+                Diagnostic("UniqueTextFileDiagnostic").WithArguments("Source3_File4.generated.cs").WithLocation(1, 1),
+                Diagnostic("GeneratedCodeDiagnostic").WithArguments("Source3_File5.designer.cs").WithLocation(1, 1),
+                Diagnostic("UniqueTextFileDiagnostic").WithArguments("Source3_File5.designer.cs").WithLocation(1, 1),
+                Diagnostic("NumberOfUniqueTextFileDescriptor").WithArguments("3").WithLocation(1, 1));
         }
     }
 }

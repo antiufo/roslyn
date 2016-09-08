@@ -1,9 +1,11 @@
 ﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
+using System.Diagnostics;
 using System.Threading;
+using Microsoft.CodeAnalysis.Semantics;
 using Microsoft.CodeAnalysis.Text;
 
 namespace Microsoft.CodeAnalysis
@@ -61,6 +63,39 @@ namespace Microsoft.CodeAnalysis
         /// The syntax tree this model was obtained from.
         /// </summary>
         protected abstract SyntaxTree SyntaxTreeCore { get; }
+
+        /// <summary>
+        /// Gets the operation corresponding to the expression or statement syntax node.
+        /// </summary>
+        /// <param name="node">The expression or statement syntax node.</param>
+        /// <param name="cancellationToken">An optional cancellation token.</param>
+        /// <returns></returns>
+        public IOperation GetOperation(SyntaxNode node, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            if (!this.Compilation.IsIOperationFeatureEnabled())
+            {
+                throw new InvalidOperationException(CodeAnalysisResources.IOperationFeatureDisabled);
+            }
+
+            return GetOperationInternal(node, cancellationToken);
+        }
+
+        internal IOperation GetOperationInternal(SyntaxNode node, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            try
+            {
+                return GetOperationCore(node, cancellationToken);
+            }
+            catch (Exception e) when (FatalError.ReportWithoutCrashUnlessCanceled(e))
+            {
+                // Log a Non-fatal-watson and then ignore the crash in the attempt of getting operation
+                Debug.Assert(false);
+            }
+
+            return null;
+        }
+
+        protected abstract IOperation GetOperationCore(SyntaxNode node, CancellationToken cancellationToken);
 
         /// <summary>
         /// Returns true if this is a SemanticModel that ignores accessibility rules when answering semantic questions.
@@ -826,13 +861,14 @@ namespace Microsoft.CodeAnalysis
         /// <param name="span">Span to get declarations.</param>
         /// <param name="getSymbol">Flag indicating whether <see cref="DeclarationInfo.DeclaredSymbol"/> should be computed for the returned declaration infos.
         /// If false, then <see cref="DeclarationInfo.DeclaredSymbol"/> is always null.</param>
+        /// <param name="builder">Builder to add declarations.</param>
         /// <param name="cancellationToken">Cancellation token.</param>
-        internal abstract ImmutableArray<DeclarationInfo> GetDeclarationsInSpan(TextSpan span, bool getSymbol, CancellationToken cancellationToken);
+        internal abstract void ComputeDeclarationsInSpan(TextSpan span, bool getSymbol, List<DeclarationInfo> builder, CancellationToken cancellationToken);
 
         /// <summary>
         /// Takes a node and returns a set of declarations that overlap the node's span.
         /// </summary>
-        internal abstract ImmutableArray<DeclarationInfo> GetDeclarationsInNode(SyntaxNode node, bool getSymbol, CancellationToken cancellationToken, int? levelsToCompute = null);
+        internal abstract void ComputeDeclarationsInNode(SyntaxNode node, bool getSymbol, List<DeclarationInfo> builder, CancellationToken cancellationToken, int? levelsToCompute = null);
 
         /// <summary>
         /// Takes a Symbol and syntax for one of its declaring syntax reference and returns the topmost syntax node to be used by syntax analyzer.

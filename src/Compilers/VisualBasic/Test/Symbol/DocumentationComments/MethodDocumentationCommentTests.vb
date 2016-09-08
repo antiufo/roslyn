@@ -139,7 +139,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
                             .GetMembers("Test").Single().GetDocumentationCommentId())
         End Sub
 
-        <WorkItem(766313, "DevDiv")>
+        <WorkItem(766313, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/766313")>
         <Fact>
         Public Sub TestMethodWithGenericDeclaringTypeAsParameter()
             Assert.Equal("M:Acme.MyList`1.Zip(Acme.MyList{`0})",
@@ -147,7 +147,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
                             .GetMembers("Zip").Single().GetDocumentationCommentId())
         End Sub
 
-        <WorkItem(766313, "DevDiv")>
+        <WorkItem(766313, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/766313")>
         <Fact>
         Public Sub TestMethodWithGenericDeclaringTypeAsTypeParameter()
             Assert.Equal("M:Acme.MyList`1.ReallyZip(Acme.MyList{Acme.MyList{`0}})",
@@ -192,11 +192,55 @@ End Class
             Next
         End Sub
 
-        <Fact, WorkItem(530924, "DevDiv")>
+        <Fact, WorkItem(530924, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530924")>
         Public Sub TestConversionOperator()
             Assert.Equal("M:Acme.ValueType.op_Implicit(System.Byte)~Acme.ValueType",
                          _acmeNamespace.GetTypeMembers("ValueType").Single() _
                              .GetMembers("op_Implicit").Single().GetDocumentationCommentId())
+        End Sub
+
+        <Fact, WorkItem(4699, "https://github.com/dotnet/roslyn/issues/4699")>
+        Public Sub GetMalformedDocumentationCommentXml()
+            Dim source =
+<compilation>
+    <file name="a.vb"><![CDATA[
+Class Test
+    ''' <summary>
+    ''' Info
+    ''' <!-- comment
+    ''' </summary
+    Shared Sub Main()
+    End Sub
+End Class
+    ]]></file>
+</compilation>
+
+            Dim compilation = CompilationUtils.CreateCompilationWithMscorlib(source, parseOptions:=TestOptions.Regular.WithDocumentationMode(DocumentationMode.Diagnose))
+            Dim main = compilation.GetTypeByMetadataName("Test").GetMember(Of MethodSymbol)("Main")
+
+            Assert.Equal(
+"<member name=""M:Test.Main"">
+ <summary>
+ Info
+ <!-- comment
+ </summary
+</member>", main.GetDocumentationCommentXml().Trim())
+
+            compilation = CompilationUtils.CreateCompilationWithMscorlib(source, parseOptions:=TestOptions.Regular.WithDocumentationMode(DocumentationMode.Parse))
+            main = compilation.GetTypeByMetadataName("Test").GetMember(Of MethodSymbol)("Main")
+
+            Assert.Equal(
+"<member name=""M:Test.Main"">
+ <summary>
+ Info
+ <!-- comment
+ </summary
+</member>", main.GetDocumentationCommentXml().Trim())
+
+            compilation = CompilationUtils.CreateCompilationWithMscorlib(source, parseOptions:=TestOptions.Regular.WithDocumentationMode(DocumentationMode.None))
+            main = compilation.GetTypeByMetadataName("Test").GetMember(Of MethodSymbol)("Main")
+
+            Assert.Equal("", main.GetDocumentationCommentXml().Trim())
         End Sub
 
     End Class

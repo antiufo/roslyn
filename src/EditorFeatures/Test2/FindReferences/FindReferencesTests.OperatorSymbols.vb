@@ -1,10 +1,12 @@
 ' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
+Imports System.Threading.Tasks
+
 Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
     Partial Public Class FindReferencesTests
-        <WorkItem(539174)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub VisualBasic_OperatorError1()
+        <WorkItem(539174, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539174")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestVisualBasic_OperatorError1() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -17,11 +19,11 @@ End Module
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub CSharpFindReferencesOnUnaryOperatorOverload()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCSharpFindReferencesOnUnaryOperatorOverload() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -38,11 +40,11 @@ class A
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub CSharpFindReferencesOnUnaryOperatorOverloadFromDefinition()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCSharpFindReferencesOnUnaryOperatorOverloadFromDefinition() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -59,11 +61,11 @@ class A
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub CSharpFindReferencesOnBinaryOperatorOverload()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCSharpFindReferencesOnBinaryOperatorOverload() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -79,11 +81,11 @@ class A
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub CSharpFindReferencesOnBinaryOperatorOverloadFromDefinition()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCSharpFindReferencesOnBinaryOperatorOverloadFromDefinition() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -99,11 +101,11 @@ class A
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub VisualBasicFindReferencesOnUnaryOperatorOverload()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestVisualBasicFindReferencesOnUnaryOperatorOverload() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -121,11 +123,11 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub VisualBasicFindReferencesOnUnaryOperatorOverloadFromDefinition()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestVisualBasicFindReferencesOnUnaryOperatorOverloadFromDefinition() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -143,11 +145,11 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub VisualBasicFindReferencesOnBinaryOperatorOverload()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestVisualBasicFindReferencesOnBinaryOperatorOverload() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -164,11 +166,11 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub VisualBasicFindReferencesOnBinaryOperatorOverloadFromDefinition()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestVisualBasicFindReferencesOnBinaryOperatorOverloadFromDefinition() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -185,7 +187,7 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
     End Class
 End Namespace

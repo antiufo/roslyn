@@ -1,17 +1,18 @@
 // Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
+using System;
 using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
 using Microsoft.CodeAnalysis.ExpressionEvaluator;
 using Microsoft.CodeAnalysis.Test.Utilities;
 using Microsoft.VisualStudio.Debugger.Clr;
 using Microsoft.VisualStudio.Debugger.Evaluation;
-using Microsoft.VisualStudio.Debugger.Evaluation.ClrCompilation;
 using Roslyn.Test.Utilities;
+using System.Collections.Generic;
 using System.Linq;
 using Xunit;
 using BindingFlags = System.Reflection.BindingFlags;
 
-namespace Microsoft.CodeAnalysis.CSharp.UnitTests
+namespace Microsoft.CodeAnalysis.CSharp.ExpressionEvaluator.UnitTests
 {
     public class ResultsViewTests : CSharpResultProviderTestBase
     {
@@ -732,7 +733,7 @@ class C : A<B>
                         DkmEvaluationResultFlags.Expandable));
                 moreChildren = GetChildren(moreChildren[0]);
                 Verify(moreChildren,
-                    EvalResult("F", "null", "object", "new System.Linq.SystemCore_EnumerableDebugView<B>(o).Items[0].F"));
+                    EvalResult("F", "null", "object", "(new System.Linq.SystemCore_EnumerableDebugView<B>(o).Items[0]).F"));
             }
         }
 
@@ -815,7 +816,7 @@ class C
             }
         }
 
-        [WorkItem(1006160)]
+        [WorkItem(1006160, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1006160")]
         [Fact]
         public void MultipleImplementations_DifferentImplementors()
         {
@@ -1328,7 +1329,7 @@ class C
         /// <summary>
         /// Do not instantiate proxy type for null IEnumerable.
         /// </summary>
-        [WorkItem(1009646)]
+        [WorkItem(1009646, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1009646")]
         [Fact]
         public void IEnumerableNull()
         {
@@ -1407,7 +1408,9 @@ class C : IEnumerable
             }
         }
 
-        [Fact, WorkItem(1145125, "DevDiv")]
+        [Fact]
+        [WorkItem(1145125, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1145125")]
+        [WorkItem(5666, "https://github.com/dotnet/roslyn/issues/5666")]
         public void GetEnumerableException()
         {
             var source =
@@ -1431,36 +1434,39 @@ class C
         get { throw new E(); }
     }
 }";
-            var runtime = new DkmClrRuntimeInstance(ReflectionUtilities.GetMscorlibAndSystemCore(GetAssembly(source)));
-            using (runtime.Load())
+            using (new EnsureEnglishUICulture())
             {
-                var type = runtime.GetType("C");
-                var value = CreateDkmClrValue(type.Instantiate(), type: type);
-                var evalResult = FormatResult("o", value);
-                Verify(evalResult,
-                    EvalResult("o", "{C}", "C", "o", DkmEvaluationResultFlags.Expandable));
-                var children = GetChildren(evalResult);
-                Verify(children,
-                    EvalResult(
-                        "P",
-                        "'o.P' threw an exception of type 'System.NotImplementedException'",
-                        "System.Collections.IEnumerable {System.NotImplementedException}",
-                        "o.P",
-                        DkmEvaluationResultFlags.Expandable | DkmEvaluationResultFlags.ReadOnly | DkmEvaluationResultFlags.ExceptionThrown),
-                    EvalResult(
-                        "Q",
-                        "'o.Q' threw an exception of type 'E'",
-                        "System.Collections.IEnumerable {E}",
-                        "o.Q",
-                        DkmEvaluationResultFlags.Expandable | DkmEvaluationResultFlags.ReadOnly | DkmEvaluationResultFlags.ExceptionThrown));
-                children = GetChildren(children[1]);
-                Verify(children[6],
-                    EvalResult(
-                        "Message",
-                        "\"Exception of type 'E' was thrown.\"",
-                        "string",
-                        null,
-                        DkmEvaluationResultFlags.RawString | DkmEvaluationResultFlags.ReadOnly));
+                var runtime = new DkmClrRuntimeInstance(ReflectionUtilities.GetMscorlibAndSystemCore(GetAssembly(source)));
+                using (runtime.Load())
+                {
+                    var type = runtime.GetType("C");
+                    var value = type.Instantiate();
+                    var evalResult = FormatResult("o", value);
+                    Verify(evalResult,
+                        EvalResult("o", "{C}", "C", "o", DkmEvaluationResultFlags.Expandable));
+                    var children = GetChildren(evalResult);
+                    Verify(children,
+                        EvalResult(
+                            "P",
+                            "'o.P' threw an exception of type 'System.NotImplementedException'",
+                            "System.Collections.IEnumerable {System.NotImplementedException}",
+                            "o.P",
+                            DkmEvaluationResultFlags.Expandable | DkmEvaluationResultFlags.ReadOnly | DkmEvaluationResultFlags.ExceptionThrown),
+                        EvalResult(
+                            "Q",
+                            "'o.Q' threw an exception of type 'E'",
+                            "System.Collections.IEnumerable {E}",
+                            "o.Q",
+                            DkmEvaluationResultFlags.Expandable | DkmEvaluationResultFlags.ReadOnly | DkmEvaluationResultFlags.ExceptionThrown));
+                    children = GetChildren(children[1]);
+                    Verify(children[6],
+                        EvalResult(
+                            "Message",
+                            "\"Exception of type 'E' was thrown.\"",
+                            "string",
+                            null,
+                            DkmEvaluationResultFlags.RawString | DkmEvaluationResultFlags.ReadOnly));
+                }
             }
         }
 
@@ -1483,7 +1489,7 @@ class C
             using (runtime.Load())
             {
                 var type = runtime.GetType("C");
-                var value = CreateDkmClrValue(type.Instantiate(), type: type);
+                var value = type.Instantiate();
                 var memberValue = value.GetMemberValue("P", (int)System.Reflection.MemberTypes.Property, "C", DefaultInspectionContext);
                 var evalResult = FormatResult("o.P", memberValue);
                 Verify(evalResult,
@@ -1500,7 +1506,7 @@ class C
         /// is [DebuggerBrowsable(DebuggerBrowsableState.RootHidden)]).
         /// Note, the native EE has an empty expansion when .dmp debugging.
         /// </summary>
-        [WorkItem(1043746)]
+        [WorkItem(1043746, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1043746")]
         [Fact]
         public void GetProxyPropertyValueError()
         {
@@ -1519,7 +1525,7 @@ class C : IEnumerable
             using (runtime.Load())
             {
                 var type = runtime.GetType("C");
-                var value = CreateDkmClrValue(type.Instantiate(), type: type);
+                var value = type.Instantiate();
                 var evalResult = FormatResult("o", value);
                 Verify(evalResult,
                     EvalResult("o", "{C}", "C", "o", DkmEvaluationResultFlags.Expandable));
@@ -1543,7 +1549,7 @@ class C : IEnumerable
         /// IEnumerable&lt;T&gt; should be expanded directly
         /// without intermediate "Results View" row.
         /// </summary>
-        [WorkItem(1114276)]
+        [WorkItem(1114276, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1114276")]
         [Fact]
         public void SyntheticIEnumerable()
         {
@@ -1563,7 +1569,7 @@ class C
             using (runtime.Load())
             {
                 var type = runtime.GetType("C");
-                var value = type.Instantiate();
+                var value = type.UnderlyingType.Instantiate();
 
                 // IEnumerable
                 var evalResult = FormatPropertyValue(runtime, value, "P");
@@ -1643,6 +1649,70 @@ class C
                 Verify(children,
                     EvalResult("[0]", "6", "int", "new System.Collections.Generic.Mscorlib_CollectionDebugView<int>(U).Items[0]"),
                     EvalResult("Raw View", null, "", "U, raw", DkmEvaluationResultFlags.Expandable | DkmEvaluationResultFlags.ReadOnly, DkmEvaluationResultCategory.Data));
+            }
+        }
+
+        [WorkItem(4098, "https://github.com/dotnet/roslyn/issues/4098")]
+        [Fact]
+        public void IEnumerableOfAnonymousType()
+        {
+            var code =
+@"using System.Collections.Generic;
+using System.Linq;
+
+class C
+{
+    static void M(List<int> list)
+    {
+        var result = from x in list from y in list where x > 0 select new { x, y };
+    }
+}";
+            var assembly = GetAssembly(code);
+            var assemblies = ReflectionUtilities.GetMscorlibAndSystemCore(assembly);
+            using (ReflectionUtilities.LoadAssemblies(assemblies))
+            {
+                var runtime = new DkmClrRuntimeInstance(assemblies);
+                var anonymousType = assembly.GetType("<>f__AnonymousType0`2").MakeGenericType(typeof(int), typeof(int));
+                var type = typeof(Enumerable).GetNestedType("WhereSelectEnumerableIterator`2", BindingFlags.NonPublic).MakeGenericType(anonymousType, anonymousType);
+                var displayClass = assembly.GetType("C+<>c");
+                var instance = displayClass.Instantiate();
+                var ctor = type.GetConstructors().Single();
+                var parameters = ctor.GetParameters();
+                var listType = typeof(List<>).MakeGenericType(anonymousType);
+                var source = listType.Instantiate();
+                listType.GetMethod("Add").Invoke(source, new[] { anonymousType.Instantiate(1, 1) });
+                var predicate = Delegate.CreateDelegate(parameters[1].ParameterType, instance, displayClass.GetMethod("<M>b__0_2", BindingFlags.Instance | BindingFlags.NonPublic));
+                var selector = Delegate.CreateDelegate(parameters[2].ParameterType, instance, displayClass.GetMethod("<M>b__0_3", BindingFlags.Instance | BindingFlags.NonPublic));
+                var value = CreateDkmClrValue(
+                    value: type.Instantiate(source, predicate, selector),
+                    type: runtime.GetType((TypeImpl)type));
+                var expr = "from x in my_list from y in my_list where x > 0 select new { x, y }";
+                var typeName = "System.Linq.Enumerable.WhereSelectEnumerableIterator<<>f__AnonymousType0<int, int>, <>f__AnonymousType0<int, int>>";
+
+                var name = expr + ";";
+                var evalResult = FormatResult(name, value);
+                Verify(evalResult,
+                    EvalResult(name, $"{{{typeName}}}", typeName, expr, DkmEvaluationResultFlags.Expandable));
+                var resultsViewRow = GetChildren(evalResult).Last();
+                Verify(GetChildren(resultsViewRow),
+                    EvalResult(
+                        "[0]",
+                        "{{ x = 1, y = 1 }}",
+                        "<>f__AnonymousType0<int, int>",
+                        null,
+                        DkmEvaluationResultFlags.Expandable));
+
+                name = expr + ", results";
+                evalResult = FormatResult(name, value, inspectionContext: CreateDkmInspectionContext(DkmEvaluationFlags.ResultsOnly));
+                Verify(evalResult,
+                    EvalResult(name, $"{{{typeName}}}", typeName, name, DkmEvaluationResultFlags.Expandable | DkmEvaluationResultFlags.ReadOnly));
+                Verify(GetChildren(evalResult),
+                    EvalResult(
+                        "[0]",
+                        "{{ x = 1, y = 1 }}",
+                        "<>f__AnonymousType0<int, int>",
+                        null,
+                        DkmEvaluationResultFlags.Expandable));
             }
         }
 

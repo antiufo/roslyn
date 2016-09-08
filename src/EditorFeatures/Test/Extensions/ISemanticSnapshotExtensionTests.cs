@@ -2,10 +2,12 @@
 
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces;
 using Microsoft.CodeAnalysis.FindSymbols;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
+using Roslyn.Test.Utilities;
 using Xunit;
 
 namespace Microsoft.CodeAnalysis.Editor.UnitTests.Extensions
@@ -13,9 +15,9 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Extensions
     public class ISemanticSnapshotExtensionTests
     {
         [Fact]
-        public void TryGetSymbolTouchingPositionOnLeadingTrivia()
+        public async Task TryGetSymbolTouchingPositionOnLeadingTrivia()
         {
-            using (var workspace = CSharpWorkspaceFactory.CreateWorkspaceFromFile(
+            using (var workspace = await TestWorkspace.CreateCSharpAsync(
                 @"using System;
                 class Program
                 {
@@ -33,7 +35,7 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Extensions
                 var document = workspace.CurrentSolution.GetDocument(workspace.Documents.Single().Id);
                 Assert.NotNull(document);
 
-                var symbol = SymbolFinder.FindSymbolAtPositionAsync(document, position, cancellationToken: CancellationToken.None).Result;
+                var symbol = await SymbolFinder.FindSymbolAtPositionAsync(document, position);
                 Assert.Null(symbol);
             }
         }

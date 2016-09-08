@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
+using System.Threading;
 using Xunit;
 
 namespace Roslyn.Test.Utilities
@@ -17,7 +18,8 @@ namespace Roslyn.Test.Utilities
             string fileName,
             string arguments,
             string workingDirectory = null,
-            IEnumerable<KeyValuePair<string, string>> additionalEnvironmentVars = null)
+            IEnumerable<KeyValuePair<string, string>> additionalEnvironmentVars = null,
+            string stdInput = null)
         {
             if (fileName == null) throw new ArgumentNullException(nameof(fileName));
 
@@ -26,11 +28,19 @@ namespace Roslyn.Test.Utilities
                 FileName = fileName,
                 Arguments = arguments,
                 UseShellExecute = false,
-                CreateNoWindow = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
+                RedirectStandardInput = stdInput != null,
                 WorkingDirectory = workingDirectory
             };
+
+            // In case the process is a console application that expects standard input
+            // do not set CreateNoWindow to true to ensure that the input encoding
+            // of both the test and the process fileName is equal.
+            if (stdInput == null)
+            {
+                startInfo.CreateNoWindow = true;
+            }
 
             if (additionalEnvironmentVars != null)
             {
@@ -59,6 +69,12 @@ namespace Roslyn.Test.Utilities
 
                 process.BeginOutputReadLine();
                 process.BeginErrorReadLine();
+
+                if (stdInput != null)
+                {
+                    process.StandardInput.Write(stdInput);
+                    process.StandardInput.Close();
+                }
 
                 process.WaitForExit();
 
@@ -119,7 +135,7 @@ namespace Roslyn.Test.Utilities
                 // might cause a deadlock.
                 result = process.StandardOutput.ReadToEnd();
                 process.WaitForExit();
-                Assert.Equal(expectedRetCode, process.ExitCode);
+                Assert.True(expectedRetCode == process.ExitCode, $"Unexpected exit code: {process.ExitCode} (expecting {expectedRetCode}). Process output: {result}");
             }
 
             return result;

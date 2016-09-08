@@ -106,8 +106,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                                                      result.ReceiverOpt,
                                                                      result.Arguments,
                                                                      rewritten.ConstantValueOpt,
-                                                                     rewritten.SuppressObjectClone,
-                                                                     rewritten.Type))
+                                                                     isLValue:=rewritten.IsLValue,
+                                                                     suppressObjectClone:=rewritten.SuppressObjectClone,
+                                                                     type:=rewritten.Type))
             End Function
 
             Public Overrides Function VisitObjectCreationExpression(node As BoundObjectCreationExpression) As BoundNode
@@ -604,7 +605,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     End If
 
                     ' We need to revisit the whenNotNull expression to replace placeholder
-                    Dim rewriter As New ConditionalAccessReceiverPlaceholderReplacement(node.PlaceholderId, placeholderReplacement)
+                    Dim rewriter As New ConditionalAccessReceiverPlaceholderReplacement(node.PlaceholderId, placeholderReplacement, RecursionDepth)
                     whenNotNull = DirectCast(rewriter.Visit(whenNotNull), BoundExpression)
                     Debug.Assert(rewriter.Replaced)
 
@@ -651,14 +652,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 End If
             End Function
 
-            Private Class ConditionalAccessReceiverPlaceholderReplacement
-                Inherits BoundTreeRewriter
+            Private NotInheritable Class ConditionalAccessReceiverPlaceholderReplacement
+                Inherits BoundTreeRewriterWithStackGuardWithoutRecursionOnTheLeftOfBinaryOperator
 
                 Private ReadOnly _placeholderId As Integer
                 Private ReadOnly _replaceWith As BoundExpression
                 Private _replaced As Boolean
 
-                Public Sub New(placeholderId As Integer, replaceWith As BoundExpression)
+                Public Sub New(placeholderId As Integer, replaceWith As BoundExpression, recursionDepth As Integer)
+                    MyBase.New(recursionDepth)
                     Me._placeholderId = placeholderId
                     Me._replaceWith = replaceWith
                 End Sub

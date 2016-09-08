@@ -33,7 +33,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Private Function BindIsExpression(
              left As BoundExpression,
              right As BoundExpression,
-             node As VisualBasicSyntaxNode,
+             node As SyntaxNode,
              [isNot] As Boolean,
              diagnostics As DiagnosticBag
         ) As BoundExpression
@@ -51,7 +51,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                              left,
                                              right,
                                              checked:=False,
-                                             Type:=booleanType,
+                                             type:=booleanType,
                                              hasErrors:=booleanType.IsErrorType())
 
             ' TODO: Add rewrite for Nullable.
@@ -123,79 +123,82 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             isOperandOfConditionalBranch As Boolean,
             diagnostics As DiagnosticBag
         ) As BoundExpression
+            ' Some tools, such as ASP .NET, generate expressions containing thousands
+            ' of string concatenations. For this reason, for string concatenations,
+            ' avoid the usual recursion along the left side of the parse. Also, attempt
+            ' to flatten whole sequences of string literal concatenations to avoid
+            ' allocating space for intermediate results.
 
             Dim preliminaryOperatorKind As BinaryOperatorKind = OverloadResolution.MapBinaryOperatorKind(node.Kind)
-
-            If preliminaryOperatorKind = BinaryOperatorKind.Add OrElse preliminaryOperatorKind = BinaryOperatorKind.Concatenate Then
-                ' Some tools, such as ASP .NET, generate expressions containing thousands
-                ' of string concatenations. For this reason, for string concatenations,
-                ' avoid the usual recursion along the left side of the parse. Also, attempt
-                ' to flatten whole sequences of string literal concatenations to avoid
-                ' allocating space for intermediate results.
-                Return BindBinaryOperatorUnwound(node, isOperandOfConditionalBranch, preliminaryOperatorKind, diagnostics)
-            End If
-
             Dim propagateIsOperandOfConditionalBranch = isOperandOfConditionalBranch AndAlso
                                                             (preliminaryOperatorKind = BinaryOperatorKind.AndAlso OrElse
                                                                 preliminaryOperatorKind = BinaryOperatorKind.OrElse)
 
-            Dim left As BoundExpression = BindValue(node.Left, diagnostics, propagateIsOperandOfConditionalBranch)
-            Dim right As BoundExpression = BindValue(node.Right, diagnostics, propagateIsOperandOfConditionalBranch)
-
-            Return BindBinaryOperator(node, left, right, node.OperatorToken.Kind, preliminaryOperatorKind, isOperandOfConditionalBranch, diagnostics)
-        End Function
-
-        Private Function BindBinaryOperatorUnwound(
-            node As BinaryExpressionSyntax,
-            isOperandOfConditionalBranch As Boolean,
-            preliminaryOperatorKind As BinaryOperatorKind,
-            diagnostics As DiagnosticBag
-        ) As BoundExpression
-
-            ' Making sure 'propagateIsOperandOfConditionalBranch' is False, see BindBinaryOperator(..., ..., ...)
-            Debug.Assert(((preliminaryOperatorKind And BinaryOperatorKind.Concatenate) <> 0) OrElse
-                         ((preliminaryOperatorKind And BinaryOperatorKind.Add) <> 0))
-
-            Dim expectedSyntaxKind As SyntaxKind = node.Kind
-
-            ' Unwind
-            Dim expressionsStack = ArrayBuilder(Of ExpressionSyntax).GetInstance()
-            expressionsStack.Push(node)
+            Dim binary As BinaryExpressionSyntax = node
+            Dim child As ExpressionSyntax
 
             Do
-                Dim current As ExpressionSyntax = expressionsStack.Peek()
-                If current.Kind <> expectedSyntaxKind Then
-                    Exit Do
-                End If
+                child = binary.Left
 
-                Dim binary = DirectCast(current, BinaryExpressionSyntax)
-                expressionsStack.Pop()
-                expressionsStack.Push(binary.Right)
-                expressionsStack.Push(binary.Left)
+                Select Case child.Kind
+                    Case SyntaxKind.AddExpression,
+                         SyntaxKind.ConcatenateExpression,
+                         SyntaxKind.LikeExpression,
+                         SyntaxKind.EqualsExpression,
+                         SyntaxKind.NotEqualsExpression,
+                         SyntaxKind.LessThanOrEqualExpression,
+                         SyntaxKind.GreaterThanOrEqualExpression,
+                         SyntaxKind.LessThanExpression,
+                         SyntaxKind.GreaterThanExpression,
+                         SyntaxKind.SubtractExpression,
+                         SyntaxKind.MultiplyExpression,
+                         SyntaxKind.ExponentiateExpression,
+                         SyntaxKind.DivideExpression,
+                         SyntaxKind.ModuloExpression,
+                         SyntaxKind.IntegerDivideExpression,
+                         SyntaxKind.LeftShiftExpression,
+                         SyntaxKind.RightShiftExpression,
+                         SyntaxKind.ExclusiveOrExpression,
+                         SyntaxKind.OrExpression,
+                         SyntaxKind.AndExpression
+
+                        If propagateIsOperandOfConditionalBranch Then
+                            Exit Do
+                        End If
+
+                    Case SyntaxKind.OrElseExpression,
+                         SyntaxKind.AndAlsoExpression
+                        Exit Select
+
+                    Case Else
+                        Exit Do
+                End Select
+
+                binary = DirectCast(child, BinaryExpressionSyntax)
             Loop
 
-            ' Bind
-            Dim leftmost As BoundExpression = BindValue(expressionsStack.Pop(), diagnostics, False)
             Dim compoundStringLength As Integer = 0
+            Dim left As BoundExpression = BindValue(child, diagnostics, propagateIsOperandOfConditionalBranch)
 
-            While expressionsStack.Count > 0
-                Dim rightSyntax As ExpressionSyntax = expressionsStack.Pop()
-                Dim binarySyntax = DirectCast(rightSyntax.Parent, BinaryExpressionSyntax)
-                Dim right As BoundExpression = BindValue(rightSyntax, diagnostics, False)
+            Do
+                binary = DirectCast(child.Parent, BinaryExpressionSyntax)
 
-                leftmost = BindBinaryOperator(binarySyntax,
-                                              leftmost,
-                                              right,
-                                              binarySyntax.OperatorToken.Kind, preliminaryOperatorKind, isOperandOfConditionalBranch, diagnostics,
-                                              compoundStringLength:=compoundStringLength)
-            End While
+                Dim right As BoundExpression = BindValue(binary.Right, diagnostics, propagateIsOperandOfConditionalBranch)
 
-            expressionsStack.Free()
-            Return leftmost
+                left = BindBinaryOperator(binary, left, right, binary.OperatorToken.Kind,
+                                          OverloadResolution.MapBinaryOperatorKind(binary.Kind),
+                                          If(binary Is node, isOperandOfConditionalBranch, propagateIsOperandOfConditionalBranch),
+                                          diagnostics,
+                                          compoundStringLength:=compoundStringLength)
+
+                child = binary
+            Loop While child IsNot node
+
+            Return left
         End Function
 
         Private Function BindBinaryOperator(
-            node As VisualBasicSyntaxNode,
+            node As SyntaxNode,
             left As BoundExpression,
             right As BoundExpression,
             operatorTokenKind As SyntaxKind,
@@ -497,7 +500,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     If divideByZero Then
                         Debug.Assert(value.IsBad)
                         ReportDiagnostic(diagnostics, node, ErrorFactory.ErrorInfo(ERRID.ERR_ZeroDivide))
-                    ElseIf compoundLengthOutOfLimit
+                    ElseIf compoundLengthOutOfLimit Then
                         Debug.Assert(value.IsBad)
                         ReportDiagnostic(diagnostics, node, ErrorFactory.ErrorInfo(ERRID.ERR_ConstantStringTooLong))
                     ElseIf (value.IsBad OrElse integerOverflow) Then
@@ -552,7 +555,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         Private Function BindUserDefinedNonShortCircuitingBinaryOperator(
-            node As VisualBasicSyntaxNode,
+            node As SyntaxNode,
             opKind As BinaryOperatorKind,
             left As BoundExpression,
             right As BoundExpression,
@@ -618,7 +621,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         '''     !T.IsTrue(temp = x) ? T.Or(temp, y) : temp
         ''' </summary>
         Private Function BindUserDefinedShortCircuitingOperator(
-            node As VisualBasicSyntaxNode,
+            node As SyntaxNode,
             opKind As BinaryOperatorKind,
             left As BoundExpression,
             right As BoundExpression,
@@ -765,8 +768,7 @@ Done:
             Return New BoundUserDefinedShortCircuitingOperator(node, leftOperand, leftPlaceholder, test, bitwise, operatorType, hasErrors)
         End Function
 
-
-        Private Sub ReportBinaryOperatorOnObject(
+        Private Shared Sub ReportBinaryOperatorOnObject(
             operatorTokenKind As SyntaxKind,
             operand As BoundExpression,
             preliminaryOperatorKind As BinaryOperatorKind,
@@ -807,7 +809,7 @@ Done:
         ''' lookups and construction of new instances of symbols.
         ''' </summary>
         Private Function GetSpecialTypeForBinaryOperator(
-            node As VisualBasicSyntaxNode,
+            node As SyntaxNode,
             leftType As TypeSymbol,
             rightType As TypeSymbol,
             specialType As SpecialType,
@@ -872,7 +874,7 @@ Done:
         ''' Get symbol for a Nullable type of particular type, reuse symbols for operand types to avoid type 
         ''' lookups and construction of new instances of symbols.
         ''' </summary>
-        Private Function GetNullableTypeForBinaryOperator(
+        Private Shared Function GetNullableTypeForBinaryOperator(
             leftType As TypeSymbol,
             rightType As TypeSymbol,
             ofType As TypeSymbol
@@ -931,7 +933,7 @@ Done:
         End Function
 
         Private Sub ReportUndefinedOperatorError(
-            syntax As VisualBasicSyntaxNode,
+            syntax As SyntaxNode,
             left As BoundExpression,
             right As BoundExpression,
             operatorTokenKind As SyntaxKind,
@@ -1046,7 +1048,7 @@ Done:
                          BinaryOperatorKind.Like
 
                         If rightType.GetNullableUnderlyingTypeOrSelf().GetEnumUnderlyingTypeOrSelf().IsIntrinsicType() OrElse
-                           rightType.IsCharArrayRankOne() OrElse
+                           rightType.IsCharSZArray() OrElse
                            rightType.IsDBNullType() Then
 
                             ' For & and Like, a Nothing operand is typed String unless the other operand
@@ -1086,7 +1088,7 @@ Done:
                          BinaryOperatorKind.Like
 
                         If leftType.GetNullableUnderlyingTypeOrSelf().GetEnumUnderlyingTypeOrSelf().IsIntrinsicType() OrElse
-                           leftType.IsCharArrayRankOne() OrElse
+                           leftType.IsCharSZArray() OrElse
                            leftType.IsDBNullType() Then
 
                             ' For & and Like, a Nothing operand is typed String unless the other operand
@@ -1209,7 +1211,7 @@ Done:
         End Function
 
         Private Function BindUserDefinedUnaryOperator(
-            node As VisualBasicSyntaxNode,
+            node As SyntaxNode,
             opKind As UnaryOperatorKind,
             operand As BoundExpression,
             <[In]> ByRef userDefinedOperator As OverloadResolution.OverloadResolutionResult,
@@ -1248,7 +1250,7 @@ Done:
             Return New BoundUserDefinedUnaryOperator(node, opKind, result, result.Type)
         End Function
 
-        Private Sub ReportUndefinedOperatorError(
+        Private Shared Sub ReportUndefinedOperatorError(
             syntax As UnaryExpressionSyntax,
             operand As BoundExpression,
             diagnostics As DiagnosticBag

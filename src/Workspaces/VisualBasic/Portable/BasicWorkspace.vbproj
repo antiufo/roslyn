@@ -1,9 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <!-- Copyright (c)  Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information. -->
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <ImportGroup Label="Settings">
-    <Import Project="..\..\..\..\build\Targets\VSL.Settings.targets" />
-  </ImportGroup>
+  <Import Project="..\..\..\..\build\Targets\VSL.Settings.targets" />
   <PropertyGroup>
     <Configuration Condition="'$(Configuration)' == ''">Debug</Configuration>
     <Platform Condition="'$(Platform)' == ''">AnyCPU</Platform>
@@ -16,33 +14,8 @@
     <TargetFrameworkIdentifier>.NETPortable</TargetFrameworkIdentifier>
     <ProjectTypeGuids>{14182A97-F7F0-4C62-8B27-98AA8AE2109A};{F184B08F-C81C-45F6-A57F-5ABD9991F28F}</ProjectTypeGuids>
     <RestorePackages>true</RestorePackages>
+    <ServiceablePackage>true</ServiceablePackage>
   </PropertyGroup>
-  <ItemGroup Label="File References">
-    <Reference Include="System.Collections.Immutable">
-      <HintPath>..\..\..\..\packages\System.Collections.Immutable.$(SystemCollectionsImmutableVersion)\lib\portable-net45+win8+wp8+wpa81\System.Collections.Immutable.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="System.Composition.AttributedModel">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\packages\Microsoft.Composition.$(MicrosoftCompositionVersion)\lib\portable-net45+win8+wp8+wpa81\System.Composition.AttributedModel.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Composition.Convention">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\packages\Microsoft.Composition.$(MicrosoftCompositionVersion)\lib\portable-net45+win8+wp8+wpa81\System.Composition.Convention.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Composition.Hosting">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\packages\Microsoft.Composition.$(MicrosoftCompositionVersion)\lib\portable-net45+win8+wp8+wpa81\System.Composition.Hosting.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Composition.Runtime">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\packages\Microsoft.Composition.$(MicrosoftCompositionVersion)\lib\portable-net45+win8+wp8+wpa81\System.Composition.Runtime.dll</HintPath>
-    </Reference>
-    <Reference Include="System.Composition.TypedParts">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\..\..\packages\Microsoft.Composition.$(MicrosoftCompositionVersion)\lib\portable-net45+win8+wp8+wpa81\System.Composition.TypedParts.dll</HintPath>
-    </Reference>
-  </ItemGroup>
   <ItemGroup Label="Project References">
     <ProjectReference Include="..\..\..\Compilers\Core\Portable\CodeAnalysis.csproj">
       <Project>{1EE8CAD3-55F9-4D91-96B2-084641DA9A6C}</Project>
@@ -61,23 +34,20 @@
     <DebugSymbols>true</DebugSymbols>
     <DefineDebug>true</DefineDebug>
     <DefineTrace>true</DefineTrace>
-    <RemoveIntegerChecks>true</RemoveIntegerChecks>
     <Optimize>false</Optimize>
-    <DebugType>full</DebugType>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
     <DefineTrace>true</DefineTrace>
-    <RemoveIntegerChecks>true</RemoveIntegerChecks>
     <Optimize>true</Optimize>
-    <DebugType>pdbonly</DebugType>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Microsoft.CodeAnalysis.VisualBasic.EditorFeatures" />
     <InternalsVisibleTo Include="Microsoft.CodeAnalysis.VisualBasic.Features" />
     <InternalsVisibleTo Include="Microsoft.VisualStudio.LanguageServices.VisualBasic" />
-    <InternalsVisibleTo Include="Roslyn.VisualBasic.InteractiveEditorFeatures" />
+    <InternalsVisibleTo Include="Microsoft.CodeAnalysis.VisualBasic.InteractiveEditorFeatures" />
     <InternalsVisibleTo Include="Roslyn.VisualStudio.VisualBasic.Repl" />
-    <InternalsVisibleToTest Include="Roslyn.Hosting.Diagnostics" />
+    <InternalsVisibleTo Include="Roslyn.Hosting.Diagnostics" />
+    <InternalsVisibleTo Include="MonoDevelop.VBNetBinding" />
     <InternalsVisibleToTest Include="Roslyn.Services.Editor.UnitTests" />
     <InternalsVisibleToTest Include="Roslyn.Services.Editor.UnitTests2" />
     <InternalsVisibleToTest Include="Roslyn.Services.Editor.VisualBasic.UnitTests" />
@@ -91,6 +61,7 @@
     <Compile Include="CaseCorrection\VisualBasicCaseCorrectionServiceFactory.vb" />
     <Compile Include="Classification\ClassificationHelpers.vb" />
     <Compile Include="Classification\Classifiers\AbstractSyntaxClassifier.vb" />
+    <Compile Include="Classification\Classifiers\IdentifierNameSyntaxClassifier.vb" />
     <Compile Include="Classification\Classifiers\ImportAliasClauseSyntaxClassifier.vb" />
     <Compile Include="Classification\Classifiers\NameSyntaxClassifier.vb" />
     <Compile Include="Classification\SyntaxClassifier.vb" />
@@ -135,6 +106,7 @@
     <Compile Include="CodeGeneration\VisualBasicSyntaxGenerator.vb" />
     <Compile Include="Composition\VisualBasicWorkspaceFeatures.vb" />
     <Compile Include="Editing\VisualBasicImportAdder.vb" />
+    <Compile Include="Execution\VisualBasicOptionsSerializationService.vb" />
     <Compile Include="Extensions\ArgumentListSyntaxExtensions.vb" />
     <Compile Include="Extensions\ArgumentSyntaxExtensions.vb" />
     <Compile Include="Extensions\CallStatementSyntaxExtensions.vb" />
@@ -152,7 +124,6 @@
     <Compile Include="Extensions\INamespaceOrTypeSymbolExtensions.vb" />
     <Compile Include="Extensions\InvocationExpressionSyntaxExtensions.vb" />
     <Compile Include="Extensions\ITypeSymbolExtensions.vb" />
-    <Compile Include="Extensions\LocationExtensions.vb" />
     <Compile Include="Extensions\MemberAccessExpressionSyntaxExtensions.vb" />
     <Compile Include="Extensions\MethodBaseSyntaxExtensions.vb" />
     <Compile Include="Extensions\NameSyntaxExtensions.vb" />
@@ -177,6 +148,7 @@
     <Compile Include="Extensions\TypeBlockSyntaxExtensions.vb" />
     <Compile Include="Extensions\TypeSyntaxGeneratorVisitor.vb" />
     <Compile Include="Extensions\VariableDeclaratorSyntaxExtensions.vb" />
+    <Compile Include="FindSymbols\VisualBasicReferenceFinder.vb" />
     <Compile Include="Formatting\DefaultOperationProvider.vb" />
     <Compile Include="Formatting\Engine\AggregatedFormattingResult.vb" />
     <Compile Include="Formatting\Engine\FormattingResult.vb" />
@@ -264,6 +236,7 @@
     <Compile Include="Utilities\NameSyntaxIterator.vb" />
     <Compile Include="Utilities\PossibleDeclarationTypes.vb" />
     <Compile Include="Utilities\SpeculationAnalyzer.vb" />
+    <Compile Include="Utilities\SymbolExtensions.vb" />
     <Compile Include="Utilities\SyntaxKindSet.vb" />
     <Compile Include="Utilities\TokenComparer.vb" />
     <Compile Include="Utilities\TypeSyntaxComparer.vb" />
@@ -283,7 +256,7 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="VBWorkspaceResources.resx">
-      <CustomToolNamespace>Microsoft.CodeAnalysis.VisualBasic</CustomToolNamespace>
+      <CustomToolNamespace>Microsoft.CodeAnalysis.VisualBasic.VBWorkspaceResources</CustomToolNamespace>
       <Generator>VbMyResourcesResXFileCodeGenerator</Generator>
       <LastGenOutput>VBWorkspaceResources.Designer.vb</LastGenOutput>
     </EmbeddedResource>
@@ -292,14 +265,11 @@
     <Folder Include="My Project\" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="packages.config" />
+    <None Include="project.json" />
   </ItemGroup>
   <ItemGroup>
     <PublicAPI Include="PublicAPI.Shipped.txt" />
     <PublicAPI Include="PublicAPI.Unshipped.txt" />
   </ItemGroup>
-  <ImportGroup Label="Targets">
-    <Import Project="..\..\..\..\build\Targets\VSL.Imports.targets" />
-    <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
-  </ImportGroup>
+  <Import Project="..\..\..\..\build\Targets\VSL.Imports.targets" />
 </Project>

@@ -9,119 +9,129 @@ using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.EditAndContinue;
-using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Editor.Implementation.EditAndContinue
 {
-    [Export(typeof(IDiagnosticUpdateSource))]
+    internal sealed class EncErrorId : BuildToolId.Base<DebuggingSession, object>
+    {
+        public EncErrorId(DebuggingSession session, object errorId)
+            : base(session, errorId)
+        {
+        }
+
+        public override string BuildTool => PredefinedBuildTools.EnC;
+    }
+
     [Export(typeof(EditAndContinueDiagnosticUpdateSource))]
     [Shared]
     internal sealed class EditAndContinueDiagnosticUpdateSource : IDiagnosticUpdateSource
     {
-        internal static object DebuggerErrorId = new object();
-        internal static object EmitErrorId = new object();
+        internal static readonly object DebuggerErrorId = new object();
+        internal static readonly object EmitErrorId = new object();
 
-        public EditAndContinueDiagnosticUpdateSource()
+        [ImportingConstructor]
+        public EditAndContinueDiagnosticUpdateSource(IDiagnosticUpdateSourceRegistrationService registrationService)
         {
+            registrationService.Register(this);
         }
 
-        public bool SupportGetDiagnostics { get { return false; } }
+        public bool SupportGetDiagnostics => false;
 
         public event EventHandler<DiagnosticsUpdatedArgs> DiagnosticsUpdated;
 
-        public ImmutableArray<DiagnosticData> GetDiagnostics(Workspace workspace, ProjectId projectId, DocumentId documentId, object id, CancellationToken cancellationToken)
+        public ImmutableArray<DiagnosticData> GetDiagnostics(Workspace workspace, ProjectId projectId, DocumentId documentId, object id, bool includeSuppressedDiagnostics = false, CancellationToken cancellationToken = default(CancellationToken))
         {
             return ImmutableArray<DiagnosticData>.Empty;
         }
 
-        public void ClearDiagnostics(DebuggingSession session, Workspace workspace, object kind, ProjectId projectId, ImmutableArray<DocumentId> documentIds)
+        public void ClearDiagnostics(EncErrorId errorId, Solution solution, ProjectId projectId, ImmutableArray<DocumentId> documentIds)
         {
-            if (documentIds.IsDefault)
+            // clear project diagnostics:
+            ClearDiagnostics(errorId, solution, projectId, null);
+
+            // clear document diagnostics:
+            foreach (var documentIdOpt in documentIds)
             {
-                return;
-            }
-
-            foreach (var documentId in documentIds)
-            {
-                ClearDiagnostics(session, workspace, kind, projectId, documentId);
-            }
-        }
-
-        public void ClearDiagnostics(DebuggingSession session, Workspace workspace, object errorId, ProjectId projectId, DocumentId documentId)
-        {
-            RaiseDiagnosticsUpdated(MakeArgs(session, workspace, errorId, projectId, documentId, ImmutableArray.Create<DiagnosticData>()));
-        }
-
-        public ImmutableArray<DocumentId> ReportDiagnostics(DebuggingSession session, object errorId, ProjectId projectId, Solution solution, IEnumerable<Diagnostic> diagnostics)
-        {
-            var argsByDocument = ImmutableArray.CreateRange(
-                from diagnostic in diagnostics
-                let document = solution.GetDocument(diagnostic.Location.SourceTree)
-                where document != null
-                let item = MakeDiagnosticData(projectId, document, solution, diagnostic)
-                group item by document.Id into itemsByDocumentId
-                select MakeArgs(session, errorId, solution.Workspace, solution, projectId, itemsByDocumentId.Key, ImmutableArray.CreateRange(itemsByDocumentId)));
-
-            foreach (var args in argsByDocument)
-            {
-                RaiseDiagnosticsUpdated(args);
-            }
-
-            return argsByDocument.SelectAsArray(args => args.DocumentId);
-        }
-
-        private static DiagnosticData MakeDiagnosticData(ProjectId projectId, Document document, Solution solution, Diagnostic d)
-        {
-            if (document != null)
-            {
-                return DiagnosticData.Create(document, d);
-            }
-            else
-            {
-                var project = solution.GetProject(projectId);
-                Debug.Assert(project != null);
-                return DiagnosticData.Create(project, d);
+                ClearDiagnostics(errorId, solution, projectId, documentIdOpt);
             }
         }
 
-        private DiagnosticsUpdatedArgs MakeArgs(
-            DebuggingSession session, Workspace workspace, object errorId, ProjectId projectId, DocumentId documentId, ImmutableArray<DiagnosticData> items)
+        public void ClearDiagnostics(EncErrorId errorId, Solution solution, ProjectId projectId, DocumentId documentIdOpt)
         {
-            return MakeArgs(session, errorId, workspace, solution: null, projectId: projectId, documentId: documentId, items: items);
-        }
-
-        private DiagnosticsUpdatedArgs MakeArgs(
-            DebuggingSession session, object errorId, Workspace workspace, Solution solution, ProjectId projectId, DocumentId documentId, ImmutableArray<DiagnosticData> items)
-        {
-            return new DiagnosticsUpdatedArgs(
-                id: new EnCId(session, errorId),
-                workspace: workspace,
+            DiagnosticsUpdated?.Invoke(this, DiagnosticsUpdatedArgs.DiagnosticsRemoved(
+                errorId,
+                solution.Workspace,
                 solution: solution,
                 projectId: projectId,
-                documentId: documentId,
-                diagnostics: items);
+                documentId: documentIdOpt));
         }
 
-        private void RaiseDiagnosticsUpdated(DiagnosticsUpdatedArgs args)
+        public ImmutableArray<DocumentId> ReportDiagnostics(object errorId, Solution solution, ProjectId projectId, IEnumerable<Diagnostic> diagnostics)
         {
-            var updated = this.DiagnosticsUpdated;
-            if (updated != null)
+            Debug.Assert(errorId != null);
+            Debug.Assert(solution != null);
+            Debug.Assert(projectId != null);
+
+            var updateEvent = DiagnosticsUpdated;
+            var documentIds = ArrayBuilder<DocumentId>.GetInstance();
+            var documentDiagnosticData = ArrayBuilder<DiagnosticData>.GetInstance();
+            var projectDiagnosticData = ArrayBuilder<DiagnosticData>.GetInstance();
+            var project = solution.GetProject(projectId);
+
+            foreach (var diagnostic in diagnostics)
             {
-                updated(this, args);
+                var documentOpt = solution.GetDocument(diagnostic.Location.SourceTree, projectId);
+
+                if (documentOpt != null)
+                {
+                    if (updateEvent != null)
+                    {
+                        documentDiagnosticData.Add(DiagnosticData.Create(documentOpt, diagnostic));
+                    }
+
+                    documentIds.Add(documentOpt.Id);
+                }
+                else if (updateEvent != null)
+                {
+                    projectDiagnosticData.Add(DiagnosticData.Create(project, diagnostic));
+                }
             }
+
+            foreach (var documentDiagnostics in documentDiagnosticData.ToDictionary(data => data.DocumentId))
+            {
+                updateEvent(this, DiagnosticsUpdatedArgs.DiagnosticsCreated(
+                    errorId,
+                    solution.Workspace,
+                    solution,
+                    projectId,
+                    documentId: documentDiagnostics.Key,
+                    diagnostics: documentDiagnostics.Value));
+            }
+
+            if (projectDiagnosticData.Count > 0)
+            {
+                updateEvent(this, DiagnosticsUpdatedArgs.DiagnosticsCreated(
+                    errorId,
+                    solution.Workspace,
+                    solution,
+                    projectId,
+                    documentId: null,
+                    diagnostics: projectDiagnosticData.ToImmutable()));
+            }
+
+            documentDiagnosticData.Free();
+            projectDiagnosticData.Free();
+            return documentIds.ToImmutableAndFree();
         }
 
-        private class EnCId : BuildToolId.Base<DebuggingSession, object>
+        internal ImmutableArray<DocumentId> ReportDiagnostics(DebuggingSession session, object errorId, ProjectId projectId, Solution solution, IEnumerable<Diagnostic> diagnostics)
         {
-            public EnCId(DebuggingSession session, object errorId) :
-                base(session, errorId)
-            {
-            }
+            return ReportDiagnostics(new EncErrorId(session, errorId), solution, projectId, diagnostics);
+        }
 
-            public override string BuildTool
-            {
-                get { return PredefinedBuildTools.EnC; }
-            }
+        internal void ClearDiagnostics(DebuggingSession session, Workspace workspace, object errorId, ProjectId projectId, ImmutableArray<DocumentId> documentIds)
+        {
+            ClearDiagnostics(new EncErrorId(session, errorId), workspace.CurrentSolution, projectId, documentIds);
         }
     }
 }

@@ -12,6 +12,7 @@ using DWORD = System.UInt32;
 using WCHAR = System.Char;
 using WORD = System.UInt16;
 using System.Reflection.PortableExecutable;
+using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis
 {
@@ -204,9 +205,9 @@ namespace Microsoft.CodeAnalysis
             var imageResourceSectionBytes = new byte[checked(rsrc1.SizeOfRawData + rsrc2.SizeOfRawData)];
 
             stream.Seek(rsrc1.PointerToRawData, SeekOrigin.Begin);
-            stream.Read(imageResourceSectionBytes, 0, rsrc1.SizeOfRawData);
+            stream.TryReadAll(imageResourceSectionBytes, 0, rsrc1.SizeOfRawData); // ConfirmSectionValues ensured that data are available
             stream.Seek(rsrc2.PointerToRawData, SeekOrigin.Begin);
-            stream.Read(imageResourceSectionBytes, rsrc1.SizeOfRawData, rsrc2.SizeOfRawData);
+            stream.TryReadAll(imageResourceSectionBytes, rsrc1.SizeOfRawData, rsrc2.SizeOfRawData); // ConfirmSectionValues ensured that data are available
 
             const int SizeOfRelocationEntry = 10;
 
@@ -640,16 +641,11 @@ namespace Microsoft.CodeAnalysis
                 //There's nothing guaranteeing that these are n.n.n.n format.
                 //The documentation says that if they're not that format the behavior is undefined.
                 Version fileVersion;
-                if (!VersionHelper.TryParse(_fileVersionContents, version: out fileVersion))
-                {
-                    fileVersion = new Version(0, 0, 0, 0);
-                }
+                VersionHelper.TryParse(_fileVersionContents, version: out fileVersion);
+
 
                 Version productVersion;
-                if (!VersionHelper.TryParse(_productVersionContents, version: out productVersion))
-                {
-                    productVersion = new Version(0, 0, 0, 0);
-                }
+                VersionHelper.TryParse(_productVersionContents, version: out productVersion);
 
                 writer.Write((DWORD)0xFEEF04BD);
                 writer.Write((DWORD)0x00010000);

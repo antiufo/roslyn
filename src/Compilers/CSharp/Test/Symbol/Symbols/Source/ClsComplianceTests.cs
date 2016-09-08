@@ -2,6 +2,7 @@
 
 using System;
 using System.Linq;
+using System.Threading;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
@@ -462,6 +463,62 @@ public class Generic<T> { }
                 // (11,14): warning CS3009: 'B2': base type 'Generic<Bad2>' is not CLS-compliant
                 // public class B2 : Generic<Bad2> { }
                 Diagnostic(ErrorCode.WRN_CLS_BadBase, "B2").WithArguments("B2", "Generic<Bad2>"));
+        }
+
+        [Fact]
+        public void TupleDefersClsComplianceToUnderlyingType()
+        {
+            var libCompliant_cs = @"
+namespace System
+{
+    [CLSCompliant(true)]
+    public struct ValueTuple<T1, T2>
+    {
+        public ValueTuple(T1 item1, T2 item2) { }
+    }
+}";
+
+            var libNotCompliant_cs = @"
+namespace System
+{
+    [CLSCompliant(false)]
+    public struct ValueTuple<T1, T2>
+    {
+        public ValueTuple(T1 item1, T2 item2) { }
+    }
+}";
+
+            var source = @"
+using System;
+
+[assembly:CLSCompliant(true)]
+public class C
+{
+    public (int, int) Method() { throw new Exception(); }
+    public (Bad, Bad) Method2() { throw new Exception(); }
+}
+
+[CLSCompliant(false)]
+public class Bad { }
+";
+            var libCompliant = CreateCompilationWithMscorlib(libCompliant_cs).EmitToImageReference();
+            var compCompliant = CreateCompilationWithMscorlib(source, new[] { libCompliant }, TestOptions.ReleaseDll);
+            compCompliant.VerifyDiagnostics(
+                // (8,23): warning CS3002: Return type of 'C.Method2()' is not CLS-compliant
+                //     public (Bad, Bad) Method2() { throw new Exception(); }
+                Diagnostic(ErrorCode.WRN_CLS_BadReturnType, "Method2").WithArguments("C.Method2()").WithLocation(8, 23)
+                );
+
+            var libNotCompliant = CreateCompilationWithMscorlib(libNotCompliant_cs).EmitToImageReference();
+            var compNotCompliant = CreateCompilationWithMscorlib(source, new[] { libNotCompliant }, TestOptions.ReleaseDll);
+            compNotCompliant.VerifyDiagnostics(
+                // (8,23): warning CS3002: Return type of 'C.Method2()' is not CLS-compliant
+                //     public (Bad, Bad) Method2() { throw new Exception(); }
+                Diagnostic(ErrorCode.WRN_CLS_BadReturnType, "Method2").WithArguments("C.Method2()").WithLocation(8, 23),
+                // (7,23): warning CS3002: Return type of 'C.Method()' is not CLS-compliant
+                //     public (int, int) Method() { throw new Exception(); }
+                Diagnostic(ErrorCode.WRN_CLS_BadReturnType, "Method").WithArguments("C.Method()").WithLocation(7, 23)
+                );
         }
 
         [Fact]
@@ -1977,7 +2034,7 @@ public class C
                 Diagnostic(ErrorCode.WRN_CLS_BadIdentifierCase, "set_p").WithArguments("C.set_p()"));
         }
 
-        [WorkItem(717146, "DevDiv")]
+        [WorkItem(717146, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/717146")]
         [Fact]
         public void WRN_CLS_BadIdentifierCase_Accessors2()
         {
@@ -2565,7 +2622,7 @@ public class Derived2 : Derived1
                 Diagnostic(ErrorCode.WRN_CLS_OverloadUnnamed, "this").WithArguments("Derived2.this[char[][]]"));
         }
 
-        [WorkItem(717146, "DevDiv")]
+        [WorkItem(717146, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/717146")]
         [Fact]
         public void Overloading_TypeParameterArray()
         {
@@ -2587,7 +2644,7 @@ public class C<T>
             CreateCompilationWithMscorlib(source).VerifyDiagnostics();
         }
 
-        [WorkItem(717146, "DevDiv")]
+        [WorkItem(717146, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/717146")]
         [Fact]
         public void Overloading_DynamicArray()
         {
@@ -2606,7 +2663,7 @@ public class C
             CreateCompilationWithMscorlibAndSystemCore(source).VerifyDiagnostics();
         }
 
-        [WorkItem(717146, "DevDiv")]
+        [WorkItem(717146, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/717146")]
         [Fact]
         public void Overloading_PointerArray()
         {
@@ -2629,7 +2686,7 @@ public unsafe class C
                 Diagnostic(ErrorCode.WRN_CLS_BadArgType, "t").WithArguments("int*[]"));
         }
 
-        [WorkItem(717146, "DevDiv")]
+        [WorkItem(717146, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/717146")]
         [Fact]
         public void Overloading_ConsiderAllInheritedMembers()
         {
@@ -2874,7 +2931,7 @@ public class C
             }
         }
 
-        [WorkItem(697178, "DevDiv")]
+        [WorkItem(697178, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/697178")]
         [Fact]
         public void ConstructedSpecialTypes()
         {
@@ -2966,9 +3023,12 @@ public class Test { }
 
             var comp = CreateCompilationWithMscorlib(source);
             comp.VerifyDiagnostics(
+                // (6,2): error CS0246: The type or namespace name 'MissingAttribute' could not be found (are you missing a using directive or an assembly reference?)
+                // [Missing]
+                Diagnostic(ErrorCode.ERR_SingleTypeNameNotFound, "Missing").WithArguments("MissingAttribute").WithLocation(6, 2),
                 // (6,2): error CS0246: The type or namespace name 'Missing' could not be found (are you missing a using directive or an assembly reference?)
                 // [Missing]
-                Diagnostic(ErrorCode.ERR_SingleTypeNameNotFound, "Missing").WithArguments("Missing"));
+                Diagnostic(ErrorCode.ERR_SingleTypeNameNotFound, "Missing").WithArguments("Missing").WithLocation(6, 2));
         }
 
         [Fact]
@@ -3108,7 +3168,7 @@ internal class C
                 Diagnostic(ErrorCode.ERR_AttributeNotOnAccessor, "CLSCompliant(false)").WithArguments("CLSCompliantAttribute", "assembly, module, class, struct, enum, constructor, method, property, indexer, field, event, interface, parameter, delegate, return, type parameter"));
         }
 
-        [WorkItem(709317, "DevDiv")]
+        [WorkItem(709317, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/709317")]
         [Fact]
         public void Repro709317()
         {
@@ -3135,10 +3195,10 @@ public class D
             var libRef = CreateCompilationWithMscorlib(libSource).EmitToImageReference();
             var comp = CreateCompilationWithMscorlib(source, new[] { libRef });
             var tree = comp.SyntaxTrees.Single();
-            comp.GetDiagnosticsForSyntaxTree(CompilationStage.Declare, tree, null, includeEarlierStages: false);
+            comp.GetDiagnosticsForSyntaxTree(CompilationStage.Declare, tree, null, includeEarlierStages: false, cancellationToken: CancellationToken.None);
         }
 
-        [WorkItem(709317, "DevDiv")]
+        [WorkItem(709317, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/709317")]
         [Fact]
         public void FilterTree()
         {
@@ -3230,7 +3290,7 @@ namespace N{0}
                 // [assembly:CLSCompliant(true)]
                 Diagnostic(ErrorCode.ERR_DuplicateAttribute, "CLSCompliant").WithArguments("CLSCompliant"));
 
-            comp.GetDiagnosticsForSyntaxTree(CompilationStage.Declare, tree1, null, includeEarlierStages: false).Verify(
+            comp.GetDiagnosticsForSyntaxTree(CompilationStage.Declare, tree1, null, includeEarlierStages: false, cancellationToken: CancellationToken.None).Verify(
                 // a.cs(21,6): warning CS3016: Arrays as attribute arguments is not CLS-compliant
                 //     [My(new int[] { 1 })]
                 Diagnostic(ErrorCode.WRN_CLS_ArrayArgumentToAttribute, "My(new int[] { 1 })"),
@@ -3258,7 +3318,7 @@ namespace N{0}
         }
 
         [Fact]
-        [WorkItem(701013, "DevDiv")]
+        [WorkItem(701013, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/701013")]
         public void AssemblyLevelAttribute()
         {
             var source = @"
@@ -3389,7 +3449,7 @@ public class C
         }
 
         [Fact]
-        [WorkItem(718503, "DevDiv")]
+        [WorkItem(718503, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/718503")]
         public void ErrorTypeAccessibility()
         {
             var source = @"
@@ -3435,7 +3495,7 @@ namespace A
         }
 
         [Fact]
-        [WorkItem(741721, "DevDiv")]
+        [WorkItem(741721, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/741721")]
         public void WRN_CLS_MeaninglessOnReturn_Inaccessible()
         {
             var source = @"
@@ -3456,7 +3516,7 @@ class Test
         }
 
         [Fact]
-        [WorkItem(741720, "DevDiv")]
+        [WorkItem(741720, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/741720")]
         public void WRN_CLS_MeaninglessOnParam_Inaccessible()
         {
             var source = @"
@@ -3480,7 +3540,7 @@ class Test
         }
 
         [Fact]
-        [WorkItem(741718, "DevDiv")]
+        [WorkItem(741718, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/741718")]
         public void WRN_CLS_ArrayArgumentToAttribute_Inaccessible()
         {
             var source = @"
@@ -3509,7 +3569,7 @@ class MyAttribute : Attribute
         }
 
         [Fact]
-        [WorkItem(749432, "DevDiv")]
+        [WorkItem(749432, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/749432")]
         public void InvalidAttributeArgument()
         {
             var source = @"
@@ -3530,7 +3590,7 @@ public class C
                 Diagnostic(ErrorCode.ERR_AnonymousTypeNotAvailable, "new"));
         }
 
-        [Fact, WorkItem(1026453, "DevDiv")]
+        [Fact, WorkItem(1026453, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1026453")]
         public void Bug1026453()
         {
             var source1 = @"

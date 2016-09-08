@@ -2,6 +2,8 @@
 
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.CodeAnalysis.Editor.Host;
+using Microsoft.CodeAnalysis.Shared.TestHooks;
 using Microsoft.VisualStudio.Text;
 using Roslyn.Utilities;
 
@@ -13,9 +15,11 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
             Workspace workspace,
             ITextBuffer subjectBuffer,
             ICodeActionEditHandlerService editHandler,
+            IWaitIndicator waitIndicator,
             PreviewChangesCodeAction codeAction,
-            object provider)
-            : base(workspace, subjectBuffer, editHandler, codeAction, provider)
+            object provider,
+            IAsynchronousOperationListener operationListener)
+            : base(workspace, subjectBuffer, editHandler, waitIndicator, codeAction, provider, operationListener)
         {
         }
 

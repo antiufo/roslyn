@@ -3,7 +3,9 @@
 Imports System.Collections.Immutable
 Imports System.IO
 Imports System.Threading.Tasks
+Imports Microsoft.CodeAnalysis.Collections
 Imports Microsoft.CodeAnalysis.Diagnostics
+Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
 
 Namespace Microsoft.CodeAnalysis.VisualBasic
 
@@ -54,7 +56,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                                    errorLogger As ErrorLogger) As SyntaxTree
 
             Dim fileReadDiagnostics As New List(Of DiagnosticInfo)()
-            Dim content = ReadFileContent(file, fileReadDiagnostics, Arguments.Encoding, Arguments.ChecksumAlgorithm)
+            Dim content = TryReadFileContent(file, fileReadDiagnostics)
 
             If content Is Nothing Then
                 ReportErrors(fileReadDiagnostics, consoleOutput, errorLogger)
@@ -76,6 +78,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
         Public Overrides Function CreateCompilation(consoleOutput As TextWriter, touchedFilesLogger As TouchedFileLogger, errorLogger As ErrorLogger) As Compilation
             Dim parseOptions = Arguments.ParseOptions
+
+            ' We compute script parse options once so we don't have to do it repeatedly in
+            ' case there are many script files.
             Dim scriptParseOptions = parseOptions.WithKind(SourceCodeKind.Script)
 
             Dim hadErrors As Boolean = False
@@ -111,11 +116,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim diagnostics = New List(Of DiagnosticInfo)()
 
             Dim assemblyIdentityComparer = DesktopAssemblyIdentityComparer.Default
-            Dim referenceDirectiveResolver As MetadataFileReferenceResolver = Nothing
-            Dim metadataProvider As MetadataFileReferenceProvider = GetMetadataProvider()
 
-            Dim externalReferenceResolver = GetExternalMetadataResolver(touchedFilesLogger)
-            Dim resolvedReferences = ResolveMetadataReferences(externalReferenceResolver, metadataProvider, diagnostics, assemblyIdentityComparer, touchedFilesLogger, referenceDirectiveResolver)
+            Dim referenceDirectiveResolver As MetadataReferenceResolver = Nothing
+            Dim resolvedReferences = ResolveMetadataReferences(diagnostics, touchedFilesLogger, referenceDirectiveResolver)
 
             If ReportErrors(diagnostics, consoleOutput, errorLogger) Then
                 Return Nothing
@@ -129,14 +132,14 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim xmlFileResolver = New LoggingXmlFileResolver(Arguments.BaseDirectory, touchedFilesLogger)
 
             ' TODO: support for #load search paths
-            Dim sourceFileResolver = New LoggingSourceFileResolver(ImmutableArray(Of String).Empty, Arguments.BaseDirectory, touchedFilesLogger)
+            Dim sourceFileResolver = New LoggingSourceFileResolver(ImmutableArray(Of String).Empty, Arguments.BaseDirectory, Arguments.PathMap, touchedFilesLogger)
 
             Dim result = VisualBasicCompilation.Create(
                  Arguments.CompilationName,
                  trees,
                  resolvedReferences,
                  Arguments.CompilationOptions.
-                     WithMetadataReferenceResolver(New AssemblyReferenceResolver(referenceDirectiveResolver, metadataProvider)).
+                     WithMetadataReferenceResolver(referenceDirectiveResolver).
                      WithAssemblyIdentityComparer(assemblyIdentityComparer).
                      WithStrongNameProvider(strongNameProvider).
                      WithXmlReferenceResolver(xmlFileResolver).
@@ -200,9 +203,44 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Return CommonCompiler.TryGetCompilerDiagnosticCode(diagnosticId, "BC", code)
         End Function
 
-        Protected Overrides Function ResolveAnalyzersFromArguments(diagnostics As List(Of DiagnosticInfo), messageProvider As CommonMessageProvider, touchedFiles As TouchedFileLogger) As ImmutableArray(Of DiagnosticAnalyzer)
-            Return Arguments.ResolveAnalyzersFromArguments(LanguageNames.VisualBasic, diagnostics, messageProvider, touchedFiles, AnalyzerLoader)
+        Protected Overrides Function ResolveAnalyzersFromArguments(
+            diagnostics As List(Of DiagnosticInfo),
+            messageProvider As CommonMessageProvider) As ImmutableArray(Of DiagnosticAnalyzer)
+            Return Arguments.ResolveAnalyzersFromArguments(LanguageNames.VisualBasic, diagnostics, messageProvider, AssemblyLoader)
         End Function
+
+        Protected Overrides Sub ResolveEmbeddedFilesFromExternalSourceDirectives(
+            tree As SyntaxTree,
+            resolver As SourceReferenceResolver,
+            embeddedFiles As OrderedSet(Of String),
+            diagnostics As IList(Of Diagnostic))
+
+            For Each directive As ExternalSourceDirectiveTriviaSyntax In tree.GetRoot().GetDirectives(
+                Function(d) d.Kind() = SyntaxKind.ExternalSourceDirectiveTrivia)
+
+                If directive.ExternalSource.IsMissing Then
+                    Continue For
+                End If
+
+                Dim path = CStr(directive.ExternalSource.Value)
+                If path Is Nothing Then
+                    Continue For
+                End If
+
+                Dim resolvedPath = resolver.ResolveReference(path, tree.FilePath)
+                If resolvedPath Is Nothing Then
+                    diagnostics.Add(
+                        MessageProvider.CreateDiagnostic(
+                            MessageProvider.ERR_FileNotFound,
+                            directive.ExternalSource.GetLocation(),
+                            path))
+
+                    Continue For
+                End If
+
+                embeddedFiles.Add(resolvedPath)
+            Next
+        End Sub
     End Class
 End Namespace
 

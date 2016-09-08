@@ -381,7 +381,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' Report Async/Await diagnostics, which depends on surrounding context.
         ''' </summary>
         Private Class CheckOnErrorAndAwaitWalker
-            Inherits BoundTreeWalker
+            Inherits BoundTreeWalkerWithStackGuardWithoutRecursionOnTheLeftOfBinaryOperator
 
             Private ReadOnly _binder As Binder
             Private ReadOnly _diagnostics As DiagnosticBag
@@ -415,9 +415,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 <Out> ByRef reportedAnError As Boolean
             )
                 Dim walker As New CheckOnErrorAndAwaitWalker(binder, diagnostics)
-                walker.Visit(block)
-                Debug.Assert(walker._enclosingSyncLockOrUsing Is Nothing)
-                Debug.Assert(Not walker._isInCatchFinallyOrSyncLock)
+
+                Try
+                    walker.Visit(block)
+                    Debug.Assert(walker._enclosingSyncLockOrUsing Is Nothing)
+                    Debug.Assert(Not walker._isInCatchFinallyOrSyncLock)
+                Catch ex As CancelledByStackGuardException
+                    ex.AddAnError(diagnostics)
+                    reportedAnError = True
+                End Try
 
                 containsAwait = walker._containsAwait
                 containsOnError = walker._containsOnError
@@ -667,7 +673,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                         arrayType = DirectCast(redimTargetType, ArrayTypeSymbol)
                     ElseIf redimTargetType.IsObjectType() Then
                         If boundIndices.Length > 0 Then '  missing redim size error will be reported later
-                            arrayType = New ArrayTypeSymbol(redimTargetType, Nothing, boundIndices.Length, Compilation)
+                            arrayType = ArrayTypeSymbol.CreateVBArray(redimTargetType, Nothing, boundIndices.Length, Compilation)
                         End If
                     Else
                         ReportDiagnostic(diagnostics, redimOperand.Expression, ERRID.ERR_ExpectedArray1, "Redim")
@@ -824,7 +830,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Return Not hasError
         End Function
 
-        Private Function IsValidBranchTarget(block As VisualBasicSyntaxNode, labelSyntax As LabelSyntax) As Boolean
+        Private Shared Function IsValidBranchTarget(block As VisualBasicSyntaxNode, labelSyntax As LabelSyntax) As Boolean
             Debug.Assert(block.Kind = SyntaxKind.TryBlock OrElse
                          block.Kind = SyntaxKind.CatchBlock OrElse
                          block.Kind = SyntaxKind.FinallyBlock OrElse
@@ -1320,6 +1326,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                         Case BoundKind.ArrayLiteral
                             arrayLiteral = DirectCast(inferFrom, BoundArrayLiteral)
                             inferredType = arrayLiteral.InferredType
+
+                        Case BoundKind.TupleLiteral
+                            Dim tupleLiteral = DirectCast(inferFrom, BoundTupleLiteral)
+                            inferredType = tupleLiteral.InferredType
 
                         Case Else
                             inferredType = inferFrom.Type
@@ -1854,7 +1864,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             result.Free()
         End Sub
 
-        Friend Function AdjustAssignmentTarget(node As VisualBasicSyntaxNode, op1 As BoundExpression, diagnostics As DiagnosticBag, ByRef isError As Boolean) As BoundExpression
+        Friend Function AdjustAssignmentTarget(node As SyntaxNode, op1 As BoundExpression, diagnostics As DiagnosticBag, ByRef isError As Boolean) As BoundExpression
             Select Case op1.Kind
                 Case BoundKind.XmlMemberAccess
                     Dim memberAccess = DirectCast(op1, BoundXmlMemberAccess)
@@ -1863,10 +1873,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
                 Case BoundKind.PropertyAccess
                     Dim propertyAccess As BoundPropertyAccess = DirectCast(op1, BoundPropertyAccess)
-                    Debug.Assert(propertyAccess.AccessKind <> PropertyAccessKind.Get)
                     Dim propertySymbol As PropertySymbol = propertyAccess.PropertySymbol
 
-                    Dim receiver As BoundExpression = propertyAccess.ReceiverOpt
+                    If propertyAccess.IsLValue Then
+                        Debug.Assert(propertySymbol.ReturnsByRef)
+                        WarnOnRecursiveAccess(propertyAccess, PropertyAccessKind.Get, diagnostics)
+                        Return propertyAccess.SetAccessKind(PropertyAccessKind.Get)
+                    End If
+
+                    Debug.Assert(propertyAccess.AccessKind <> PropertyAccessKind.Get)
 
                     If Not propertyAccess.IsWriteable Then
                         ReportDiagnostic(diagnostics, node, ERRID.ERR_NoSetProperty1, CustomSymbolDisplayFormatter.ShortErrorName(propertySymbol))
@@ -1884,7 +1899,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                             If ReportUseSiteError(diagnostics, op1.Syntax, setMethod) Then
                                 isError = True
                             Else
-                                Dim accessThroughType = GetAccessThroughType(receiver)
+                                Dim accessThroughType = GetAccessThroughType(propertyAccess.ReceiverOpt)
                                 Dim useSiteDiagnostics As HashSet(Of DiagnosticInfo) = Nothing
 
                                 If Not IsAccessible(setMethod, useSiteDiagnostics, accessThroughType) AndAlso
@@ -1915,7 +1930,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End Select
         End Function
 
-        Private Function BindAssignment(node As VisualBasicSyntaxNode, op1 As BoundExpression, op2 As BoundExpression, diagnostics As DiagnosticBag) As BoundAssignmentOperator
+        Private Function BindAssignment(node As SyntaxNode, op1 As BoundExpression, op2 As BoundExpression, diagnostics As DiagnosticBag) As BoundAssignmentOperator
 
             Dim isError As Boolean = False
             op1 = AdjustAssignmentTarget(node, op1, diagnostics, isError)
@@ -1972,11 +1987,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 right = MakeRValueAndIgnoreDiagnostics(right)
             End If
 
-            If left.IsPropertyOrXmlPropertyAccess() Then
-                left = left.SetAccessKind(PropertyAccessKind.Get Or PropertyAccessKind.Set)
-            ElseIf left.IsLateBound() Then
-                left = left.SetLateBoundAccessKind(LateBoundAccessKind.Get Or LateBoundAccessKind.Set)
-            End If
+            left = left.SetGetSetAccessKindIfAppropriate()
 
             Return New BoundAssignmentOperator(node, left, placeholder, right, False, hasErrors:=isError)
         End Function
@@ -1984,7 +1995,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <summary>
         ''' Binds a list of statements and puts in a scope.
         ''' </summary>
-        Friend Function BindBlock(syntax As VisualBasicSyntaxNode, stmtList As SyntaxList(Of StatementSyntax), diagnostics As DiagnosticBag) As BoundBlock
+        Friend Function BindBlock(syntax As SyntaxNode, stmtList As SyntaxList(Of StatementSyntax), diagnostics As DiagnosticBag) As BoundBlock
             Dim stmtListBinder = Me.GetBinder(stmtList)
             Return BindBlock(syntax, stmtList, diagnostics, stmtListBinder)
         End Function
@@ -1992,12 +2003,12 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <summary>
         ''' Binds a list of statements and puts in a scope.
         ''' </summary>
-        Friend Function BindBlock(syntax As VisualBasicSyntaxNode, stmtList As SyntaxList(Of StatementSyntax), diagnostics As DiagnosticBag, stmtListBinder As Binder) As BoundBlock
+        Friend Function BindBlock(syntax As SyntaxNode, stmtList As SyntaxList(Of StatementSyntax), diagnostics As DiagnosticBag, stmtListBinder As Binder) As BoundBlock
             Dim boundStatements(stmtList.Count - 1) As BoundStatement
             Dim locals As ArrayBuilder(Of LocalSymbol) = Nothing
 
             For i = 0 To boundStatements.Length - 1
-                Dim boundStatement As boundStatement = stmtListBinder.BindStatement(stmtList(i), diagnostics)
+                Dim boundStatement As BoundStatement = stmtListBinder.BindStatement(stmtList(i), diagnostics)
                 boundStatements(i) = boundStatement
 
                 Select Case boundStatement.Kind
@@ -2174,11 +2185,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 Debug.Assert((original.Kind = BoundKind.CompoundAssignmentTargetPlaceholder) = (right.Kind = BoundKind.MidResult) OrElse original.HasErrors OrElse right.HasErrors)
             End If
 
-            If target.IsPropertyOrXmlPropertyAccess() Then
-                target = target.SetAccessKind(PropertyAccessKind.Get Or PropertyAccessKind.Set)
-            ElseIf target.IsLateBound() Then
-                target = target.SetLateBoundAccessKind(LateBoundAccessKind.Get Or LateBoundAccessKind.Set)
-            End If
+            target = target.SetGetSetAccessKindIfAppropriate()
 
             Return New BoundExpressionStatement(node, New BoundAssignmentOperator(node, target, placeholder, right, False,
                                                                                   Compilation.GetSpecialType(SpecialType.System_Void),
@@ -2953,7 +2960,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' </summary>
         ''' <remarks>
         ''' The binding of the loop body and the next variables cannot happen before the local type inference has
-        ''' completed, which happens in the specialized binding functions for for each and for loops. Otherwise we would
+        ''' completed, which happens in the specialized binding functions for foreach and for loops. Otherwise we would
         ''' loose the diagnostics from the type inference.
         ''' </remarks>
         ''' <param name="loopBody">The loop body.</param>
@@ -3237,7 +3244,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         ' Verify that control variable can actually be used as a control variable
-        Private Function IsValidForControlVariableType(node As ForOrForEachBlockSyntax,
+        Private Shared Function IsValidForControlVariableType(node As ForOrForEachBlockSyntax,
                                     targetType As TypeSymbol,
                                     diagnostics As DiagnosticBag) As Boolean
 
@@ -3347,7 +3354,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim currentPlaceholderType = currentType
 
             Dim collectionType = collection.Type
-            If Not (collectionType.IsArrayType AndAlso DirectCast(collectionType, ArrayTypeSymbol).Rank = 1) Then
+            If Not (collectionType.IsArrayType AndAlso DirectCast(collectionType, ArrayTypeSymbol).IsSZArray) Then
                 Dim isStringForEach = collectionType.IsStringType
                 If Not isStringForEach AndAlso collection.Kind = BoundKind.Conversion Then
                     Dim conversion As BoundConversion = DirectCast(collection, BoundConversion)
@@ -3395,7 +3402,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 ' for multidimensional arrays make additional check that array element is castable to iteration variable type
                 ' we need to do this because multidimensional arrays only implement nongeneric IEnumerable 
                 ' so the cast from Current --> control variable will statically succeed (since Current returns object)
-                ' We however can know the element type and may know that under no condition the cst will work at run time
+                ' We however can know the element type and may know that under no condition the cast will work at run time
                 ' So we will check that here.
                 If collection.Type.IsArrayType Then
                     Dim elementType = DirectCast(collection.Type, ArrayTypeSymbol).ElementType
@@ -3487,7 +3494,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' </summary>
         ''' <param name="variableDeclarator">The variable declarator.</param>
         ''' <param name="diagnostics">The diagnostics.</param><returns></returns>
-        Private Function VerifyForControlVariableDeclaration(variableDeclarator As VariableDeclaratorSyntax, diagnostics As DiagnosticBag) As Boolean
+        Private Shared Function VerifyForControlVariableDeclaration(variableDeclarator As VariableDeclaratorSyntax, diagnostics As DiagnosticBag) As Boolean
             ' Check variable declaration syntax if present
             Debug.Assert(variableDeclarator.Names.Count = 1, "should be exactly one control variable")
             Dim identifier = variableDeclarator.Names(0)
@@ -3577,7 +3584,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End If
 
             If Not controlVariable.HasErrors AndAlso IsInAsyncContext() AndAlso
-               SeenAwaitVisitor.SeenAwaitIn(controlVariable) Then
+               SeenAwaitVisitor.SeenAwaitIn(controlVariable, diagnostics) Then
                 ReportDiagnostic(diagnostics, controlVariable.Syntax, ERRID.ERR_LoopControlMustNotAwait)
                 Return False
             End If
@@ -3586,13 +3593,21 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         Private Class SeenAwaitVisitor
-            Inherits BoundTreeWalker
+            Inherits BoundTreeWalkerWithStackGuardWithoutRecursionOnTheLeftOfBinaryOperator
 
             Private _seenAwait As Boolean
 
-            Public Shared Function SeenAwaitIn(node As BoundNode) As Boolean
+            Private Sub New()
+            End Sub
+
+            Public Shared Function SeenAwaitIn(node As BoundNode, diagnostics As DiagnosticBag) As Boolean
                 Dim visitor = New SeenAwaitVisitor()
-                visitor.Visit(node)
+                Try
+                    visitor.Visit(node)
+                Catch ex As CancelledByStackGuardException
+                    ex.AddAnError(diagnostics)
+                End Try
+
                 Return visitor._seenAwait
             End Function
 
@@ -3686,7 +3701,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 ' ambiguous lookups or a failed overload resolution for the current property access. 
                 isEnumerable = True
 
-                If collectionType.IsArrayType AndAlso DirectCast(collectionType, ArrayTypeSymbol).Rank = 1 Then
+                If collectionType.IsArrayType AndAlso DirectCast(collectionType, ArrayTypeSymbol).IsSZArray Then
                     Dim arrayType = DirectCast(collectionType, ArrayTypeSymbol)
                     currentType = arrayType.ElementType
 
@@ -4130,7 +4145,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <param name="methodOrPropertyGroup">The method or property group.</param>
         ''' <param name="diagnostics">The diagnostics.</param>
         Private Function CreateBoundInvocationExpressionFromMethodOrPropertyGroup(
-            syntax As VisualBasicSyntaxNode,
+            syntax As SyntaxNode,
             methodOrPropertyGroup As BoundMethodOrPropertyGroup,
             diagnostics As DiagnosticBag
         ) As BoundExpression
@@ -4183,7 +4198,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             container As TypeSymbol,
             symbolChecker As Func(Of Symbol, Boolean),
             result As LookupResult,
-            syntax As VisualBasicSyntaxNode,
+            syntax As SyntaxNode,
             diagnostics As DiagnosticBag
         ) As Boolean
             result.Clear()
@@ -4368,7 +4383,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     ' There is one exception to this rule: the parent is a declarator and has multiple names then 
                     ' the identifier syntax should be used to be able to distinguish between the error locations.
                     ' e.g. dim x, y as Integer = 23
-                    Dim syntaxNodeForErrors As VisualBasicSyntaxNode
+                    Dim syntaxNodeForErrors As SyntaxNode
                     If localDeclarations.Kind <> BoundKind.AsNewLocalDeclarations Then
                         syntaxNodeForErrors = declarationSyntax.Parent
 
@@ -4436,7 +4451,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Function
 
         Private Sub VerifyUsingVariableDeclarationAndBuildUsingInfo(
-            syntaxNode As VisualBasicSyntaxNode,
+            syntaxNode As SyntaxNode,
             localSymbol As LocalSymbol,
             iDisposable As TypeSymbol,
             placeholderInfo As Dictionary(Of TypeSymbol, ValueTuple(Of BoundRValuePlaceholder, BoundExpression, BoundExpression)),
@@ -4472,7 +4487,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Sub
 
         Private Sub BuildAndVerifyUsingInfo(
-            syntaxNode As VisualBasicSyntaxNode,
+            syntaxNode As SyntaxNode,
             resourceType As TypeSymbol,
             placeholderInfo As Dictionary(Of TypeSymbol, ValueTuple(Of BoundRValuePlaceholder, BoundExpression, BoundExpression)),
             iDisposable As TypeSymbol,
@@ -4519,7 +4534,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
         ''' <summary>Check the given type of and report WRN_MutableGenericStructureInUsing if needed.</summary>
         ''' <remarks>This function should only be called for a type of a using variable.</remarks>
-        Private Sub ReportMutableStructureConstraintsInUsing(type As TypeSymbol, symbolName As String, syntaxNode As VisualBasicSyntaxNode, diagnostics As DiagnosticBag)
+        Private Sub ReportMutableStructureConstraintsInUsing(type As TypeSymbol, symbolName As String, syntaxNode As SyntaxNode, diagnostics As DiagnosticBag)
             ' Dev10 #666593: Warn if the type of the variable is not a reference type or an immutable structure.
             If Not type.IsReferenceType Then
                 If type.IsTypeParameter Then
@@ -4572,7 +4587,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ' This method decides if a WRN_MutableStructureInUsing should be shown for a given type of the Using variable.
         ' The purpose of this function is to avoid code duplication in 'CheckForMutableStructureConstraints'. 
         ' This is not a general purpose helper.
-        Private Function ShouldReportMutableStructureInUsing(structureType As TypeSymbol) As Boolean
+        Private Shared Function ShouldReportMutableStructureInUsing(structureType As TypeSymbol) As Boolean
             Debug.Assert(structureType.IsValueType)
 
             If structureType.Kind = SymbolKind.NamedType Then

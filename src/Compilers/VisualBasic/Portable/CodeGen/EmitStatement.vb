@@ -1,9 +1,11 @@
 ﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 Imports System.Collections.Immutable
+Imports System.Reflection.Metadata
 Imports System.Runtime.InteropServices
 Imports Microsoft.CodeAnalysis.CodeGen
 Imports Microsoft.CodeAnalysis.Collections
+Imports Microsoft.CodeAnalysis.Emit
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
@@ -84,7 +86,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
         Private Sub EmitNoOpStatement(statement As BoundNoOpStatement)
             Select Case statement.Flavor
                 Case NoOpStatementFlavor.Default
-                    If _optimizations = OptimizationLevel.Debug Then
+                    If _ilEmitStyle = ILEmitStyle.Debug Then
                         _builder.EmitOpCode(ILOpCode.Nop)
                     End If
 
@@ -423,7 +425,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
             Return Not Me._module.SourceModule.ContainingSourceAssembly.IsVbRuntime
         End Function
 
-        Private Sub EmitSetProjectError(syntaxNode As VisualBasicSyntaxNode, errorLineNumberOpt As BoundExpression)
+        Private Sub EmitSetProjectError(syntaxNode As SyntaxNode, errorLineNumberOpt As BoundExpression)
             Dim setProjectErrorMethod As MethodSymbol
 
             If errorLineNumberOpt Is Nothing Then
@@ -440,7 +442,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
             Me.EmitSymbolToken(setProjectErrorMethod, syntaxNode)
         End Sub
 
-        Private Sub EmitClearProjectError(syntaxNode As VisualBasicSyntaxNode)
+        Private Sub EmitClearProjectError(syntaxNode As SyntaxNode)
             Const clearProjectError As WellKnownMember = WellKnownMember.Microsoft_VisualBasic_CompilerServices_ProjectData__ClearProjectError
             Dim clearProjectErrorMethod = DirectCast(Me._module.Compilation.GetWellKnownTypeMember(clearProjectError), MethodSymbol)
 
@@ -634,6 +636,34 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.CodeGen
         ' it is ok if lazyDest is Nothing
         ' if lazyDest is needed it will be initialized to a new object
         Private Sub EmitCondBranch(condition As BoundExpression, ByRef lazyDest As Object, sense As Boolean)
+            _recursionDepth += 1
+
+            If _recursionDepth > 1 Then
+                StackGuard.EnsureSufficientExecutionStack(_recursionDepth)
+
+                EmitCondBranchCore(condition, lazyDest, sense)
+            Else
+                EmitCondBranchCoreWithStackGuard(condition, lazyDest, sense)
+            End If
+
+            _recursionDepth -= 1
+        End Sub
+
+        Private Sub EmitCondBranchCoreWithStackGuard(condition As BoundExpression, ByRef lazyDest As Object, sense As Boolean)
+            Debug.Assert(_recursionDepth = 1)
+
+            Try
+                EmitCondBranchCore(condition, lazyDest, sense)
+                Debug.Assert(_recursionDepth = 1)
+
+            Catch ex As Exception When StackGuard.IsInsufficientExecutionStackException(ex)
+                _diagnostics.Add(ERRID.ERR_TooLongOrComplexExpression,
+                                 BoundTreeVisitor.CancelledByStackGuardException.GetTooLongOrComplexExpressionErrorLocation(condition))
+                Throw New EmitCancelledException()
+            End Try
+        End Sub
+
+        Private Sub EmitCondBranchCore(condition As BoundExpression, ByRef lazyDest As Object, sense As Boolean)
 oneMoreTime:
             Dim ilcode As ILOpCode
             Dim constExprValue = condition.ConstantValueOpt
@@ -832,7 +862,9 @@ OtherExpressions:
         ''' <summary>
         ''' tells if given node contains a label statement that defines given label symbol
         ''' </summary>
-        Private Class LabelFinder : Inherits BoundTreeWalker
+        Private Class LabelFinder
+            Inherits StatementWalker
+
             Private ReadOnly _label As LabelSymbol
             Private _found As Boolean = False
 
@@ -841,7 +873,7 @@ OtherExpressions:
             End Sub
 
             Public Overrides Function Visit(node As BoundNode) As BoundNode
-                If Not _found Then
+                If Not _found AndAlso TypeOf node IsNot BoundExpression Then
                     Return MyBase.Visit(node)
                 End If
 
@@ -1051,7 +1083,7 @@ OtherExpressions:
             End If
         End Sub
 
-        Private Sub EmitStringSwitchJumpTable(caseLabels As KeyValuePair(Of ConstantValue, Object)(), fallThroughLabel As LabelSymbol, key As LocalDefinition, syntaxNode As VisualBasicSyntaxNode)
+        Private Sub EmitStringSwitchJumpTable(caseLabels As KeyValuePair(Of ConstantValue, Object)(), fallThroughLabel As LabelSymbol, key As LocalDefinition, syntaxNode As SyntaxNode)
             Dim genHashTableSwitch As Boolean = SwitchStringJumpTableEmitter.ShouldGenerateHashTableSwitch(_module, caseLabels.Length)
             Dim keyHash As LocalDefinition = Nothing
 
@@ -1171,7 +1203,7 @@ OtherExpressions:
                         EmitSequencePoint(caseStatement.Syntax)
                     End If
 
-                    If _optimizations = OptimizationLevel.Debug Then
+                    If _ilEmitStyle = ILEmitStyle.Debug Then
                         ' Emit nop for the case statement otherwise the above sequence point
                         ' will get associated with the first statement in subsequent case block.
                         ' This matches the native compiler codegen.
@@ -1208,7 +1240,7 @@ OtherExpressions:
             End If
         End Sub
 
-        Private Function DefineLocal(local As LocalSymbol, syntaxNode As VisualBasicSyntaxNode) As LocalDefinition
+        Private Function DefineLocal(local As LocalSymbol, syntaxNode As SyntaxNode) As LocalDefinition
             Dim specType = local.Type.SpecialType
 
             ' We're treating constants of type Decimal and DateTime as local here to not create a new instance for each time
@@ -1255,7 +1287,7 @@ OtherExpressions:
                 constraints:=constraints,
                 isDynamic:=False,
                 dynamicTransformFlags:=Nothing,
-                isSlotReusable:=synthesizedKind.IsSlotReusable(_optimizations))
+                isSlotReusable:=synthesizedKind.IsSlotReusable(_ilEmitStyle <> ILEmitStyle.Release))
 
             ' If named, add it to the local debug scope.
             If localDef.Name IsNot Nothing Then
@@ -1295,7 +1327,7 @@ OtherExpressions:
                 Return Nothing
             End If
 
-            If _optimizations = OptimizationLevel.Debug Then
+            If _ilEmitStyle = ILEmitStyle.Debug Then
                 Dim syntax = local.GetDeclaratorSyntax()
                 Dim syntaxOffset = _method.CalculateLocalSyntaxOffset(syntax.SpanStart, syntax.SyntaxTree)
 
@@ -1315,7 +1347,7 @@ OtherExpressions:
         End Function
 
         Private Function IsSlotReusable(local As LocalSymbol) As Boolean
-            Return local.SynthesizedKind.IsSlotReusable(_optimizations)
+            Return local.SynthesizedKind.IsSlotReusable(_ilEmitStyle <> ILEmitStyle.Release)
         End Function
 
         Private Sub FreeLocal(local As LocalSymbol)
@@ -1342,7 +1374,7 @@ OtherExpressions:
         ''' <summary>
         ''' Allocates a temp without identity.
         ''' </summary>
-        Private Function AllocateTemp(type As TypeSymbol, syntaxNode As VisualBasicSyntaxNode) As LocalDefinition
+        Private Function AllocateTemp(type As TypeSymbol, syntaxNode As SyntaxNode) As LocalDefinition
             Return _builder.LocalSlotManager.AllocateSlot(
                 Me._module.Translate(type, syntaxNodeOpt:=syntaxNode, diagnostics:=_diagnostics),
                 LocalSlotConstraints.None)
@@ -1382,23 +1414,24 @@ OtherExpressions:
         Private Sub EmitStateMachineScope(scope As BoundStateMachineScope)
             _builder.OpenLocalScope()
 
-            'VB EE uses name mangling to match up original locals and the fields where they are hoisted
-            'The scoping information is passed by recording PDB scopes of "fake" locals named the same 
-            'as the fields. These locals are not emitted to IL.
+            If _module.EmitOptions.DebugInformationFormat = DebugInformationFormat.Pdb Then
+                'Native PDBs: VB EE uses name mangling to match up original locals and the fields where they are hoisted
+                'The scoping information is passed by recording PDB scopes of "fake" locals named the same 
+                'as the fields. These locals are not emitted to IL.
 
-            '         vb\language\debugger\procedurecontext.cpp
-            '  813                  // Since state machines lift (almost) all locals of a method, the lifted fields should
-            '  814                  // only be shown in the debugger when the original local variable was in scope.  So
-            '  815                  // we first check if there's a local by the given name and attempt to remove it from 
-            '  816                  // m_localVariableMap.  If it was present, we decode the original local's name, otherwise
-            '  817                  // we skip loading this lifted field since it is out of scope.
+                '         vb\language\debugger\procedurecontext.cpp
+                '  813                  // Since state machines lift (almost) all locals of a method, the lifted fields should
+                '  814                  // only be shown in the debugger when the original local variable was in scope.  So
+                '  815                  // we first check if there's a local by the given name and attempt to remove it from 
+                '  816                  // m_localVariableMap.  If it was present, we decode the original local's name, otherwise
+                '  817                  // we skip loading this lifted field since it is out of scope.
 
-            For Each field In scope.Fields
-                DefineUserDefinedStateMachineHoistedLocal(DirectCast(field, StateMachineFieldSymbol))
-            Next
+                For Each field In scope.Fields
+                    DefineUserDefinedStateMachineHoistedLocal(DirectCast(field, StateMachineFieldSymbol))
+                Next
+            End If
 
             EmitStatement(scope.Statement)
-
             _builder.CloseLocalScope()
         End Sub
 
@@ -1411,7 +1444,7 @@ OtherExpressions:
                         slot:=field.SlotIndex,
                         synthesizedKind:=SynthesizedLocalKind.EmitterTemp,
                         id:=Nothing,
-                        pdbAttributes:=Cci.PdbWriter.DefaultLocalAttributesValue,
+                        pdbAttributes:=LocalVariableAttributes.None,
                         constraints:=LocalSlotConstraints.None,
                         isDynamic:=False,
                         dynamicTransformFlags:=Nothing)

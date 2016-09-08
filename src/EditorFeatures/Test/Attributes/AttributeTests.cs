@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis.Classification.Classifiers;
 using Microsoft.CodeAnalysis.CodeRefactorings;
 using Microsoft.CodeAnalysis.Editor;
 using Microsoft.CodeAnalysis.Text;
+using Roslyn.Test.Utilities;
 using Xunit;
 
 namespace Microsoft.CodeAnalysis.Editor.UnitTests.Attributes
@@ -12,7 +13,7 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Attributes
     public class AttributeTests
     {
 #if false
-        [Fact]
+        [WpfFact]
         public void CreateExportSyntaxTokenCodeIssueProviderAttributeWithNullArg()
         {
             Assert.Throws<ArgumentNullException>(() =>
@@ -22,7 +23,7 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Attributes
             new ExportSyntaxTokenCodeIssueProviderAttribute("name", "language");
         }
 
-        [Fact]
+        [WpfFact]
         public void CreateExportSyntaxTriviaCodeIssueProviderAttributeWithNullArg()
         {
             Assert.Throws<ArgumentNullException>(() =>
@@ -44,9 +45,9 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Attributes
         public void CreateExportCompletionProviderAttributeWithNullArg()
         {
             Assert.Throws<ArgumentNullException>(() =>
-                new ExportCompletionProviderAttribute("name", null));
+                new ExportCompletionProviderMef1Attribute("name", null));
             Assert.Throws<ArgumentNullException>(() =>
-                new ExportCompletionProviderAttribute(null, "language"));
+                new ExportCompletionProviderMef1Attribute(null, "language"));
         }
     }
 }

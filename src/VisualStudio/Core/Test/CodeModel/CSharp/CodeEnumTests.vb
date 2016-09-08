@@ -1,5 +1,6 @@
 ' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
+Imports System.Threading.Tasks
 Imports Microsoft.CodeAnalysis
 Imports Roslyn.Test.Utilities
 
@@ -9,18 +10,18 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.CodeModel.CSharp
 
 #Region "Access tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Access1()
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAccess1() As Task
             Dim code =
 <Code>
 enum $$E { }
 </Code>
 
-            TestAccess(code, EnvDTE.vsCMAccess.vsCMAccessProject)
-        End Sub
+            Await TestAccess(code, EnvDTE.vsCMAccess.vsCMAccessProject)
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Access2()
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAccess2() As Task
             Dim code =
 <Code>
 class C
@@ -29,65 +30,65 @@ class C
 }
 </Code>
 
-            TestAccess(code, EnvDTE.vsCMAccess.vsCMAccessPrivate)
-        End Sub
+            Await TestAccess(code, EnvDTE.vsCMAccess.vsCMAccessPrivate)
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Access3()
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAccess3() As Task
             Dim code =
 <Code>
 private enum $$E { }
 </Code>
 
-            TestAccess(code, EnvDTE.vsCMAccess.vsCMAccessPrivate)
-        End Sub
+            Await TestAccess(code, EnvDTE.vsCMAccess.vsCMAccessPrivate)
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Access4()
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAccess4() As Task
             Dim code =
 <Code>
 protected enum $$E { }
 </Code>
 
-            TestAccess(code, EnvDTE.vsCMAccess.vsCMAccessProtected)
-        End Sub
+            Await TestAccess(code, EnvDTE.vsCMAccess.vsCMAccessProtected)
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Access5()
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAccess5() As Task
             Dim code =
 <Code>
 protected internal enum $$E { }
 </Code>
 
-            TestAccess(code, EnvDTE.vsCMAccess.vsCMAccessProjectOrProtected)
-        End Sub
+            Await TestAccess(code, EnvDTE.vsCMAccess.vsCMAccessProjectOrProtected)
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Access6()
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAccess6() As Task
             Dim code =
 <Code>
 internal enum $$E { }
 </Code>
 
-            TestAccess(code, EnvDTE.vsCMAccess.vsCMAccessProject)
-        End Sub
+            Await TestAccess(code, EnvDTE.vsCMAccess.vsCMAccessProject)
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Access7()
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAccess7() As Task
             Dim code =
 <Code>
 public enum $$E { }
 </Code>
 
-            TestAccess(code, EnvDTE.vsCMAccess.vsCMAccessPublic)
-        End Sub
+            Await TestAccess(code, EnvDTE.vsCMAccess.vsCMAccessPublic)
+        End Function
 
 #End Region
 
 #Region "Bases tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Bases1()
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestBases1() As Task
             Dim code =
 <Code>
 enum $$E
@@ -96,15 +97,15 @@ enum $$E
     Bar
 }</Code>
 
-            TestBases(code, IsElement("Enum"))
-        End Sub
+            Await TestBases(code, IsElement("Enum"))
+        End Function
 
 #End Region
 
 #Region "Attributes tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Attributes1()
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAttributes1() As Task
             Dim code =
 <Code>
 enum $$C
@@ -113,11 +114,11 @@ enum $$C
 }
 </Code>
 
-            TestAttributes(code, NoElements)
-        End Sub
+            Await TestAttributes(code, NoElements)
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Attributes2()
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAttributes2() As Task
             Dim code =
 <Code>
 using System;
@@ -129,11 +130,11 @@ enum $$C
 }
 </Code>
 
-            TestAttributes(code, IsElement("Flags"))
-        End Sub
+            Await TestAttributes(code, IsElement("Flags"))
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Attributes3()
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAttributes3() As Task
             Dim code =
 <Code>using System;
 
@@ -145,11 +146,11 @@ enum $$C
 }
 </Code>
 
-            TestAttributes(code, IsElement("Serializable"), IsElement("Flags"))
-        End Sub
+            Await TestAttributes(code, IsElement("Serializable"), IsElement("Flags"))
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Attributes4()
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAttributes4() As Task
             Dim code =
 <Code>using System;
 
@@ -160,14 +161,14 @@ enum $$C
 }
 </Code>
 
-            TestAttributes(code, IsElement("Serializable"), IsElement("Flags"))
-        End Sub
+            Await TestAttributes(code, IsElement("Serializable"), IsElement("Flags"))
+        End Function
 #End Region
 
 #Region "FullName tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub FullName1()
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestFullName1() As Task
             Dim code =
 <Code>
 enum $$E
@@ -176,15 +177,15 @@ enum $$E
     Bar
 }</Code>
 
-            TestFullName(code, "E")
-        End Sub
+            Await TestFullName(code, "E")
+        End Function
 
 #End Region
 
 #Region "Name tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub Name1()
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestName1() As Task
             Dim code =
 <Code>
 enum $$E
@@ -194,14 +195,14 @@ enum $$E
 }
 </Code>
 
-            TestName(code, "E")
-        End Sub
+            Await TestName(code, "E")
+        End Function
 
 #End Region
 
 #Region "AddAttribute tests"
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddAttribute1()
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddAttribute1() As Task
             Dim code =
 <Code>
 using System;
@@ -224,11 +225,11 @@ enum E
     Bar
 }
 </Code>
-            TestAddAttribute(code, expected, New AttributeData With {.Name = "Flags"})
-        End Sub
+            Await TestAddAttribute(code, expected, New AttributeData With {.Name = "Flags"})
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddAttribute2()
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddAttribute2() As Task
             Dim code =
 <Code>
 using System;
@@ -253,12 +254,12 @@ enum E
     Bar
 }
 </Code>
-            TestAddAttribute(code, expected, New AttributeData With {.Name = "CLSCompliant", .Value = "true", .Position = 1})
-        End Sub
+            Await TestAddAttribute(code, expected, New AttributeData With {.Name = "CLSCompliant", .Value = "true", .Position = 1})
+        End Function
 
         <WorkItem(2825, "https://github.com/dotnet/roslyn/issues/2825")>
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddAttribute_BelowDocComment()
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddAttribute_BelowDocComment() As Task
             Dim code =
 <Code>
 using System;
@@ -283,15 +284,15 @@ enum E
     Bar
 }
 </Code>
-            TestAddAttribute(code, expected, New AttributeData With {.Name = "Flags"})
-        End Sub
+            Await TestAddAttribute(code, expected, New AttributeData With {.Name = "Flags"})
+        End Function
 
 #End Region
 
 #Region "AddMember tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddMember1()
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddMember1() As Task
             Dim code =
 <Code>
 enum $$E
@@ -307,11 +308,11 @@ enum E
 }
 </Code>
 
-            TestAddEnumMember(code, expected, New EnumMemberData With {.Name = "V"})
-        End Sub
+            Await TestAddEnumMember(code, expected, New EnumMemberData With {.Name = "V"})
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddMember2()
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddMember2() As Task
             Dim code =
 <Code>
 enum $$E
@@ -327,11 +328,11 @@ enum E
 }
 </Code>
 
-            TestAddEnumMember(code, expected, New EnumMemberData With {.Name = "V", .Value = "1"})
-        End Sub
+            Await TestAddEnumMember(code, expected, New EnumMemberData With {.Name = "V", .Value = "1"})
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddMember3()
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddMember3() As Task
             Dim code =
 <Code>
 enum $$E
@@ -349,12 +350,12 @@ enum E
 }
 </Code>
 
-            TestAddEnumMember(code, expected, New EnumMemberData With {.Name = "U", .Value = "V"})
-        End Sub
+            Await TestAddEnumMember(code, expected, New EnumMemberData With {.Name = "U", .Value = "V"})
+        End Function
 
-        <WorkItem(638225)>
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddMember4()
+        <WorkItem(638225, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/638225")>
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddMember4() As Task
             Dim code =
 <Code>
 enum $$E
@@ -372,12 +373,12 @@ enum E
 }
 </Code>
 
-            TestAddEnumMember(code, expected, New EnumMemberData With {.Position = -1, .Name = "B"})
-        End Sub
+            Await TestAddEnumMember(code, expected, New EnumMemberData With {.Position = -1, .Name = "B"})
+        End Function
 
-        <WorkItem(638225)>
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddMember5()
+        <WorkItem(638225, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/638225")>
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddMember5() As Task
             Dim code =
 <Code>
 enum $$E
@@ -397,12 +398,12 @@ enum E
 }
 </Code>
 
-            TestAddEnumMember(code, expected, New EnumMemberData With {.Position = 1, .Name = "B"})
-        End Sub
+            Await TestAddEnumMember(code, expected, New EnumMemberData With {.Position = 1, .Name = "B"})
+        End Function
 
-        <WorkItem(638225)>
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddMember6()
+        <WorkItem(638225, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/638225")>
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddMember6() As Task
             Dim code =
 <Code>
 enum $$E
@@ -422,12 +423,12 @@ enum E
 }
 </Code>
 
-            TestAddEnumMember(code, expected, New EnumMemberData With {.Position = -1, .Name = "C"})
-        End Sub
+            Await TestAddEnumMember(code, expected, New EnumMemberData With {.Position = -1, .Name = "C"})
+        End Function
 
-        <WorkItem(638225)>
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub AddMember7()
+        <WorkItem(638225, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/638225")>
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestAddMember7() As Task
             Dim code =
 <Code>
 enum $$E
@@ -449,15 +450,15 @@ enum E
 }
 </Code>
 
-            TestAddEnumMember(code, expected, New EnumMemberData With {.Position = -1, .Name = "D"})
-        End Sub
+            Await TestAddEnumMember(code, expected, New EnumMemberData With {.Position = -1, .Name = "D"})
+        End Function
 
 #End Region
 
 #Region "RemoveMember tests"
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub RemoveMember1()
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestRemoveMember1() As Task
             Dim code =
 <Code>
 enum $$E
@@ -473,11 +474,11 @@ enum E
 }
 </Code>
 
-            TestRemoveChild(code, expected, "A")
-        End Sub
+            Await TestRemoveChild(code, expected, "A")
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub RemoveMember2()
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestRemoveMember2() As Task
             Dim code =
 <Code>
 enum $$E
@@ -495,11 +496,11 @@ enum E
 }
 </Code>
 
-            TestRemoveChild(code, expected, "A")
-        End Sub
+            Await TestRemoveChild(code, expected, "A")
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub RemoveMember3()
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestRemoveMember3() As Task
             Dim code =
 <Code>
 enum $$E
@@ -517,11 +518,11 @@ enum E
 }
 </Code>
 
-            TestRemoveChild(code, expected, "B")
-        End Sub
+            Await TestRemoveChild(code, expected, "B")
+        End Function
 
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub RemoveMember4()
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestRemoveMember4() As Task
             Dim code =
 <Code>
 enum $$E
@@ -541,14 +542,14 @@ enum E
 }
 </Code>
 
-            TestRemoveChild(code, expected, "B")
-        End Sub
+            Await TestRemoveChild(code, expected, "B")
+        End Function
 
 #End Region
 
 #Region "Set Name tests"
-        <ConditionalFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
-        Public Sub SetName1()
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestSetName1() As Task
             Dim code =
 <Code>
 enum $$Foo
@@ -563,9 +564,27 @@ enum Bar
 }
 </Code>
 
-            TestSetName(code, expected, "Bar", NoThrow(Of String)())
-        End Sub
+            Await TestSetName(code, expected, "Bar", NoThrow(Of String)())
+        End Function
 #End Region
+
+        <ConditionalWpfFact(GetType(x86)), Trait(Traits.Feature, Traits.Features.CodeModel)>
+        Public Async Function TestTypeDescriptor_GetProperties() As Task
+            Dim code =
+<Code>
+enum $$E
+{
+}
+</Code>
+
+            Dim expectedPropertyNames =
+                {"DTE", "Collection", "Name", "FullName", "ProjectItem", "Kind", "IsCodeType",
+                 "InfoLocation", "Children", "Language", "StartPoint", "EndPoint", "ExtenderNames",
+                 "ExtenderCATID", "Parent", "Namespace", "Bases", "Members", "Access", "Attributes",
+                 "DocComment", "Comment", "DerivedTypes"}
+
+            Await TestPropertyDescriptors(code, expectedPropertyNames)
+        End Function
 
         Protected Overrides ReadOnly Property LanguageName As String
             Get

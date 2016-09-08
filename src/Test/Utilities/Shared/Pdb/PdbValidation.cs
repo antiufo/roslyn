@@ -107,7 +107,7 @@ namespace Microsoft.CodeAnalysis.Test.Utilities
             bool expectedIsXmlLiteral)
         {
             Assert.NotEqual(DebugInformationFormat.Embedded, format);
-            
+
             if (format == 0 || format == DebugInformationFormat.Pdb)
             {
                 XElement actualNativePdb = XElement.Parse(GetPdbXml(compilation, debugEntryPoint, options, qualifiedMethodName, portable: false));
@@ -133,7 +133,7 @@ namespace Microsoft.CodeAnalysis.Test.Utilities
 
                     // remove scopes that only contained non-portable elements (namespace scopes)
                     RemoveEmptyScopes(expectedPdb);
-
+                    RemoveMethodsWithNoSequencePoints(expectedPdb);
                     RemoveEmptyMethods(expectedPdb);
                 }
 
@@ -141,16 +141,37 @@ namespace Microsoft.CodeAnalysis.Test.Utilities
             }
         }
 
+        private static void RemoveMethodsWithNoSequencePoints(XElement pdb)
+        {
+            var methods = (from e in pdb.DescendantsAndSelf()
+                              where e.Name == "method" 
+                              select e).ToArray();
+            foreach(var method in methods)
+            {
+                bool hasNoSequencePoints = method.DescendantsAndSelf().Where(node => node.Name == "entry").IsEmpty();
+                if (hasNoSequencePoints)
+                {
+                    method.Remove();
+                }  
+            }
+        }
+
         private static void RemoveEmptyScopes(XElement pdb)
         {
-            var emptyScopes = from e in pdb.DescendantsAndSelf()
-                              where e.Name == "scope" && !e.HasElements
-                              select e;
+            XElement[] emptyScopes;
 
-            foreach (var e in emptyScopes.ToArray())
+            do
             {
-                e.Remove();
+                emptyScopes = (from e in pdb.DescendantsAndSelf()
+                               where e.Name == "scope" && !e.HasElements
+                               select e).ToArray();
+
+                foreach (var e in emptyScopes)
+                {
+                    e.Remove();
+                }
             }
+            while (emptyScopes.Any());
         }
 
         private static void RemoveEmptySequencePoints(XElement pdb)
@@ -190,7 +211,8 @@ namespace Microsoft.CodeAnalysis.Test.Utilities
                                             e.Name == "type" ||
                                             e.Name == "defunct" ||
                                             e.Name == "extern" ||
-                                            e.Name == "externinfo"
+                                            e.Name == "externinfo" ||
+                                            e.Name == "local" && e.Attributes().Any(a => a.Name.LocalName == "name" && a.Value.StartsWith("$VB$ResumableLocal_"))
                                       select e;
 
             foreach (var e in nonPortableElements.ToArray())
@@ -224,15 +246,15 @@ namespace Microsoft.CodeAnalysis.Test.Utilities
 
                     options |= PdbToXmlOptions.ResolveTokens | PdbToXmlOptions.ThrowOnError;
                     actual = PdbToXmlConverter.ToXml(pdbbits, exebits, options, methodName: qualifiedMethodName);
-                }
 
-                ValidateDebugDirectory(exebits, compilation.AssemblyName + ".pdb", portable, compilation.IsEmitDeterministic);
+                    ValidateDebugDirectory(exebits, portable ? pdbbits : null, compilation.AssemblyName + ".pdb", compilation.IsEmitDeterministic);
+                }
             }
 
             return actual;
         }
 
-        public static void ValidateDebugDirectory(Stream peStream, string pdbPath, bool isPortable, bool isDeterministic)
+        public static void ValidateDebugDirectory(Stream peStream, Stream portablePdbStreamOpt, string pdbPath, bool isDeterministic)
         {
             peStream.Seek(0, SeekOrigin.Begin);
             PEReader peReader = new PEReader(peStream);
@@ -241,24 +263,25 @@ namespace Microsoft.CodeAnalysis.Test.Utilities
 
             int position;
             Assert.True(peReader.PEHeaders.TryGetDirectoryOffset(debugDirectory, out position));
-            Assert.Equal(0x1c, debugDirectory.Size);
-
-            byte[] buffer = new byte[debugDirectory.Size];
-            peStream.Read(buffer, 0, buffer.Length);
+            int entries = debugDirectory.Size / 0x1c;
+            Assert.Equal(0, debugDirectory.Size % 0x1c);
+            Assert.True(entries == 1 || entries == 2);
+            bool hasDebug = entries == 2;
 
             peStream.Position = position;
             var reader = new BinaryReader(peStream);
 
+            // first the IMAGE_DEBUG_TYPE_CODEVIEW entry
             int characteristics = reader.ReadInt32();
             Assert.Equal(0, characteristics);
 
-            uint timeDateStamp = reader.ReadUInt32();
+            byte[] stamp = reader.ReadBytes(sizeof(int));
 
             uint version = reader.ReadUInt32();
-            Assert.Equal(isPortable ? 0x504d0001u : 0, version);
+            Assert.Equal((portablePdbStreamOpt != null) ? 0x504d0100u : 0, version);
 
             int type = reader.ReadInt32();
-            Assert.Equal(2, type);
+            Assert.Equal(2, type); // IMAGE_DEBUG_TYPE_CODEVIEW
 
             int sizeOfData = reader.ReadInt32();
             int rvaOfRawData = reader.ReadInt32();
@@ -269,6 +292,27 @@ namespace Microsoft.CodeAnalysis.Test.Utilities
             int pointerToRawData = reader.ReadInt32();
             Assert.Equal(pointerToRawData, sectionHeader.PointerToRawData + rvaOfRawData - sectionHeader.VirtualAddress);
 
+            // optionally a IMAGE_DEBUG_TYPE_NO_TIMESTAMP entry indicating that timestamps are deterministic
+            if (hasDebug)
+            {
+                int characteristics2 = reader.ReadInt32();
+                Assert.Equal(0, characteristics2);
+
+                byte[] stamp2 = reader.ReadBytes(sizeof(int));
+
+                int version2 = reader.ReadInt32();
+                Assert.Equal(0, version2);
+
+                int type2 = reader.ReadInt32();
+                Assert.Equal(16, type2); // IMAGE_DEBUG_TYPE_NO_TIMESTAMP
+
+                int sizeOfData2 = reader.ReadInt32();
+                int rvaOfRawData2 = reader.ReadInt32();
+                int pointerToRawData2 = reader.ReadInt32();
+                Assert.Equal(0, sizeOfData2 | rvaOfRawData2 | pointerToRawData2);
+            }
+
+            // Now verify the data pointed to by the IMAGE_DEBUG_TYPE_CODEVIEW entry
             peStream.Position = pointerToRawData;
 
             Assert.Equal((byte)'R', reader.ReadByte());
@@ -303,6 +347,28 @@ namespace Microsoft.CodeAnalysis.Test.Utilities
 
             var actualPath = Encoding.UTF8.GetString(pathBlob, 0, terminator);
             Assert.Equal(pdbPath, actualPath);
+
+            if (portablePdbStreamOpt != null)
+            {
+                ValidatePortablePdbId(portablePdbStreamOpt, stamp, guidBlob);
+            }
+        }
+
+        private unsafe static void ValidatePortablePdbId(Stream pdbStream, byte[] stampInDebugDirectory, byte[] guidInDebugDirectory)
+        {
+            var expectedId = ImmutableArray.CreateRange(guidInDebugDirectory.Concat(stampInDebugDirectory));
+
+            pdbStream.Position = 0;
+            var buffer = new byte[pdbStream.Length];
+            var bytesRead = pdbStream.TryReadAll(buffer, 0, buffer.Length);
+
+            Assert.Equal(buffer.Length, bytesRead);
+
+            fixed (byte* bufferPtr = buffer)
+            {
+                var id = new MetadataReader(bufferPtr, buffer.Length).DebugMetadataHeader.Id;
+                Assert.Equal(id.ToArray(), expectedId);
+            }
         }
 
         public static void VerifyMetadataEqualModuloMvid(Stream peStream1, Stream peStream2)

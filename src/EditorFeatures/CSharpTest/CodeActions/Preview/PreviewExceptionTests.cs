@@ -1,8 +1,9 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeRefactorings;
 using Microsoft.CodeAnalysis.Editor.Implementation.Suggestions;
@@ -12,47 +13,49 @@ using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
 using Roslyn.Test.Utilities;
 using Xunit;
+using Microsoft.CodeAnalysis.Editor.UnitTests.Utilities;
 
 namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.CodeRefactorings
 {
     public partial class PreviewTests
     {
-        [Fact]
-        public void TestExceptionInComputePreview()
+        [WpfFact]
+        public async Task TestExceptionInComputePreview()
         {
-            using (var workspace = CreateWorkspaceFromFile("class D {}", null, null))
+            using (var workspace = await CreateWorkspaceFromFileAsync("class D {}", null, null))
             {
-                GetPreview(workspace, new ErrorCases.ExceptionInCodeAction());
+                await GetPreview(workspace, new ErrorCases.ExceptionInCodeAction());
             }
         }
 
         [Fact]
-        public void TestExceptionInDisplayText()
+        public async Task TestExceptionInDisplayText()
         {
-            using (var workspace = CreateWorkspaceFromFile("class D {}", null, null))
+            using (var workspace = await CreateWorkspaceFromFileAsync("class D {}", null, null))
             {
                 DisplayText(workspace, new ErrorCases.ExceptionInCodeAction());
             }
         }
 
-        [Fact]
-        public void TestExceptionInActionSets()
+        [WpfFact]
+        public async Task TestExceptionInActionSets()
         {
-            using (var workspace = CreateWorkspaceFromFile("class D {}", null, null))
+            using (var workspace = await CreateWorkspaceFromFileAsync("class D {}", null, null))
             {
-                ActionSets(workspace, new ErrorCases.ExceptionInCodeAction());
+                await ActionSets(workspace, new ErrorCases.ExceptionInCodeAction());
             }
         }
 
-        private void GetPreview(TestWorkspace workspace, CodeRefactoringProvider provider)
+        private async Task GetPreview(TestWorkspace workspace, CodeRefactoringProvider provider)
         {
             List<CodeAction> refactorings = new List<CodeAction>();
             ICodeActionEditHandlerService editHandler;
             EditorLayerExtensionManager.ExtensionManager extensionManager;
             VisualStudio.Text.ITextBuffer textBuffer;
             RefactoringSetup(workspace, provider, refactorings, out editHandler, out extensionManager, out textBuffer);
-            var suggestedAction = new CodeRefactoringSuggestedAction(workspace, textBuffer, editHandler, refactorings.First(), provider);
-            suggestedAction.GetPreviewAsync(CancellationToken.None).PumpingWaitResult();
+            var suggestedAction = new CodeRefactoringSuggestedAction(workspace, textBuffer, editHandler, 
+                new TestWaitIndicator(), refactorings.First(), provider, operationListener: null);
+            await suggestedAction.GetPreviewAsync(CancellationToken.None);
             Assert.True(extensionManager.IsDisabled(provider));
             Assert.False(extensionManager.IsIgnored(provider));
         }
@@ -64,25 +67,26 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.CodeRefactorings
             EditorLayerExtensionManager.ExtensionManager extensionManager;
             VisualStudio.Text.ITextBuffer textBuffer;
             RefactoringSetup(workspace, provider, refactorings, out editHandler, out extensionManager, out textBuffer);
-            var suggestedAction = new CodeRefactoringSuggestedAction(workspace, textBuffer, editHandler, refactorings.First(), provider);
+            var suggestedAction = new CodeRefactoringSuggestedAction(workspace, textBuffer, editHandler, 
+                new TestWaitIndicator(), refactorings.First(), provider, operationListener: null);
             var text = suggestedAction.DisplayText;
             Assert.True(extensionManager.IsDisabled(provider));
             Assert.False(extensionManager.IsIgnored(provider));
         }
 
-        private void ActionSets(TestWorkspace workspace, CodeRefactoringProvider provider)
+        private async Task ActionSets(TestWorkspace workspace, CodeRefactoringProvider provider)
         {
             List<CodeAction> refactorings = new List<CodeAction>();
             ICodeActionEditHandlerService editHandler;
             EditorLayerExtensionManager.ExtensionManager extensionManager;
             VisualStudio.Text.ITextBuffer textBuffer;
             RefactoringSetup(workspace, provider, refactorings, out editHandler, out extensionManager, out textBuffer);
-            var suggestedAction = new CodeRefactoringSuggestedAction(workspace, textBuffer, editHandler, refactorings.First(), provider);
-            var actionSets = suggestedAction.GetActionSetsAsync(CancellationToken.None).PumpingWaitResult();
+            var suggestedAction = new CodeRefactoringSuggestedAction(workspace, textBuffer, editHandler,
+                new TestWaitIndicator(), refactorings.First(), provider, operationListener: null);
+            var actionSets = await suggestedAction.GetActionSetsAsync(CancellationToken.None);
             Assert.True(extensionManager.IsDisabled(provider));
             Assert.False(extensionManager.IsIgnored(provider));
         }
-
 
         private static void RefactoringSetup(TestWorkspace workspace, CodeRefactoringProvider provider, List<CodeAction> refactorings, out ICodeActionEditHandlerService editHandler, out EditorLayerExtensionManager.ExtensionManager extensionManager, out VisualStudio.Text.ITextBuffer textBuffer)
         {

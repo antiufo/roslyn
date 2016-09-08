@@ -4,6 +4,7 @@ Imports System.Composition
 Imports Microsoft.CodeAnalysis.Editor.Host
 Imports Microsoft.CodeAnalysis.Editor.Implementation.GoToDefinition
 Imports Microsoft.CodeAnalysis.Host.Mef
+Imports Microsoft.CodeAnalysis.VisualBasic.Utilities
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.GoToDefinition
     <ExportLanguageService(GetType(IGoToDefinitionService), LanguageNames.VisualBasic), [Shared]>
@@ -11,27 +12,12 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.GoToDefinition
         Inherits AbstractGoToDefinitionService
 
         <ImportingConstructor>
-        Public Sub New(<ImportMany> presenters As IEnumerable(Of Lazy(Of INavigableItemsPresenter)))
-            MyBase.New(presenters)
+        Public Sub New(<ImportMany> presenters As IEnumerable(Of Lazy(Of INavigableItemsPresenter)), <ImportMany> externalDefinitionProviders As IEnumerable(Of Lazy(Of INavigableDefinitionProvider)))
+            MyBase.New(presenters, externalDefinitionProviders)
         End Sub
 
         Protected Overrides Function FindRelatedExplicitlyDeclaredSymbol(symbol As ISymbol, compilation As Compilation) As ISymbol
-            ' For example: My.Forms.[|LoginForm|]
-            ' LoginForm is a SynthesizedMyGroupCollectionPropertySymbol with no Location. Use the
-            ' type of this property, the actual LoginForm type itself, for navigation purposes.
-
-            If symbol.IsKind(SymbolKind.Property) AndAlso symbol.IsImplicitlyDeclared Then
-                Dim propertySymbol = DirectCast(symbol, IPropertySymbol)
-                If propertySymbol.ContainingType IsNot Nothing AndAlso
-                   propertySymbol.ContainingType.Name = "MyForms" AndAlso
-                   propertySymbol.ContainingType.ContainingNamespace IsNot Nothing AndAlso
-                   propertySymbol.ContainingType.ContainingNamespace.IsMyNamespace(compilation) Then
-
-                    Return propertySymbol.Type
-                End If
-            End If
-
-            Return symbol
+            Return symbol.FindRelatedExplicitlyDeclaredSymbol(compilation)
         End Function
     End Class
 End Namespace

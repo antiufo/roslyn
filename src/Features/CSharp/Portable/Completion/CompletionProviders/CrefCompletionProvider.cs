@@ -2,10 +2,10 @@
 
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Completion;
-using Microsoft.CodeAnalysis.Completion.Providers;
 using Microsoft.CodeAnalysis.CSharp.Extensions;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -13,200 +13,339 @@ using Microsoft.CodeAnalysis.Options;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
+using System.Collections.Immutable;
+using Microsoft.CodeAnalysis.Completion.Providers;
 
 namespace Microsoft.CodeAnalysis.CSharp.Completion.Providers
 {
-    internal partial class CrefCompletionProvider : AbstractCompletionProvider
+    internal partial class CrefCompletionProvider : CommonCompletionProvider
     {
+        public static readonly SymbolDisplayFormat QualifiedCrefFormat =
+            new SymbolDisplayFormat(
+                globalNamespaceStyle: SymbolDisplayGlobalNamespaceStyle.Omitted,
+                typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameOnly,
+                propertyStyle: SymbolDisplayPropertyStyle.NameOnly,
+                genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
+                parameterOptions: SymbolDisplayParameterOptions.None,
+                miscellaneousOptions: SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers);
+
         public static readonly SymbolDisplayFormat CrefFormat =
             new SymbolDisplayFormat(
                 globalNamespaceStyle: SymbolDisplayGlobalNamespaceStyle.Omitted,
                 typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameOnly,
                 propertyStyle: SymbolDisplayPropertyStyle.NameOnly,
                 genericsOptions: SymbolDisplayGenericsOptions.IncludeTypeParameters,
-                parameterOptions:
-                    SymbolDisplayParameterOptions.IncludeType,
+                parameterOptions: SymbolDisplayParameterOptions.None,
                 miscellaneousOptions:
                     SymbolDisplayMiscellaneousOptions.EscapeKeywordIdentifiers |
                     SymbolDisplayMiscellaneousOptions.UseSpecialTypes);
 
-        public override bool IsTriggerCharacter(SourceText text, int characterPosition, OptionSet options)
+        internal override bool IsInsertionTrigger(SourceText text, int characterPosition, OptionSet options)
         {
             return CompletionUtilities.IsTriggerCharacter(text, characterPosition, options);
         }
 
-        protected override Task<bool> IsExclusiveAsync(Document document, int position, CompletionTriggerInfo triggerInfo, CancellationToken cancellationToken)
+        public override async Task ProvideCompletionsAsync(CompletionContext context)
         {
-            return SpecializedTasks.True;
-        }
+            var document = context.Document;
+            var position = context.Position;
+            var options = context.Options;
+            var cancellationToken = context.CancellationToken;
 
-        protected override async Task<IEnumerable<CompletionItem>> GetItemsWorkerAsync(Document document, int position, CompletionTriggerInfo triggerInfo, System.Threading.CancellationToken cancellationToken)
-        {
             var tree = await document.GetSyntaxTreeAsync(cancellationToken).ConfigureAwait(false);
             if (!tree.IsEntirelyWithinCrefSyntax(position, cancellationToken))
             {
-                return null;
+                return;
             }
 
-            var token = tree.FindTokenOnLeftOfPosition(position, cancellationToken);
-            token = token.GetPreviousTokenIfTouchingWord(position);
-            if (token.Kind() == SyntaxKind.None)
-            {
-                return null;
-            }
-
-            var result = SpecializedCollections.EmptyEnumerable<ISymbol>();
+            var token = tree.FindTokenOnLeftOfPosition(position, cancellationToken, includeDocumentationComments: true)
+                            .GetPreviousTokenIfTouchingWord(position);
 
             // To get a Speculative SemanticModel (which is much faster), we need to 
             // walk up to the node the DocumentationTrivia is attached to.
-            var parentNode = token.GetAncestor<DocumentationCommentTriviaSyntax>().ParentTrivia.Token.Parent;
+            var parentNode = token.Parent.FirstAncestorOrSelf<DocumentationCommentTriviaSyntax>()?.ParentTrivia.Token.Parent;
+            if (parentNode == null)
+            {
+                return;
+            }
+
             var semanticModel = await document.GetSemanticModelForNodeAsync(parentNode, cancellationToken).ConfigureAwait(false);
 
-            // cref ""|, ""|"", ""a|""
-            if (token.IsKind(SyntaxKind.DoubleQuoteToken, SyntaxKind.SingleQuoteToken) && token.Parent.IsKind(SyntaxKind.XmlCrefAttribute))
+            var symbols = GetSymbols(token, semanticModel, cancellationToken);
+
+            symbols = symbols.FilterToVisibleAndBrowsableSymbols(options.GetOption(CompletionOptions.HideAdvancedMembers, semanticModel.Language), semanticModel.Compilation);
+
+            if (!symbols.Any())
             {
-                result = semanticModel.LookupSymbols(token.SpanStart)
-                                        .FilterToVisibleAndBrowsableSymbols(document.ShouldHideAdvancedMembers(), semanticModel.Compilation);
-
-                result = result.Concat(GetOperatorsAndIndexers(token, semanticModel, cancellationToken));
-            }
-            else if (IsSignatureContext(token))
-            {
-                result = semanticModel.LookupNamespacesAndTypes(token.SpanStart)
-                                        .FilterToVisibleAndBrowsableSymbols(document.ShouldHideAdvancedMembers(), semanticModel.Compilation);
-            }
-            else if (token.IsKind(SyntaxKind.DotToken) && token.Parent.IsKind(SyntaxKind.QualifiedCref))
-            {
-                // cref "a.|"
-                var parent = token.Parent as QualifiedCrefSyntax;
-                var leftType = semanticModel.GetTypeInfo(parent.Container, cancellationToken).Type;
-                var leftSymbol = semanticModel.GetSymbolInfo(parent.Container, cancellationToken).Symbol;
-
-                var container = leftSymbol ?? leftType;
-
-                result = semanticModel.LookupSymbols(token.SpanStart, container: (INamespaceOrTypeSymbol)container)
-                                        .FilterToVisibleAndBrowsableSymbols(document.ShouldHideAdvancedMembers(), semanticModel.Compilation);
-
-                if (container is INamedTypeSymbol)
-                {
-                    result = result.Concat(((INamedTypeSymbol)container).InstanceConstructors);
-                }
+                return;
             }
 
-            return await CreateItemsAsync(document.Project.Solution.Workspace, semanticModel,
-                position, result, token, cancellationToken).ConfigureAwait(false);
+            context.IsExclusive = true;
+
+            var text = await document.GetTextAsync(cancellationToken).ConfigureAwait(false);
+            var span = GetCompletionItemSpan(text, position);
+
+            var items = CreateCompletionItems(document.Project.Solution.Workspace, semanticModel, symbols, token, span);
+            context.AddItems(items);
         }
 
-        private bool IsSignatureContext(SyntaxToken token)
+        private static bool IsCrefStartContext(SyntaxToken token)
         {
-            return token.IsKind(SyntaxKind.OpenParenToken, SyntaxKind.CommaToken, SyntaxKind.RefKeyword, SyntaxKind.OutKeyword)
-                && token.Parent.IsKind(SyntaxKind.CrefParameterList, SyntaxKind.CrefBracketedParameterList);
+            // cases:
+            //   <see cref="|
+            //   <see cref='|
+
+            return token.IsKind(SyntaxKind.DoubleQuoteToken, SyntaxKind.SingleQuoteToken)
+                && token.Parent.IsKind(SyntaxKind.XmlCrefAttribute);
         }
 
-        // LookupSymbols doesn't return indexers or operators because they can't be referred to by name, so we'll have to try to 
-        // find the innermost type declaration and return its operators and indexers
-        private IEnumerable<ISymbol> GetOperatorsAndIndexers(SyntaxToken token, SemanticModel semanticModel, CancellationToken cancellationToken)
+        private static bool IsCrefParameterListContext(SyntaxToken token)
         {
-            var typeDeclaration = token.GetAncestor<TypeDeclarationSyntax>();
+            // cases:
+            //   <see cref="M(|
+            //   <see cref="M(x, |
+            //   <see cref="M(x, ref |
+            //   <see cref="M(x, out |
+            //   <see cref="M[|
+            //   <see cref="M[x, |
+            //   <see cref="M[x, ref |
+            //   <see cref="M[x, out |
 
-            var result = new List<ISymbol>();
+            if (!token.Parent.IsKind(SyntaxKind.CrefParameterList, SyntaxKind.CrefBracketedParameterList))
+            {
+                return false;
+            }
 
+            if (token.IsKind(SyntaxKind.OpenParenToken) &&
+                token.Parent.IsKind(SyntaxKind.CrefParameterList))
+            {
+                return true;
+            }
+
+            if (token.IsKind(SyntaxKind.OpenBracketToken) &&
+                token.Parent.IsKind(SyntaxKind.CrefBracketedParameterList))
+            {
+                return true;
+            }
+
+            return token.IsKind(SyntaxKind.CommaToken, SyntaxKind.RefKeyword, SyntaxKind.OutKeyword);
+        }
+
+        private static bool IsCrefQualifiedNameContext(SyntaxToken token)
+        {
+            // cases:
+            //   <see cref="x.|
+
+            return token.IsKind(SyntaxKind.DotToken)
+                && token.Parent.IsKind(SyntaxKind.QualifiedCref);
+        }
+
+        private static IEnumerable<ISymbol> GetSymbols(SyntaxToken token, SemanticModel semanticModel, CancellationToken cancellationToken)
+        {
+            if (IsCrefStartContext(token))
+            {
+                return GetUnqualifiedSymbols(token, semanticModel, cancellationToken);
+            }
+            else if (IsCrefParameterListContext(token))
+            {
+                return semanticModel.LookupNamespacesAndTypes(token.SpanStart);
+            }
+            else if (IsCrefQualifiedNameContext(token))
+            {
+                return GetQualifiedSymbols((QualifiedCrefSyntax)token.Parent, token, semanticModel, cancellationToken);
+            }
+
+            return SpecializedCollections.EmptyEnumerable<ISymbol>();
+        }
+
+        private static IEnumerable<ISymbol> GetUnqualifiedSymbols(SyntaxToken token, SemanticModel semanticModel, CancellationToken cancellationToken)
+        {
+            foreach (var symbol in semanticModel.LookupSymbols(token.SpanStart))
+            {
+                yield return symbol;
+            }
+
+            // LookupSymbols doesn't return indexers or operators because they can't be referred to by name.
+            // So, try to find the innermost type declaration and return its operators and indexers
+            var typeDeclaration = token.Parent?.FirstAncestorOrSelf<TypeDeclarationSyntax>();
             if (typeDeclaration != null)
             {
                 var type = semanticModel.GetDeclaredSymbol(typeDeclaration, cancellationToken);
-
-                result.AddRange(type.GetMembers().OfType<IPropertySymbol>().Where(p => p.IsIndexer));
-                result.AddRange(type.GetAccessibleMembersInThisAndBaseTypes<IMethodSymbol>(type)
-                                    .Where(m => m.MethodKind == MethodKind.UserDefinedOperator));
+                if (type != null)
+                {
+                    foreach (var baseType in type.GetBaseTypesAndThis())
+                    {
+                        foreach (var member in baseType.GetMembers())
+                        {
+                            if ((member.IsIndexer() || member.IsUserDefinedOperator()) &&
+                                member.IsAccessibleWithin(type))
+                            {
+                                yield return member;
+                            }
+                        }
+                    }
+                }
             }
-
-            return result;
         }
 
-        private async Task<IEnumerable<CompletionItem>> CreateItemsAsync(
-            Workspace workspace, SemanticModel semanticModel, int textChangeSpanPosition, IEnumerable<ISymbol> symbols, SyntaxToken token, CancellationToken cancellationToken)
+        private static IEnumerable<ISymbol> GetQualifiedSymbols(QualifiedCrefSyntax parent, SyntaxToken token, SemanticModel semanticModel, CancellationToken cancellationToken)
         {
-            var items = new List<CompletionItem>();
+            var leftType = semanticModel.GetTypeInfo(parent.Container, cancellationToken).Type;
+            var leftSymbol = semanticModel.GetSymbolInfo(parent.Container, cancellationToken).Symbol;
 
-            foreach (var symbol in symbols)
+            var container = (leftSymbol ?? leftType) as INamespaceOrTypeSymbol;
+
+            foreach (var symbol in semanticModel.LookupSymbols(token.SpanStart, container))
             {
-                var item = await CreateItemAsync(workspace, semanticModel, textChangeSpanPosition, symbol, token, cancellationToken).ConfigureAwait(false);
-                items.Add(item);
+                yield return symbol;
             }
 
-            return items;
+            var namedTypeContainer = container as INamedTypeSymbol;
+            if (namedTypeContainer != null)
+            {
+                foreach (var instanceConstructor in namedTypeContainer.InstanceConstructors)
+                {
+                    yield return instanceConstructor;
+                }
+            }
         }
 
-        private async Task<CompletionItem> CreateItemAsync(
-            Workspace workspace, SemanticModel semanticModel, int textChangeSpanPosition, ISymbol symbol, SyntaxToken token, CancellationToken cancellationToken)
+        private static TextSpan GetCompletionItemSpan(SourceText text, int position)
         {
-            int tokenPosition = token.SpanStart;
-            string symbolText = string.Empty;
+            return CommonCompletionUtilities.GetWordSpan(
+                text,
+                position,
+                ch => CompletionUtilities.IsCompletionItemStartCharacter(ch) || ch == '{',
+                ch => CompletionUtilities.IsWordCharacter(ch) || ch == '{' || ch == '}');
+        }
+
+        private IEnumerable<CompletionItem> CreateCompletionItems(
+            Workspace workspace, SemanticModel semanticModel, IEnumerable<ISymbol> symbols, SyntaxToken token, TextSpan itemSpan)
+        {
+            var builder = SharedPools.Default<StringBuilder>().Allocate();
+            try
+            {
+                foreach (var symbol in symbols)
+                {
+                    builder.Clear();
+                    yield return CreateItem(workspace, semanticModel, symbol, token, builder);
+                }
+            }
+            finally
+            {
+                SharedPools.Default<StringBuilder>().ClearAndFree(builder);
+            }
+        }
+
+        private CompletionItem CreateItem(
+            Workspace workspace, SemanticModel semanticModel, ISymbol symbol, SyntaxToken token, StringBuilder builder)
+        {
+            int position = token.SpanStart;
 
             if (symbol is INamespaceOrTypeSymbol && token.IsKind(SyntaxKind.DotToken))
             {
-                symbolText = symbol.Name.EscapeIdentifier();
+                // Handle qualified namespace and type names.
 
-                if (symbol.GetArity() > 0)
-                {
-                    symbolText += "{";
-                    symbolText += string.Join(", ", ((INamedTypeSymbol)symbol).TypeParameters);
-                    symbolText += "}";
-                }
+                builder.Append(symbol.ToDisplayString(QualifiedCrefFormat));
             }
             else
             {
-                symbolText = symbol.ToMinimalDisplayString(semanticModel, tokenPosition, CrefFormat);
-                var parameters = symbol.GetParameters().Select(p =>
+                // Handle unqualified namespace and type names, or member names.
+
+                builder.Append(symbol.ToMinimalDisplayString(semanticModel, position, CrefFormat));
+
+                var parameters = symbol.GetParameters();
+                if (!parameters.IsDefaultOrEmpty)
+                {
+                    // Note: we intentionally don't add the "params" modifier for any parameters.
+
+                    builder.Append(symbol.IsIndexer() ? '[' : '(');
+
+                    for (int i = 0; i < parameters.Length; i++)
                     {
-                        var displayName = p.Type.ToMinimalDisplayString(semanticModel, tokenPosition);
-
-                        if (p.RefKind == RefKind.Out)
+                        if (i > 0)
                         {
-                            return "out " + displayName;
+                            builder.Append(", ");
                         }
 
-                        if (p.RefKind == RefKind.Ref)
+                        var parameter = parameters[i];
+
+                        if (parameter.RefKind == RefKind.Out)
                         {
-                            return "ref " + displayName;
+                            builder.Append("out ");
+                        }
+                        else if (parameter.RefKind == RefKind.Ref)
+                        {
+                            builder.Append("ref ");
                         }
 
-                        return displayName;
-                    });
+                        builder.Append(parameter.Type.ToMinimalDisplayString(semanticModel, position));
+                    }
 
-                var parameterList = !symbol.IsIndexer() ? string.Format("({0})", string.Join(", ", parameters))
-                                                        : string.Format("[{0}]", string.Join(", ", parameters));
-                symbolText += parameterList;
+                    builder.Append(symbol.IsIndexer() ? ']' : ')');
+                }
             }
 
-            var insertionText = symbolText
+            var symbolText = builder.ToString();
+
+            var insertionText = builder
                 .Replace('<', '{')
                 .Replace('>', '}')
-                .Replace("()", "");
+                .ToString();
 
-            var text = await semanticModel.SyntaxTree.GetTextAsync(cancellationToken).ConfigureAwait(false);
-            return new Item(
-                completionProvider: this,
+            return SymbolCompletionItem.Create(
                 displayText: insertionText,
                 insertionText: insertionText,
-                textSpan: GetTextChangeSpan(text, textChangeSpanPosition),
-                descriptionFactory: CommonCompletionUtilities.CreateDescriptionFactory(workspace, semanticModel, tokenPosition, symbol),
-                glyph: symbol.GetGlyph(),
-                sortText: symbolText);
+                symbol: symbol,
+                contextPosition: position,
+                sortText: symbolText,
+                rules: GetRules(insertionText));
         }
 
-        private TextSpan GetTextChangeSpan(SourceText text, int position)
+        public override Task<CompletionDescription> GetDescriptionAsync(Document document, CompletionItem item, CancellationToken cancellationToken)
         {
-            return CommonCompletionUtilities.GetTextChangeSpan(
-                text,
-                position,
-                (ch) => CompletionUtilities.IsTextChangeSpanStartCharacter(ch) || ch == '{',
-                (ch) => CompletionUtilities.IsWordCharacter(ch) || ch == '{' || ch == '}');
+            return SymbolCompletionItem.GetDescriptionAsync(item, document, cancellationToken);
         }
 
-        private string CreateParameters(IEnumerable<ITypeSymbol> arguments, SemanticModel semanticModel, int position)
+        private static readonly CharacterSetModificationRule s_WithoutOpenBrace = CharacterSetModificationRule.Create(CharacterSetModificationKind.Remove, '{');
+        private static readonly CharacterSetModificationRule s_WithoutOpenParen = CharacterSetModificationRule.Create(CharacterSetModificationKind.Remove, '(');
+
+        private CompletionItemRules GetRules(string displayText)
         {
-            return string.Join(", ", arguments.Select(t => t.ToMinimalDisplayString(semanticModel, position)));
+            var commitRules = ImmutableArray<CharacterSetModificationRule>.Empty;
+
+            if (displayText.Contains("{"))
+            {
+                commitRules = commitRules.Add(s_WithoutOpenBrace);
+            }
+
+            if (displayText.Contains("("))
+            {
+                commitRules = commitRules.Add(s_WithoutOpenParen);
+            }
+
+            if (commitRules.IsEmpty)
+            {
+                return CompletionItemRules.Default;
+            }
+            else
+            {
+                return CompletionItemRules.Default.WithCommitCharacterRules(commitRules);
+            }
+        }
+
+
+        private static readonly string InsertionTextProperty = "insertionText";
+
+        protected override Task<TextChange?> GetTextChangeAsync(CompletionItem selectedItem, char? ch, CancellationToken cancellationToken)
+        {
+            string insertionText;
+            if (!selectedItem.Properties.TryGetValue(InsertionTextProperty, out insertionText))
+            {
+                insertionText = selectedItem.DisplayText;
+            }
+
+            return Task.FromResult<TextChange?>(new TextChange(selectedItem.Span, insertionText));
         }
     }
 }

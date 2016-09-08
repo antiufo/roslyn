@@ -13,7 +13,8 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense.Completion
             return nextHandler();
         }
 
-        void ICommandHandler<CommitUniqueCompletionListItemCommandArgs>.ExecuteCommand(CommitUniqueCompletionListItemCommandArgs args, Action nextHandler)
+        void ICommandHandler<CommitUniqueCompletionListItemCommandArgs>.ExecuteCommand(
+            CommitUniqueCompletionListItemCommandArgs args, Action nextHandler)
         {
             AssertIsForeground();
 
@@ -27,7 +28,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense.Completion
                     return;
                 }
 
-                if (!StartNewModelComputation(completionService, filterItems: true))
+                if (!StartNewModelComputation(completionService, filterItems: true, dismissIfEmptyAllowed: true))
                 {
                     return;
                 }
@@ -44,17 +45,14 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense.Completion
 
             // Note: Dev10 behavior seems to be that if there is no unique item that filtering is
             // turned off.  However, i do not know if this is desirable behavior, or merely a bug
-            // with how that convoluted code worked.  So i'm not maintaining that behavior here.  If
+            // with how that convoluted code worked.  So I'm not maintaining that behavior here.  If
             // we do want it through, it would be easy to get again simply by asking the model
             // computation to remove all filtering.
 
             if (model.IsUnique)
             {
                 // We had a unique item in the list.  Commit it and dismiss this session.
-
-                var selectedItem = Controller.GetExternallyUsableCompletionItem(model.SelectedItem);
-                var textChange = GetCompletionRules().GetTextChange(selectedItem);
-                this.Commit(selectedItem, textChange, model, null);
+                this.CommitOnNonTypeChar(model.SelectedItem, model);
             }
         }
     }

@@ -426,6 +426,19 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Retargeting
 
             public NamedTypeSymbol Retarget(NamedTypeSymbol type, RetargetOptions options)
             {
+                if (type.IsTupleType)
+                {
+                    var newUnderlyingType = Retarget(type.TupleUnderlyingType, options);
+                    if (newUnderlyingType.IsTupleOrCompatibleWithTupleOfCardinality(type.TupleElementTypes.Length))
+                    {
+                        return ((TupleTypeSymbol)type).WithUnderlyingType(newUnderlyingType);
+                    }
+                    else
+                    {
+                        return newUnderlyingType;
+                    }
+                }
+
                 NamedTypeSymbol originalDefinition = type.OriginalDefinition;
 
                 NamedTypeSymbol newDefinition = RetargetNamedTypeDefinition(originalDefinition, options);
@@ -630,6 +643,10 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Retargeting
                     case SymbolKind.NamedType:
 
                         var namedType = (NamedTypeSymbol)symbol;
+                        if (namedType.IsTupleType)
+                        {
+                            namedType = namedType.TupleUnderlyingType;
+                        }
 
                         if ((object)symbol.OriginalDefinition.ContainingModule == (object)_retargetingModule.UnderlyingModule &&
                             namedType.IsExplicitDefinitionOfNoPiaLocalType)
@@ -676,7 +693,12 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Retargeting
                     return type;
                 }
 
-                return new ArrayTypeSymbol(this.RetargetingAssembly, newElement, newModifiers, type.Rank);
+                if (type.IsSZArray)
+                {
+                    return ArrayTypeSymbol.CreateSZArray(this.RetargetingAssembly, newElement, newModifiers);
+                }
+
+                return ArrayTypeSymbol.CreateMDArray(this.RetargetingAssembly, newElement, type.Rank, type.Sizes, type.LowerBounds, newModifiers);
             }
 
             internal ImmutableArray<CustomModifier> RetargetModifiers(ImmutableArray<CustomModifier> oldModifiers, out bool modifiersHaveChanged)
@@ -927,6 +949,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Retargeting
                         method.CallingConvention,
                         IndexedTypeParameterSymbol.Take(method.Arity),
                         targetParamsBuilder.ToImmutableAndFree(),
+                        method.RefKind,
                         translator.Retarget(method.ReturnType, RetargetOptions.RetargetPrimitiveTypesByTypeCode),
                         translator.RetargetModifiers(method.ReturnTypeCustomModifiers, out modifiersHaveChanged),
                         ImmutableArray<MethodSymbol>.Empty);
@@ -980,6 +1003,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Symbols.Retargeting
                     property.Name,
                     retargetedType,
                     targetParamsBuilder.ToImmutableAndFree(),
+                    property.RefKind,
                     Retarget(property.Type, RetargetOptions.RetargetPrimitiveTypesByTypeCode),
                     RetargetModifiers(property.TypeCustomModifiers, out modifiersHaveChanged),
                     property.IsStatic,

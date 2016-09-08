@@ -2,45 +2,53 @@
 
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Text;
-using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Completion.Providers
 {
-    internal abstract class AbstractObjectInitializerCompletionProvider : AbstractCompletionProvider
+    internal abstract class AbstractObjectInitializerCompletionProvider : CommonCompletionProvider
     {
-        protected abstract TextSpan GetTextChangeSpan(SourceText text, int position);
         protected abstract Tuple<ITypeSymbol, Location> GetInitializedType(Document document, SemanticModel semanticModel, int position, CancellationToken cancellationToken);
         protected abstract HashSet<string> GetInitializedMembers(SyntaxTree tree, int position, CancellationToken cancellationToken);
 
-        protected override async Task<IEnumerable<CompletionItem>> GetItemsWorkerAsync(Document document, int position, CompletionTriggerInfo triggerInfo, CancellationToken cancellationToken)
+        public override async Task ProvideCompletionsAsync(CompletionContext context)
         {
+            var document = context.Document;
+            var position = context.Position;
+            var cancellationToken = context.CancellationToken;
+
             var workspace = document.Project.Solution.Workspace;
-            var semanticModel = await document.GetSemanticModelForSpanAsync(new TextSpan(position, 0), cancellationToken).ConfigureAwait(false);
+            var semanticModel = await document.GetSemanticModelForSpanAsync(new TextSpan(position, length: 0), cancellationToken).ConfigureAwait(false);
             var typeAndLocation = GetInitializedType(document, semanticModel, position, cancellationToken);
 
             if (typeAndLocation == null)
             {
-                return null;
+                return;
             }
 
             var initializedType = typeAndLocation.Item1 as INamedTypeSymbol;
             var initializerLocation = typeAndLocation.Item2;
             if (initializedType == null)
             {
-                return null;
+                return;
             }
+
+            if (await IsExclusiveAsync(document, position, cancellationToken).ConfigureAwait(false))
+            {
+                context.IsExclusive = true;
+            }
+
+            var enclosing = semanticModel.GetEnclosingNamedType(position, cancellationToken);
 
             // Find the members that can be initialized. If we have a NamedTypeSymbol, also get the overridden members.
             IEnumerable<ISymbol> members = semanticModel.LookupSymbols(position, initializedType);
-            members = members.Where(m => IsInitializable(m, initializedType) &&
+            members = members.Where(m => IsInitializable(m, enclosing) &&
                                          m.CanBeReferencedByName &&
-                                         IsLegalFieldOrProperty(m) &&
+                                         IsLegalFieldOrProperty(m, enclosing) &&
                                          !m.IsImplicitlyDeclared);
 
             // Filter out those members that have already been typed
@@ -50,19 +58,29 @@ namespace Microsoft.CodeAnalysis.Completion.Providers
             uninitializedMembers = uninitializedMembers.Where(m => m.IsEditorBrowsable(document.ShouldHideAdvancedMembers(), semanticModel.Compilation));
 
             var text = await semanticModel.SyntaxTree.GetTextAsync(cancellationToken).ConfigureAwait(false);
-            var changes = GetTextChangeSpan(text, position);
 
-            // Return the members
-            return uninitializedMembers.Select(
-                m => CreateItem(workspace, m.Name, changes,
-                    CommonCompletionUtilities.CreateDescriptionFactory(workspace, semanticModel, initializerLocation.SourceSpan.Start, m),
-                    m.GetGlyph()));
+            foreach (var uninitializedMember in uninitializedMembers)
+            {
+                context.AddItem(SymbolCompletionItem.Create(
+                    displayText: uninitializedMember.Name,
+                    insertionText: null,
+                    symbol: uninitializedMember,
+                    contextPosition: initializerLocation.SourceSpan.Start,
+                    rules: s_rules));
+            }
         }
 
-        private bool IsLegalFieldOrProperty(ISymbol symbol)
+        public override Task<CompletionDescription> GetDescriptionAsync(Document document, CompletionItem item, CancellationToken cancellationToken)
+        {
+            return SymbolCompletionItem.GetDescriptionAsync(item, document, cancellationToken);
+        }
+
+        protected abstract Task<bool> IsExclusiveAsync(Document document, int position, CancellationToken cancellationToken);
+
+        private bool IsLegalFieldOrProperty(ISymbol symbol, ISymbol within)
         {
             var type = symbol.GetMemberType();
-            if (type != null && type.CanSupportCollectionInitializer())
+            if (type != null && type.CanSupportCollectionInitializer(within))
             {
                 return true;
             }
@@ -70,15 +88,7 @@ namespace Microsoft.CodeAnalysis.Completion.Providers
             return symbol.IsWriteableFieldOrProperty();
         }
 
-        protected CompletionItem CreateItem(
-            Workspace workspace,
-            string displayText,
-            TextSpan textSpan,
-            Func<CancellationToken, Task<ImmutableArray<SymbolDisplayPart>>> descriptionFactory,
-            Glyph? glyph)
-        {
-            return new CompletionItem(this, displayText, textSpan, descriptionFactory, glyph, rules: ObjectInitializerCompletionItemRules.Instance);
-        }
+        private static readonly CompletionItemRules s_rules = CompletionItemRules.Create(enterKeyRule: EnterKeyRule.Never);
 
         protected virtual bool IsInitializable(ISymbol member, INamedTypeSymbol containingType)
         {

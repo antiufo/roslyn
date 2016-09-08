@@ -1,6 +1,9 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
-using Microsoft.CodeAnalysis.CSharp.CodeRefactorings.ExtractMethod;
+using System.Threading.Tasks;
+using Microsoft.CodeAnalysis.CodeRefactorings;
+using Microsoft.CodeAnalysis.CodeRefactorings.ExtractMethod;
+using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
 using Roslyn.Test.Utilities;
 using Xunit;
 
@@ -8,86 +11,86 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.CodeRefactorings.Extrac
 {
     public class ExtractMethodTests : AbstractCSharpCodeActionTest
     {
-        protected override object CreateCodeRefactoringProvider(Workspace workspace)
+        protected override CodeRefactoringProvider CreateCodeRefactoringProvider(Workspace workspace)
         {
             return new ExtractMethodCodeRefactoringProvider();
         }
 
-        [WorkItem(540799)]
+        [WorkItem(540799, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540799")]
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsExtractMethod)]
-        public void TestPartialSelection()
+        public async Task TestPartialSelection()
         {
-            Test(
+            await TestAsync(
 @"class Program { static void Main ( string [ ] args ) { bool b = true ; System . Console . WriteLine ( [|b != true|] ? b = true : b = false ) ; } } ",
 @"class Program { static void Main ( string [ ] args ) { bool b = true ; System . Console . WriteLine ( {|Rename:NewMethod|} ( b ) ? b = true : b = false ) ; } private static bool NewMethod ( bool b ) { return b != true ; } } ",
 index: 0);
         }
 
-        [WorkItem(540796)]
+        [WorkItem(540796, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540796")]
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsExtractMethod)]
-        public void TestReadOfDataThatDoesNotFlowIn()
+        public async Task TestReadOfDataThatDoesNotFlowIn()
         {
-            Test(
+            await TestAsync(
 @"class Program { static void Main ( string [ ] args ) { int x = 1 ; object y = 0 ; [|int s = true ? fun ( x ) : fun ( y ) ;|] } private static T fun < T > ( T t ) { return t ; } } ",
 @"class Program { static void Main ( string [ ] args ) { int x = 1 ; object y = 0 ; {|Rename:NewMethod|} ( x , y ) ; } private static void NewMethod ( int x , object y ) { int s = true ? fun ( x ) : fun ( y ) ; } private static T fun < T > ( T t ) { return t ; } } ",
 index: 0);
         }
 
-        [WorkItem(540819)]
+        [WorkItem(540819, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540819")]
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsExtractMethod)]
-        public void TestMissingOnGoto()
+        public async Task TestMissingOnGoto()
         {
-            TestMissing(@"delegate int del ( int i ) ; class C { static void Main ( string [ ] args ) { del q = x => { [|goto label2 ; return x * x ;|] } ; label2 : return ; } } ");
+            await TestMissingAsync(@"delegate int del ( int i ) ; class C { static void Main ( string [ ] args ) { del q = x => { [|goto label2 ; return x * x ;|] } ; label2 : return ; } } ");
         }
 
-        [WorkItem(540819)]
+        [WorkItem(540819, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/540819")]
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsExtractMethod)]
-        public void TestOnStatementAfterUnconditionalGoto()
+        public async Task TestOnStatementAfterUnconditionalGoto()
         {
-            Test(
+            await TestAsync(
 @"delegate int del ( int i ) ; class C { static void Main ( string [ ] args ) { del q = x => { goto label2 ; [|return x * x ;|] } ; label2 : return ; } } ",
 @"delegate int del ( int i ) ; class C { static void Main ( string [ ] args ) { del q = x => { goto label2 ; return {|Rename:NewMethod|} ( x ) ; } ; label2 : return ; } private static int NewMethod ( int x ) { return x * x ; } } ",
 index: 0);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsExtractMethod)]
-        public void TestMissingOnNamespace()
+        public async Task TestMissingOnNamespace()
         {
-            Test(
+            await TestAsync(
 @"class Program { void Main ( ) { [|System|] . Console . WriteLine ( 4 ) ; } } ",
 @"class Program { void Main ( ) { {|Rename:NewMethod|} ( ) ; } private static void NewMethod ( ) { System . Console . WriteLine ( 4 ) ; } } ");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsExtractMethod)]
-        public void TestMissingOnType()
+        public async Task TestMissingOnType()
         {
-            Test(
+            await TestAsync(
 @"class Program { void Main ( ) { [|System . Console|] . WriteLine ( 4 ) ; } } ",
 @"class Program { void Main ( ) { {|Rename:NewMethod|} ( ) ; } private static void NewMethod ( ) { System . Console . WriteLine ( 4 ) ; } } ");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsExtractMethod)]
-        public void TestMissingOnBase()
+        public async Task TestMissingOnBase()
         {
-            Test(
+            await TestAsync(
 @"class Program { void Main ( ) { [|base|] . ToString ( ) ; } } ",
 @"class Program { void Main ( ) { {|Rename:NewMethod|} ( ) ; } private void NewMethod ( ) { base . ToString ( ) ; } } ");
         }
 
-        [WorkItem(545623)]
+        [WorkItem(545623, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545623")]
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsExtractMethod)]
-        public void TestOnActionInvocation()
+        public async Task TestOnActionInvocation()
         {
-            Test(
+            await TestAsync(
 @"using System ; class C { public static Action X { get ; set ; } } class Program { void Main ( ) { [|C . X|] ( ) ; } } ",
 @"using System ; class C { public static Action X { get ; set ; } } class Program { void Main ( ) { {|Rename:GetX|} ( ) ( ) ; } private static Action GetX ( ) { return C . X ; } } ");
         }
 
-        [WorkItem(529841), WorkItem(714632)]
+        [WorkItem(529841, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529841"), WorkItem(714632, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/714632")]
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsExtractMethod)]
-        public void DisambiguateCallSiteIfNecessary1()
+        public async Task DisambiguateCallSiteIfNecessary1()
         {
-            Test(
+            await TestAsync(
 @"using System;
 
 class Program
@@ -124,11 +127,11 @@ class Program
 compareTokens: false);
         }
 
-        [WorkItem(529841), WorkItem(714632)]
+        [WorkItem(529841, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529841"), WorkItem(714632, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/714632")]
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsExtractMethod)]
-        public void DisambiguateCallSiteIfNecessary2()
+        public async Task DisambiguateCallSiteIfNecessary2()
         {
-            Test(
+            await TestAsync(
 @"using System;
 
 class Program
@@ -165,12 +168,12 @@ class Program
 compareTokens: false);
         }
 
-        [WorkItem(530709)]
-        [WorkItem(632182)]
+        [WorkItem(530709, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530709")]
+        [WorkItem(632182, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/632182")]
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsExtractMethod)]
-        public void DontOverparenthesize()
+        public async Task DontOverparenthesize()
         {
-            Test(
+            await TestAsync(
 @"using System;
 
 static class C
@@ -227,11 +230,11 @@ static class E
 parseOptions: Options.Regular);
         }
 
-        [WorkItem(632182)]
+        [WorkItem(632182, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/632182")]
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsExtractMethod)]
-        public void DontOverparenthesizeGenerics()
+        public async Task DontOverparenthesizeGenerics()
         {
-            Test(
+            await TestAsync(
 @"using System;
 
 static class C
@@ -288,11 +291,11 @@ static class E
 parseOptions: Options.Regular);
         }
 
-        [WorkItem(984831)]
+        [WorkItem(984831, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/984831")]
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsExtractMethod)]
-        public void PreserveCommentsBeforeDeclaration_1()
+        public async Task PreserveCommentsBeforeDeclaration_1()
         {
-            Test(
+            await TestAsync(
 @"class Construct
 {
     public void Do() { }
@@ -332,11 +335,11 @@ parseOptions: Options.Regular);
 compareTokens: false);
         }
 
-        [WorkItem(984831)]
+        [WorkItem(984831, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/984831")]
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsExtractMethod)]
-        public void PreserveCommentsBeforeDeclaration_2()
+        public async Task PreserveCommentsBeforeDeclaration_2()
         {
-            Test(
+            await TestAsync(
 @"class Construct
 {
     public void Do() { }
@@ -384,11 +387,11 @@ compareTokens: false);
 compareTokens: false);
         }
 
-        [WorkItem(984831)]
+        [WorkItem(984831, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/984831")]
         [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsExtractMethod)]
-        public void PreserveCommentsBeforeDeclaration_3()
+        public async Task PreserveCommentsBeforeDeclaration_3()
         {
-            Test(
+            await TestAsync(
 @"class Construct
 {
     public void Do() { }
@@ -431,6 +434,125 @@ compareTokens: false);
 }",
 
 compareTokens: false);
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsExtractMethod), Test.Utilities.CompilerTrait(Test.Utilities.CompilerFeature.Tuples)]
+        [WorkItem(11196, "https://github.com/dotnet/roslyn/issues/11196")]
+        public async Task TestTuple()
+        {
+            await TestAsync(
+@"class Program { static void Main ( string [ ] args ) { [| (int, int) x = (1, 2); |]  System . Console . WriteLine ( x.Item1 ); } } " + TestResources.NetFX.ValueTuple.tuplelib_cs,
+@"class Program { static void Main ( string [ ] args ) { (int, int) x = {|Rename:NewMethod|}(); System.Console.WriteLine(x.Item1); } private static (int, int) NewMethod() { return (1, 2); } }" + TestResources.NetFX.ValueTuple.tuplelib_cs,
+index: 0,
+parseOptions: TestOptions.Regular,
+withScriptOption: true);
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsExtractMethod), Test.Utilities.CompilerTrait(Test.Utilities.CompilerFeature.Tuples)]
+        [WorkItem(11196, "https://github.com/dotnet/roslyn/issues/11196")]
+        public async Task TestTupleDeclarationWithNames()
+        {
+            await TestAsync(
+@"class Program { static void Main ( string [ ] args ) { [| (int a, int b) x = (1, 2); |]  System . Console . WriteLine ( x.a ); } } " + TestResources.NetFX.ValueTuple.tuplelib_cs,
+@"class Program { static void Main ( string [ ] args ) { (int a, int b) x = {|Rename:NewMethod|}(); System.Console.WriteLine(x.a); } private static (int a, int b) NewMethod() { return (1, 2); } }" + TestResources.NetFX.ValueTuple.tuplelib_cs,
+index: 0,
+parseOptions: TestOptions.Regular,
+withScriptOption: true);
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsExtractMethod), Test.Utilities.CompilerTrait(Test.Utilities.CompilerFeature.Tuples)]
+        [WorkItem(11196, "https://github.com/dotnet/roslyn/issues/11196")]
+        public async Task TestTupleDeclarationWithSomeNames()
+        {
+            await TestAsync(
+@"class Program { static void Main ( string [ ] args ) { [| (int a, int) x = (1, 2); |]  System . Console . WriteLine ( x.a ); } } " + TestResources.NetFX.ValueTuple.tuplelib_cs,
+@"class Program { static void Main ( string [ ] args ) { (int a, int) x = {|Rename:NewMethod|}(); System.Console.WriteLine(x.a); } private static (int a, int) NewMethod() { return (1, 2); } }" + TestResources.NetFX.ValueTuple.tuplelib_cs,
+index: 0,
+parseOptions: TestOptions.Regular,
+withScriptOption: true);
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsExtractMethod), Test.Utilities.CompilerTrait(Test.Utilities.CompilerFeature.Tuples)]
+        [WorkItem(11196, "https://github.com/dotnet/roslyn/issues/11196")]
+        public async Task TestTupleLiteralWithNames()
+        {
+            await TestAsync(
+@"class Program { static void Main ( string [ ] args ) { [| (int, int) x = (a: 1, b: 2); |]  System . Console . WriteLine ( x.Item1 ); } } " + TestResources.NetFX.ValueTuple.tuplelib_cs,
+@"class Program { static void Main ( string [ ] args ) { (int, int) x = {|Rename:NewMethod|}(); System.Console.WriteLine(x.Item1); } private static (int, int) NewMethod() { return (a: 1, b: 2); } }" + TestResources.NetFX.ValueTuple.tuplelib_cs,
+index: 0,
+parseOptions: TestOptions.Regular,
+withScriptOption: true);
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsExtractMethod), Test.Utilities.CompilerTrait(Test.Utilities.CompilerFeature.Tuples)]
+        [WorkItem(11196, "https://github.com/dotnet/roslyn/issues/11196")]
+        public async Task TestTupleDeclarationAndLiteralWithNames()
+        {
+            await TestAsync(
+@"class Program { static void Main ( string [ ] args ) { [| (int a, int b) x = (c: 1, d: 2); |]  System . Console . WriteLine ( x.a ); } } " + TestResources.NetFX.ValueTuple.tuplelib_cs,
+@"class Program { static void Main ( string [ ] args ) { (int a, int b) x = {|Rename:NewMethod|}(); System.Console.WriteLine(x.a); } private static (int a, int b) NewMethod() { return (c: 1, d: 2); } }" + TestResources.NetFX.ValueTuple.tuplelib_cs,
+index: 0,
+parseOptions: TestOptions.Regular,
+withScriptOption: true);
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsExtractMethod), Test.Utilities.CompilerTrait(Test.Utilities.CompilerFeature.Tuples)]
+        [WorkItem(11196, "https://github.com/dotnet/roslyn/issues/11196")]
+        public async Task TestTupleIntoVar()
+        {
+            await TestAsync(
+@"class Program { static void Main ( string [ ] args ) { [| var x = (c: 1, d: 2); |]  System . Console . WriteLine ( x.c ); } } " + TestResources.NetFX.ValueTuple.tuplelib_cs,
+@"class Program { static void Main ( string [ ] args ) { (int c, int d) x = {|Rename:NewMethod|}(); System.Console.WriteLine(x.c); } private static (int c, int d) NewMethod() { return (c: 1, d: 2); } }" + TestResources.NetFX.ValueTuple.tuplelib_cs,
+index: 0,
+parseOptions: TestOptions.Regular,
+withScriptOption: true);
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsExtractMethod), Test.Utilities.CompilerTrait(Test.Utilities.CompilerFeature.Tuples)]
+        [WorkItem(11196, "https://github.com/dotnet/roslyn/issues/11196")]
+        public async Task RefactorWithoutSystemValueTuple()
+        {
+            await TestAsync(
+@"class Program { static void Main ( string [ ] args ) { [| var x = (c: 1, d: 2); |]  System . Console . WriteLine ( x.c ); } } ",
+@"class Program { static void Main ( string [ ] args ) { object x = {|Rename:NewMethod|}(); System.Console.WriteLine(x.c); } private static object NewMethod() { return (c: 1, d: 2); } }",
+index: 0,
+parseOptions: TestOptions.Regular,
+withScriptOption: true);
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsExtractMethod), Test.Utilities.CompilerTrait(Test.Utilities.CompilerFeature.Tuples)]
+        [WorkItem(11196, "https://github.com/dotnet/roslyn/issues/11196")]
+        public async Task TestTupleWithNestedNamedTuple()
+        {
+            // This is not the best refactoring, but this is an edge case
+            await TestAsync(
+@"class Program { static void Main ( string [ ] args ) { [| var x = new System.ValueTuple<int, int, int, int, int, int, int, (string a, string b)>(1, 2, 3, 4, 5, 6, 7, (a: ""hello"", b: ""world"")); |]  System . Console . WriteLine ( x.c ); } } " + TestResources.NetFX.ValueTuple.tuplelib_cs,
+@"class Program { static void Main ( string [ ] args ) { (int, int, int, int, int, int, int, string, string) x = {|Rename:NewMethod|}(); System . Console . WriteLine ( x.c ); } private static (int, int, int, int, int, int, int, string, string) NewMethod() { return new System.ValueTuple<int, int, int, int, int, int, int, (string a, string b)>(1, 2, 3, 4, 5, 6, 7, (a: ""hello"", b: ""world"")); } }" + TestResources.NetFX.ValueTuple.tuplelib_cs,
+index: 0,
+parseOptions: TestOptions.Regular,
+withScriptOption: true);
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsExtractMethod), Test.Utilities.CompilerTrait(Test.Utilities.CompilerFeature.Tuples)]
+        public async Task TestDeconstruction()
+        {
+            await TestAsync(
+@"class Program { static void Main ( string [ ] args ) { var (x, y) = [| (1, 2) |];  System . Console . WriteLine ( x ); } } " + TestResources.NetFX.ValueTuple.tuplelib_cs,
+@"class Program { static void Main ( string [ ] args ) { var (x, y) = {|Rename:NewMethod|}(); System . Console . WriteLine ( x ); } private static (int, int) NewMethod() { return (1, 2); } }" + TestResources.NetFX.ValueTuple.tuplelib_cs,
+index: 0,
+parseOptions: TestOptions.Regular,
+withScriptOption: true);
+        }
+
+        [Fact, Trait(Traits.Feature, Traits.Features.CodeActionsExtractMethod), Test.Utilities.CompilerTrait(Test.Utilities.CompilerFeature.Tuples)]
+        public async Task TestDeconstruction2()
+        {
+            await TestAsync(
+@"class Program { static void Main ( string [ ] args ) { var (x, y) = (1, 2); var z = [| 3; |]  System . Console . WriteLine ( z ); } } " + TestResources.NetFX.ValueTuple.tuplelib_cs,
+@"class Program { static void Main ( string [ ] args ) { var (x, y) = (1, 2); int z = {|Rename:NewMethod|}(); System . Console . WriteLine ( z ); } private static int NewMethod() { return 3; } }" + TestResources.NetFX.ValueTuple.tuplelib_cs,
+index: 0,
+parseOptions: TestOptions.Regular,
+withScriptOption: true);
         }
     }
 }

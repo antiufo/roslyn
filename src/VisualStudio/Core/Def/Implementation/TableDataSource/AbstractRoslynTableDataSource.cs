@@ -7,40 +7,36 @@ using Microsoft.CodeAnalysis.SolutionCrawler;
 
 namespace Microsoft.VisualStudio.LanguageServices.Implementation.TableDataSource
 {
-    internal abstract class AbstractRoslynTableDataSource<TArgs, TData> : AbstractTableDataSource<TData>
+    /// <summary>
+    /// A version of ITableDataSource who knows how to connect them to Roslyn solution crawler for live information.
+    /// </summary>
+    internal abstract class AbstractRoslynTableDataSource<TData> : AbstractTableDataSource<TData>
     {
-        protected abstract AbstractTableEntriesFactory<TData> CreateTableEntryFactory(object key, TArgs data);
-
-        protected void OnDataAddedOrChanged(object key, TArgs data, int itemCount)
+        public AbstractRoslynTableDataSource(Workspace workspace) : base(workspace)
         {
-            // reuse factory. it is okay to re-use factory since we make sure we remove the factory before
-            // adding it back
-            bool newFactory = false;
-            ImmutableArray<SubscriptionWithoutLock> snapshot;
-            AbstractTableEntriesFactory<TData> factory;
-
-            lock (Gate)
-            {
-                snapshot = Subscriptions;
-                if (!Map.TryGetValue(key, out factory))
-                {
-                    factory = CreateTableEntryFactory(key, data);
-                    Map.Add(key, factory);
-                    newFactory = true;
-                }
-            }
-
-            factory.OnUpdated(itemCount);
-
-            for (var i = 0; i < snapshot.Length; i++)
-            {
-                snapshot[i].AddOrUpdate(factory, newFactory);
-            }
+            ConnectToSolutionCrawlerService(workspace);
         }
 
-        protected void ConnectToSolutionCrawlerService(Workspace workspace)
+        protected ImmutableArray<DocumentId> GetDocumentsWithSameFilePath(Solution solution, DocumentId documentId)
+        {
+            var document = solution.GetDocument(documentId);
+            if (document == null)
+            {
+                return ImmutableArray<DocumentId>.Empty;
+            }
+
+            return solution.GetDocumentIdsWithFilePath(document.FilePath);
+        }
+
+        private void ConnectToSolutionCrawlerService(Workspace workspace)
         {
             var crawlerService = workspace.Services.GetService<ISolutionCrawlerService>();
+            if (crawlerService == null)
+            {
+                // can happen depends on host such as testing host.
+                return;
+            }
+
             var reporter = crawlerService.GetProgressReporter(workspace);
 
             // set initial value

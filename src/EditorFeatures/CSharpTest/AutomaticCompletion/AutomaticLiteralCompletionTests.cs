@@ -1,5 +1,6 @@
 ﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Editor.Implementation.AutomaticCompletion;
 using Microsoft.CodeAnalysis.Editor.UnitTests.AutomaticCompletion;
 using Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces;
@@ -10,67 +11,67 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
 {
     public class AutomaticLiteralCompletionTests : AbstractAutomaticBraceCompletionTests
     {
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void Creation()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task Creation()
         {
-            using (var session = CreateSessionSingleQuote("$$"))
+            using (var session = await CreateSessionSingleQuoteAsync("$$"))
             {
                 Assert.NotNull(session);
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void String_TopLevel()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task String_TopLevel()
         {
-            using (var session = CreateSessionDoubleQuote("$$"))
-            {
-                Assert.NotNull(session);
-                CheckStart(session.Session, expectValidSession: false);
-            }
-        }
-
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void VerbatimString_TopLevel()
-        {
-            using (var session = CreateSessionDoubleQuote("@$$"))
+            using (var session = await CreateSessionDoubleQuoteAsync("$$"))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session, expectValidSession: false);
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void Char_TopLevel()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task VerbatimString_TopLevel()
         {
-            using (var session = CreateSessionSingleQuote("$$"))
+            using (var session = await CreateSessionDoubleQuoteAsync("@$$"))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session, expectValidSession: false);
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void String_TopLevel2()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task Char_TopLevel()
         {
-            using (var session = CreateSessionDoubleQuote("using System;$$"))
+            using (var session = await CreateSessionSingleQuoteAsync("$$"))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session, expectValidSession: false);
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void VerbatimString_TopLevel2()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task String_TopLevel2()
         {
-            using (var session = CreateSessionDoubleQuote("using System;@$$"))
+            using (var session = await CreateSessionDoubleQuoteAsync("using System;$$"))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session, expectValidSession: false);
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void String_String()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task VerbatimString_TopLevel2()
+        {
+            using (var session = await CreateSessionDoubleQuoteAsync("using System;@$$"))
+            {
+                Assert.NotNull(session);
+                CheckStart(session.Session, expectValidSession: false);
+            }
+        }
+
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task String_String()
         {
             var code = @"class C
 {
@@ -79,15 +80,15 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
         var s = """"$$
     }
 }";
-            using (var session = CreateSessionDoubleQuote(code))
+            using (var session = await CreateSessionDoubleQuoteAsync(code))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session);
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void String_VerbatimString()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task String_VerbatimString()
         {
             var code = @"class C
 {
@@ -96,15 +97,15 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
         var s = """"@$$
     }
 }";
-            using (var session = CreateSessionDoubleQuote(code))
+            using (var session = await CreateSessionDoubleQuoteAsync(code))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session);
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void String_Char()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task String_Char()
         {
             var code = @"class C
 {
@@ -113,15 +114,15 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
         var s = @""""$$
     }
 }";
-            using (var session = CreateSessionSingleQuote(code))
+            using (var session = await CreateSessionSingleQuoteAsync(code))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session);
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void Method_String()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task Method_String()
         {
             var code = @"class C
 {
@@ -130,15 +131,15 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
         var s = $$
     }
 }";
-            using (var session = CreateSessionDoubleQuote(code))
+            using (var session = await CreateSessionDoubleQuoteAsync(code))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session);
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void Method_String_Delete()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task Method_String_Delete()
         {
             var code = @"class C
 {
@@ -147,7 +148,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
         var s = $$
     }
 }";
-            using (var session = CreateSessionDoubleQuote(code))
+            using (var session = await CreateSessionDoubleQuoteAsync(code))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session);
@@ -155,8 +156,8 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void Method_String_Tab()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task Method_String_Tab()
         {
             var code = @"class C
 {
@@ -165,7 +166,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
         var s = $$
     }
 }";
-            using (var session = CreateSessionDoubleQuote(code))
+            using (var session = await CreateSessionDoubleQuoteAsync(code))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session);
@@ -173,8 +174,8 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void Method_String_Quotation()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task Method_String_Quotation()
         {
             var code = @"class C
 {
@@ -183,7 +184,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
         var s = $$
     }
 }";
-            using (var session = CreateSessionDoubleQuote(code))
+            using (var session = await CreateSessionDoubleQuoteAsync(code))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session);
@@ -191,8 +192,8 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void VerbatimMethod_String()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task VerbatimMethod_String()
         {
             var code = @"class C
 {
@@ -201,15 +202,15 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
         var s = @$$
     }
 }";
-            using (var session = CreateSessionDoubleQuote(code))
+            using (var session = await CreateSessionDoubleQuoteAsync(code))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session);
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void VerbatimMethod_String_Delete()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task VerbatimMethod_String_Delete()
         {
             var code = @"class C
 {
@@ -218,7 +219,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
         var s = @$$
     }
 }";
-            using (var session = CreateSessionDoubleQuote(code))
+            using (var session = await CreateSessionDoubleQuoteAsync(code))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session);
@@ -226,8 +227,8 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void VerbatimMethod_String_Tab()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task VerbatimMethod_String_Tab()
         {
             var code = @"class C
 {
@@ -236,7 +237,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
         var s = @$$
     }
 }";
-            using (var session = CreateSessionDoubleQuote(code))
+            using (var session = await CreateSessionDoubleQuoteAsync(code))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session);
@@ -244,8 +245,8 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void VerbatimMethod_String_Quotation()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task VerbatimMethod_String_Quotation()
         {
             var code = @"class C
 {
@@ -254,7 +255,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
         var s = @$$
     }
 }";
-            using (var session = CreateSessionDoubleQuote(code))
+            using (var session = await CreateSessionDoubleQuoteAsync(code))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session);
@@ -262,8 +263,8 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void Method_InterpolatedString()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task Method_InterpolatedString()
         {
             var code = @"class C
 {
@@ -272,15 +273,15 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
         var s = $[||]$$
     }
 }";
-            using (var session = CreateSessionDoubleQuote(code))
+            using (var session = await CreateSessionDoubleQuoteAsync(code))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session);
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void Method_InterpolatedString_Delete()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task Method_InterpolatedString_Delete()
         {
             var code = @"class C
 {
@@ -289,7 +290,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
         var s = $[||]$$
     }
 }";
-            using (var session = CreateSessionDoubleQuote(code))
+            using (var session = await CreateSessionDoubleQuoteAsync(code))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session);
@@ -297,8 +298,8 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void Method_InterpolatedString_Tab()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task Method_InterpolatedString_Tab()
         {
             var code = @"class C
 {
@@ -307,7 +308,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
         var s = $[||]$$
     }
 }";
-            using (var session = CreateSessionDoubleQuote(code))
+            using (var session = await CreateSessionDoubleQuoteAsync(code))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session);
@@ -315,8 +316,8 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void Method_InterpolatedString_Quotation()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task Method_InterpolatedString_Quotation()
         {
             var code = @"class C
 {
@@ -325,7 +326,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
         var s = $[||]$$
     }
 }";
-            using (var session = CreateSessionDoubleQuote(code))
+            using (var session = await CreateSessionDoubleQuoteAsync(code))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session);
@@ -333,8 +334,8 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void VerbatimMethod_InterpolatedString()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task VerbatimMethod_InterpolatedString()
         {
             var code = @"class C
 {
@@ -343,15 +344,15 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
         var s = $@$$
     }
 }";
-            using (var session = CreateSessionDoubleQuote(code))
+            using (var session = await CreateSessionDoubleQuoteAsync(code))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session);
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void VerbatimMethod_InterpolatedString_Delete()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task VerbatimMethod_InterpolatedString_Delete()
         {
             var code = @"class C
 {
@@ -360,7 +361,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
         var s = $@$$
     }
 }";
-            using (var session = CreateSessionDoubleQuote(code))
+            using (var session = await CreateSessionDoubleQuoteAsync(code))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session);
@@ -368,8 +369,8 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void VerbatimMethod_InterpolatedString_Tab()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task VerbatimMethod_InterpolatedString_Tab()
         {
             var code = @"class C
 {
@@ -378,7 +379,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
         var s = $@$$
     }
 }";
-            using (var session = CreateSessionDoubleQuote(code))
+            using (var session = await CreateSessionDoubleQuoteAsync(code))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session);
@@ -386,8 +387,8 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void VerbatimMethod_InterpolatedString_Quotation()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task VerbatimMethod_InterpolatedString_Quotation()
         {
             var code = @"class C
 {
@@ -396,7 +397,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
         var s = $@$$
     }
 }";
-            using (var session = CreateSessionDoubleQuote(code))
+            using (var session = await CreateSessionDoubleQuoteAsync(code))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session);
@@ -404,8 +405,8 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
             }
         }
 
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void Preprocessor1()
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task Preprocessor1()
         {
             var code = @"class C
 {
@@ -414,7 +415,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
 #line $$
     }
 }";
-            using (var session = CreateSessionDoubleQuote(code))
+            using (var session = await CreateSessionDoubleQuoteAsync(code))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session);
@@ -422,7 +423,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
             }
         }
 
-        public void Preprocessor2()
+        public async Task Preprocessor2()
         {
             var code = @"class C
 {
@@ -431,7 +432,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
 #line $$
     }
 }";
-            using (var session = CreateSessionDoubleQuote(code))
+            using (var session = await CreateSessionDoubleQuoteAsync(code))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session);
@@ -439,7 +440,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
             }
         }
 
-        public void Preprocessor3()
+        public async Task Preprocessor3()
         {
             var code = @"class C
 {
@@ -448,7 +449,7 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
 #line $$
     }
 }";
-            using (var session = CreateSessionDoubleQuote(code))
+            using (var session = await CreateSessionDoubleQuoteAsync(code))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session);
@@ -456,9 +457,9 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
             }
         }
 
-        [WorkItem(546047)]
-        [Fact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
-        public void VerbatimStringDoubleQuote()
+        [WorkItem(546047, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546047")]
+        [WpfFact, Trait(Traits.Feature, Traits.Features.AutomaticCompletion)]
+        public async Task VerbatimStringDoubleQuote()
         {
             var code = @"class C
 {
@@ -467,24 +468,24 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.AutomaticCompletion
         var s = @""""$$
     }
 }";
-            using (var session = CreateSessionDoubleQuote(code))
+            using (var session = await CreateSessionDoubleQuoteAsync(code))
             {
                 Assert.NotNull(session);
                 CheckStart(session.Session, expectValidSession: false);
             }
         }
 
-        internal Holder CreateSessionSingleQuote(string code)
+        internal async Task<Holder> CreateSessionSingleQuoteAsync(string code)
         {
             return CreateSession(
-                CSharpWorkspaceFactory.CreateWorkspaceFromFile(code),
+                await TestWorkspace.CreateCSharpAsync(code),
                 BraceCompletionSessionProvider.SingleQuote.OpenCharacter, BraceCompletionSessionProvider.SingleQuote.CloseCharacter);
         }
 
-        internal Holder CreateSessionDoubleQuote(string code)
+        internal async Task<Holder> CreateSessionDoubleQuoteAsync(string code)
         {
             return CreateSession(
-                CSharpWorkspaceFactory.CreateWorkspaceFromFile(code),
+                await TestWorkspace.CreateCSharpAsync(code),
                 BraceCompletionSessionProvider.DoubleQuote.OpenCharacter, BraceCompletionSessionProvider.DoubleQuote.CloseCharacter);
         }
     }

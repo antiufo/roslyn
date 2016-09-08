@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System;
 using System.Collections.Generic;
@@ -163,18 +163,18 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.NavigationBar
                     var keybindingString = KeyBindingHelper.GetGlobalKeyBinding(VSConstants.GUID_VSStandardCommandSet97, (int)VSConstants.VSStd97CmdID.MoveToDropdownBar);
                     if (!string.IsNullOrWhiteSpace(keybindingString))
                     {
-                        pbstrText = string.Format(ServicesVSResources.ProjectNavBarTooltipWithShortcut, selectedItemPreviewText, keybindingString);
+                        pbstrText = string.Format(ServicesVSResources.Project_colon_0_1_Use_the_dropdown_to_view_and_switch_to_other_projects_this_file_may_belong_to, selectedItemPreviewText, keybindingString);
                     }
                     else
                     {
-                        pbstrText = string.Format(ServicesVSResources.ProjectNavBarTooltipWithoutShortcut, selectedItemPreviewText);
+                        pbstrText = string.Format(ServicesVSResources.Project_colon_0_Use_the_dropdown_to_view_and_switch_to_other_projects_this_file_may_belong_to, selectedItemPreviewText);
                     }
 
                     return VSConstants.S_OK;
 
                 case 1:
                 case 2:
-                    pbstrText = string.Format(ServicesVSResources.NavBarTooltip, selectedItemPreviewText);
+                    pbstrText = string.Format(ServicesVSResources._0_Use_the_dropdown_to_view_and_navigate_to_other_items_in_this_file, selectedItemPreviewText);
                     return VSConstants.S_OK;
 
                 default:
@@ -220,11 +220,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.NavigationBar
 
         int IVsDropdownBarClient.OnComboGetFocus(int iCombo)
         {
-            var dropDownFocused = DropDownFocused;
-            if (dropDownFocused != null)
-            {
-                dropDownFocused(this, EventArgs.Empty);
-            }
+            DropDownFocused?.Invoke(this, EventArgs.Empty);
 
             return VSConstants.S_OK;
         }
@@ -245,11 +241,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.NavigationBar
             if (selection >= 0)
             {
                 var item = GetItem(iCombo, selection);
-                var itemSelected = ItemSelected;
-                if (itemSelected != null)
-                {
-                    itemSelected(this, new NavigationBarItemSelectedEventArgs(item));
-                }
+                ItemSelected?.Invoke(this, new NavigationBarItemSelectedEventArgs(item));
             }
 
             return VSConstants.S_OK;
@@ -400,20 +392,12 @@ namespace Microsoft.VisualStudio.LanguageServices.Implementation.NavigationBar
 
         private void OnCaretPositionChanged(object sender, CaretPositionChangedEventArgs e)
         {
-            var caretMoved = CaretMoved;
-            if (caretMoved != null)
-            {
-                caretMoved(this, e);
-            }
+            CaretMoved?.Invoke(this, e);
         }
 
         private void OnViewGotAggregateFocus(object sender, EventArgs e)
         {
-            var viewFocused = ViewFocused;
-            if (viewFocused != null)
-            {
-                viewFocused(this, e);
-            }
+            ViewFocused?.Invoke(this, e);
         }
 
         ITextView INavigationBarPresenter.TryGetCurrentView()

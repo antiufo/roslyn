@@ -2,8 +2,10 @@
 
 Imports System.ComponentModel.Composition.Hosting
 Imports System.Composition
+Imports System.Threading
 Imports System.Threading.Tasks
 Imports Microsoft.CodeAnalysis
+Imports Microsoft.CodeAnalysis.Completion
 Imports Microsoft.CodeAnalysis.Host.Mef
 Imports Microsoft.CodeAnalysis.Snippets
 Imports Roslyn.Test.Utilities
@@ -11,8 +13,8 @@ Imports Roslyn.Utilities
 
 Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Snippets
     Public Class SnippetCompletionProviderTests
-        <Fact, Trait(Traits.Feature, Traits.Features.Snippets)>
-        Public Sub SnippetCompletion()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Snippets)>
+        Public Async Function SnippetCompletion() As Task
             Dim markup = "a?$$"
             Dim testState = SnippetTestState.CreateTestState(markup, LanguageNames.VisualBasic, extraParts:={GetType(MockSnippetInfoService)})
             Using testState
@@ -20,38 +22,43 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Snippets
 
                 Assert.Equal(testState.GetDocumentText(), "a")
 
-                testState.WaitForAsynchronousOperations()
-                Assert.Equal(testState.CurrentCompletionPresenterSession.SelectedItem.DisplayText, "Shortcut")
-                Assert.Equal(testState.CurrentCompletionPresenterSession.SelectedItem.GetDescriptionAsync().Result.ToDisplayString(), "Description")
+                Await testState.WaitForAsynchronousOperationsAsync()
+                Assert.Equal(testState.CurrentCompletionPresenterSession.SelectedItem.Item.DisplayText, "Shortcut")
+
+                Dim document = testState.Workspace.CurrentSolution.Projects.First().Documents.First()
+                Dim service = document.Project.LanguageServices.GetService(Of CompletionService)
+                Dim itemDescription = Await service.GetDescriptionAsync(document, testState.CurrentCompletionPresenterSession.SelectedItem.Item)
+                Assert.Equal("Description", itemDescription.Text)
 
                 testState.SendTabToCompletion()
 
                 Assert.True(testState.SnippetExpansionClient.TryInsertExpansionCalled)
             End Using
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Snippets)>
-        Public Sub TracksChangeSpanCorrectly()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Snippets)>
+        Public Async Function TracksChangeSpanCorrectly() As Task
             Dim markup = "a?$$"
             Dim testState = SnippetTestState.CreateTestState(markup, LanguageNames.VisualBasic, extraParts:={GetType(MockSnippetInfoService)})
             Using testState
                 testState.SendTabToCompletion()
-                testState.WaitForAsynchronousOperations()
-                Assert.Equal(testState.CurrentCompletionPresenterSession.SelectedItem.DisplayText, "Shortcut")
+                Await testState.WaitForAsynchronousOperationsAsync()
+                Assert.Equal(testState.CurrentCompletionPresenterSession.SelectedItem.Item.DisplayText, "Shortcut")
 
                 testState.SendBackspace()
-                testState.WaitForAsynchronousOperations()
-                Assert.Equal(testState.CurrentCompletionPresenterSession.SelectedItem.DisplayText, "Shortcut")
+                Await testState.WaitForAsynchronousOperationsAsync()
+                Assert.Equal(testState.CurrentCompletionPresenterSession.SelectedItem.Item.DisplayText, "Shortcut")
 
                 testState.SendTabToCompletion()
 
+                Await testState.WaitForAsynchronousOperationsAsync()
                 Assert.True(testState.SnippetExpansionClient.TryInsertExpansionCalled)
                 Assert.Equal(testState.GetDocumentText(), "Shortcut")
             End Using
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.Snippets)>
-        Public Sub SnippetListOnlyIfTextBeforeQuestionMark()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Snippets)>
+        Public Async Function SnippetListOnlyIfTextBeforeQuestionMark() As Task
             Dim markup = <File>
 Class C
     ?$$
@@ -60,10 +67,10 @@ End Class</File>.Value
             Dim testState = SnippetTestState.CreateTestState(markup, LanguageNames.VisualBasic, extraParts:={GetType(MockSnippetInfoService)})
             Using testState
                 testState.SendTabToCompletion()
-                testState.WaitForAsynchronousOperations()
+                Await testState.WaitForAsynchronousOperationsAsync()
                 Assert.Null(testState.CurrentCompletionPresenterSession)
             End Using
-        End Sub
+        End Function
     End Class
 
     <ExportLanguageService(GetType(ISnippetInfoService), LanguageNames.VisualBasic), [Shared]>

@@ -9,15 +9,13 @@ namespace Microsoft.CodeAnalysis.CSharp
 {
     internal sealed class MethodBodySemanticModel : MemberSemanticModel
     {
-        private DiagnosticBag _ignoredDiagnostics = new DiagnosticBag();
-
         private MethodBodySemanticModel(CSharpCompilation compilation, Symbol owner, Binder rootBinder, CSharpSyntaxNode syntax, SyntaxTreeSemanticModel parentSemanticModelOpt = null, int speculatedPosition = 0)
             : base(compilation, syntax, owner, rootBinder, parentSemanticModelOpt, speculatedPosition)
         {
             Debug.Assert((object)owner != null);
             Debug.Assert(owner.Kind == SymbolKind.Method);
             Debug.Assert(syntax != null);
-            Debug.Assert(owner.ContainingType.IsScriptClass || syntax.Kind() != SyntaxKind.CompilationUnit);
+            Debug.Assert(syntax.Kind() != SyntaxKind.CompilationUnit);
         }
 
         /// <summary>
@@ -27,16 +25,6 @@ namespace Microsoft.CodeAnalysis.CSharp
         {
             var executableCodeBinder = new ExecutableCodeBinder(syntax, owner, rootBinder);
             return new MethodBodySemanticModel(compilation, owner, executableCodeBinder, syntax);
-        }
-
-        /// <summary>
-        /// Creates a SemanticModel for an ArrowExpressionClause, which includes
-        /// an ExecutableCodeBinder and a ScopedExpressionBinder.
-        /// </summary>
-        internal static MethodBodySemanticModel Create(CSharpCompilation compilation, MethodSymbol owner, Binder rootBinder, ArrowExpressionClauseSyntax syntax)
-        {
-            Binder binder = new ExecutableCodeBinder(syntax, owner, rootBinder);
-            return new MethodBodySemanticModel(compilation, owner, binder, syntax);
         }
 
         internal override BoundNode Bind(Binder binder, CSharpSyntaxNode node, DiagnosticBag diagnostics)
@@ -96,7 +84,25 @@ namespace Microsoft.CodeAnalysis.CSharp
             position = CheckAndAdjustPosition(position);
 
             var methodSymbol = (MethodSymbol)this.MemberSymbol;
-            var executablebinder = new ExecutableCodeBinder(body, methodSymbol, this.RootBinder.Next); // Strip off ExecutableCodeBinder (see ctor).
+
+            // Strip off ExecutableCodeBinder (see ctor).
+            Binder binder = this.RootBinder;
+
+            do
+            {
+                if (binder is ExecutableCodeBinder)
+                {
+                    binder = binder.Next;
+                    break;
+                }
+
+                binder = binder.Next;
+            }
+            while (binder != null);
+
+            Debug.Assert(binder != null);
+
+            var executablebinder = new ExecutableCodeBinder(body, methodSymbol, binder ?? this.RootBinder);
             var blockBinder = executablebinder.GetBinder(body).WithAdditionalFlags(GetSemanticModelBinderFlags());
             speculativeModel = CreateSpeculative(parentModel, methodSymbol, body, blockBinder, position);
             return true;
@@ -120,13 +126,6 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             var methodSymbol = (MethodSymbol)this.MemberSymbol;
             binder = new ExecutableCodeBinder(statement, methodSymbol, binder);
-
-            // local declaration statements need to be wrapped in a block so the local gets seen 
-            if (!statement.IsKind(SyntaxKind.Block))
-            {
-                binder = new BlockBinder(binder, new SyntaxList<StatementSyntax>(statement));
-            }
-
             speculativeModel = CreateSpeculative(parentModel, methodSymbol, statement, binder, position);
             return true;
         }

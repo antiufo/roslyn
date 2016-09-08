@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System;
 using System.Collections.Generic;
@@ -10,9 +10,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
-#if !MSBUILD12
 using Microsoft.Build.Construction;
-#endif
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.Host.Mef;
@@ -40,7 +38,7 @@ namespace Microsoft.CodeAnalysis.MSBuild
         public MSBuildProjectLoader(Workspace workspace, ImmutableDictionary<string, string> properties = null)
         {
             _workspace = workspace;
-            _properties = properties ??  ImmutableDictionary<string, string>.Empty;
+            _properties = properties ?? ImmutableDictionary<string, string>.Empty;
         }
 
         /// <summary>
@@ -97,25 +95,22 @@ namespace Microsoft.CodeAnalysis.MSBuild
 
         private void SetSolutionProperties(string solutionFilePath)
         {
+            // When MSBuild is building an individual project, it doesn't define $(SolutionDir).
+            // However when building an .sln file, or when working inside Visual Studio,
+            // $(SolutionDir) is defined to be the directory where the .sln file is located.
+            // Some projects out there rely on $(SolutionDir) being set (although the best practice is to
+            // use MSBuildProjectDirectory which is always defined).
             if (!string.IsNullOrEmpty(solutionFilePath))
             {
-                // When MSBuild is building an individual project, it doesn't define $(SolutionDir).
-                // However when building an .sln file, or when working inside Visual Studio,
-                // $(SolutionDir) is defined to be the directory where the .sln file is located.
-                // Some projects out there rely on $(SolutionDir) being set (although the best practice is to
-                // use MSBuildProjectDirectory which is always defined).
-                if (!string.IsNullOrEmpty(solutionFilePath))
+                string solutionDirectory = Path.GetDirectoryName(solutionFilePath);
+                if (!solutionDirectory.EndsWith(@"\", StringComparison.Ordinal))
                 {
-                    string solutionDirectory = Path.GetDirectoryName(solutionFilePath);
-                    if (!solutionDirectory.EndsWith(@"\", StringComparison.Ordinal))
-                    {
-                        solutionDirectory += @"\";
-                    }
+                    solutionDirectory += @"\";
+                }
 
-                    if (Directory.Exists(solutionDirectory))
-                    {
-                        _properties = _properties.SetItem(SolutionDirProperty, solutionDirectory);
-                    }
+                if (Directory.Exists(solutionDirectory))
+                {
+                    _properties = _properties.SetItem(SolutionDirProperty, solutionDirectory);
                 }
             }
         }
@@ -126,7 +121,6 @@ namespace Microsoft.CodeAnalysis.MSBuild
         /// </summary>
         public async Task<SolutionInfo> LoadSolutionInfoAsync(
             string solutionFilePath,
-            IReadOnlyDictionary<string, ProjectId> projectPathToProjectIdMap = null,
             CancellationToken cancellationToken = default(CancellationToken))
         {
             if (solutionFilePath == null)
@@ -142,7 +136,6 @@ namespace Microsoft.CodeAnalysis.MSBuild
 
             VersionStamp version = default(VersionStamp);
 
-#if !MSBUILD12
             Microsoft.Build.Construction.SolutionFile solutionFile = Microsoft.Build.Construction.SolutionFile.Parse(absoluteSolutionPath);
             var reportMode = this.SkipUnrecognizedProjects ? ReportMode.Log : ReportMode.Throw;
 
@@ -169,41 +162,6 @@ namespace Microsoft.CodeAnalysis.MSBuild
                     }
                 }
             }
-#else
-            SolutionFile solutionFile = null;
-
-            using (var reader = new StreamReader(absoluteSolutionPath))
-            {
-                version = VersionStamp.Create(File.GetLastWriteTimeUtc(absoluteSolutionPath));
-                var text = await reader.ReadToEndAsync().ConfigureAwait(false);
-                solutionFile = SolutionFile.Parse(new StringReader(text));
-            }
-
-            var solutionFolder = Path.GetDirectoryName(absoluteSolutionPath);
-
-            // a list to accumulate all the loaded projects
-            var loadedProjects = new LoadState(null);
-
-            var reportMode = this.SkipUnrecognizedProjects ? ReportMode.Log : ReportMode.Throw;
-
-            // load all the projects
-            foreach (var projectBlock in solutionFile.ProjectBlocks)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                string absoluteProjectPath;
-                if (TryGetAbsoluteProjectPath(projectBlock.ProjectPath, solutionFolder, reportMode, out absoluteProjectPath))
-                {
-                    IProjectFileLoader loader;
-                    if (TryGetLoaderFromProjectPath(absoluteProjectPath, reportMode, out loader))
-                    { 
-                        // projects get added to 'loadedProjects' as side-effect
-                        // never prefer metadata when loading solution, all projects get loaded if they can.
-                        var tmp = await GetOrLoadProjectAsync(absoluteProjectPath, loader, preferMetadata: false, loadedProjects: loadedProjects, cancellationToken: cancellationToken).ConfigureAwait(false);
-                    }
-                }
-            }
-#endif
 
             // construct workspace from loaded project infos
             return SolutionInfo.Create(SolutionId.CreateNewId(debugName: absoluteSolutionPath), version, absoluteSolutionPath, loadedProjects.Projects);
@@ -219,12 +177,12 @@ namespace Microsoft.CodeAnalysis.MSBuild
             }
             catch (Exception)
             {
-                throw new InvalidOperationException(string.Format(WorkspacesResources.InvalidSolutionFilePath, path));
+                throw new InvalidOperationException(string.Format(WorkspacesResources.Invalid_solution_file_path_colon_0, path));
             }
 
             if (!File.Exists(absolutePath))
             {
-                throw new FileNotFoundException(string.Format(WorkspacesResources.SolutionFileNotFound, absolutePath));
+                throw new FileNotFoundException(string.Format(WorkspacesResources.Solution_file_not_found_colon_0, absolutePath));
             }
 
             return absolutePath;
@@ -235,8 +193,8 @@ namespace Microsoft.CodeAnalysis.MSBuild
         /// The first <see cref="ProjectInfo"/> in the result corresponds to the specified project file.
         /// </summary>
         public async Task<ImmutableArray<ProjectInfo>> LoadProjectInfoAsync(
-            string projectFilePath, 
-            IReadOnlyDictionary<string, ProjectId> projectPathToProjectIdMap = null, 
+            string projectFilePath,
+            ImmutableDictionary<string, ProjectId> projectPathToProjectIdMap = null,
             CancellationToken cancellationToken = default(CancellationToken))
         {
             if (projectFilePath == null)
@@ -260,7 +218,7 @@ namespace Microsoft.CodeAnalysis.MSBuild
 
         private class LoadState
         {
-            private Dictionary<ProjectId, ProjectInfo> _projetIdToProjectInfoMap
+            private Dictionary<ProjectId, ProjectInfo> _projectIdToProjectInfoMap
                 = new Dictionary<ProjectId, ProjectInfo>();
 
             private List<ProjectInfo> _projectInfoList
@@ -279,13 +237,13 @@ namespace Microsoft.CodeAnalysis.MSBuild
 
             public void Add(ProjectInfo info)
             {
-                _projetIdToProjectInfoMap.Add(info.Id, info);
+                _projectIdToProjectInfoMap.Add(info.Id, info);
                 _projectInfoList.Add(info);
             }
 
             public bool TryGetValue(ProjectId id, out ProjectInfo info)
             {
-                return _projetIdToProjectInfoMap.TryGetValue(id, out info);
+                return _projectIdToProjectInfoMap.TryGetValue(id, out info);
             }
 
             public IReadOnlyList<ProjectInfo> Projects
@@ -361,8 +319,9 @@ namespace Microsoft.CodeAnalysis.MSBuild
                 isInteractive: false,
                 sdkDirectory: RuntimeEnvironment.GetRuntimeDirectory());
 
-            var resolver = new RelativePathReferenceResolver(commandLineArgs.ReferencePaths, commandLineArgs.BaseDirectory);
-            var metadataReferences = commandLineArgs.ResolveMetadataReferences(new AssemblyReferenceResolver(resolver, metadataService.GetProvider()));
+            // we only support file paths in /r command line arguments
+            var resolver = new WorkspaceMetadataFileReferenceResolver(metadataService, new RelativePathResolver(commandLineArgs.ReferencePaths, commandLineArgs.BaseDirectory));
+            var metadataReferences = commandLineArgs.ResolveMetadataReferences(resolver);
 
             var analyzerLoader = analyzerService.GetLoader();
             foreach (var path in commandLineArgs.AnalyzerReferences.Select(r => r.FilePath))
@@ -417,7 +376,7 @@ namespace Microsoft.CodeAnalysis.MSBuild
             }
 
             // project references
-            var resolvedReferences = await this.ResolveProjectReferencesAsync(
+            var resolvedReferences = await ResolveProjectReferencesAsync(
                 projectId, projectFilePath, projectFileInfo.ProjectReferences, preferMetadata, loadedProjects, cancellationToken).ConfigureAwait(false);
 
             // add metadata references for project refs converted to metadata refs
@@ -447,10 +406,8 @@ namespace Microsoft.CodeAnalysis.MSBuild
             var compOptions = commandLineArgs.CompilationOptions
                     .WithXmlReferenceResolver(new XmlFileResolver(projectDirectory))
                     .WithSourceReferenceResolver(new SourceFileResolver(ImmutableArray<string>.Empty, projectDirectory))
-                    .WithMetadataReferenceResolver(
-                        new AssemblyReferenceResolver(
-                            new RelativePathReferenceResolver(ImmutableArray<string>.Empty, projectDirectory),
-                            MetadataFileReferenceProvider.Default))
+                    // TODO: https://github.com/dotnet/roslyn/issues/4967
+                    .WithMetadataReferenceResolver(new WorkspaceMetadataFileReferenceResolver(metadataService, new RelativePathResolver(ImmutableArray<string>.Empty, projectDirectory)))
                     .WithStrongNameProvider(new DesktopStrongNameProvider(ImmutableArray.Create(projectDirectory, outputFilePath)))
                     .WithAssemblyIdentityComparer(DesktopAssemblyIdentityComparer.Default);
 
@@ -508,7 +465,7 @@ namespace Microsoft.CodeAnalysis.MSBuild
             {
                 if (paths.Contains(doc.FilePath))
                 {
-                    _workspace.OnWorkspaceFailed(new ProjectDiagnostic(WorkspaceDiagnosticKind.Warning, string.Format(WorkspacesResources.DuplicateSourceFileInProject, doc.FilePath, projectFilePath), projectId));
+                    _workspace.OnWorkspaceFailed(new ProjectDiagnostic(WorkspaceDiagnosticKind.Warning, string.Format(WorkspacesResources.Duplicate_source_file_0_in_project_1, doc.FilePath, projectFilePath), projectId));
                 }
 
                 paths.Add(doc.FilePath);
@@ -659,7 +616,7 @@ namespace Microsoft.CodeAnalysis.MSBuild
             }
             catch (Exception)
             {
-                ReportFailure(mode, string.Format(WorkspacesResources.InvalidProjectFilePath, path));
+                ReportFailure(mode, string.Format(WorkspacesResources.Invalid_project_file_path_colon_0, path));
                 return null;
             }
 
@@ -667,7 +624,7 @@ namespace Microsoft.CodeAnalysis.MSBuild
             {
                 ReportFailure(
                     mode,
-                    string.Format(WorkspacesResources.ProjectFileNotFound, path),
+                    string.Format(WorkspacesResources.Project_file_not_found_colon_0, path),
                     msg => new FileNotFoundException(msg));
                 return null;
             }
@@ -701,7 +658,7 @@ namespace Microsoft.CodeAnalysis.MSBuild
                     else
                     {
                         loader = null;
-                        this.ReportFailure(mode, string.Format(WorkspacesResources.CannotOpenProjectUnsupportedLanguage, projectFilePath, language));
+                        this.ReportFailure(mode, string.Format(WorkspacesResources.Cannot_open_project_0_because_the_language_1_is_not_supported, projectFilePath, language));
                         return false;
                     }
                 }
@@ -711,7 +668,22 @@ namespace Microsoft.CodeAnalysis.MSBuild
 
                     if (loader == null)
                     {
-                        this.ReportFailure(mode, string.Format(WorkspacesResources.CannotOpenProjectUnrecognizedFileExtension, projectFilePath, Path.GetExtension(projectFilePath)));
+                        this.ReportFailure(mode, string.Format(WorkspacesResources.Cannot_open_project_0_because_the_file_extension_1_is_not_associated_with_a_language, projectFilePath, Path.GetExtension(projectFilePath)));
+                        return false;
+                    }
+                }
+
+                // since we have both C# and VB loaders in this same library, it no longer indicates whether we have full language support available.
+                if (loader != null)
+                {
+                    language = loader.Language;
+
+                    // check for command line parser existing... if not then error.
+                    var commandLineParser = _workspace.Services.GetLanguageServices(language).GetService<ICommandLineParserService>();
+                    if (commandLineParser == null)
+                    {
+                        loader = null;
+                        this.ReportFailure(mode, string.Format(WorkspacesResources.Cannot_open_project_0_because_the_language_1_is_not_supported, projectFilePath, language));
                         return false;
                     }
                 }
@@ -728,7 +700,7 @@ namespace Microsoft.CodeAnalysis.MSBuild
             }
             catch (Exception)
             {
-                ReportFailure(mode, string.Format(WorkspacesResources.InvalidProjectFilePath, path));
+                ReportFailure(mode, string.Format(WorkspacesResources.Invalid_project_file_path_colon_0, path));
                 absolutePath = null;
                 return false;
             }
@@ -737,7 +709,7 @@ namespace Microsoft.CodeAnalysis.MSBuild
             {
                 ReportFailure(
                     mode,
-                    string.Format(WorkspacesResources.ProjectFileNotFound, absolutePath),
+                    string.Format(WorkspacesResources.Project_file_not_found_colon_0, absolutePath),
                     msg => new FileNotFoundException(msg));
                 return false;
             }

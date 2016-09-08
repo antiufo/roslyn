@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System;
 using System.Collections.Generic;
@@ -11,11 +11,11 @@ using Microsoft.CodeAnalysis.Editing;
 using Microsoft.CodeAnalysis.Formatting;
 using Microsoft.CodeAnalysis.Host;
 using Microsoft.CodeAnalysis.Rename;
-using Microsoft.CodeAnalysis.Rename.ConflictEngine;
 using Microsoft.CodeAnalysis.Shared.Extensions;
 using Microsoft.CodeAnalysis.Simplification;
 using Microsoft.CodeAnalysis.Text;
 using Roslyn.Utilities;
+using System.Globalization;
 
 namespace Microsoft.CodeAnalysis.EncapsulateField
 {
@@ -65,8 +65,8 @@ namespace Microsoft.CodeAnalysis.EncapsulateField
 
         private IEnumerable<EncapsulateFieldCodeAction> EncapsulateAllFields(Document document, TextSpan span)
         {
-            var action1Text = FeaturesResources.EncapsulateFieldsUsages;
-            var action2Text = FeaturesResources.EncapsulateFields;
+            var action1Text = FeaturesResources.Encapsulate_fields_and_use_property;
+            var action2Text = FeaturesResources.Encapsulate_fields_but_still_use_field;
 
             return new[]
             {
@@ -77,8 +77,8 @@ namespace Microsoft.CodeAnalysis.EncapsulateField
 
         private IEnumerable<EncapsulateFieldCodeAction> EncapsulateOneField(Document document, TextSpan span, IFieldSymbol field, int index)
         {
-            var action1Text = string.Format(FeaturesResources.EncapsulateFieldUsages, field.Name);
-            var action2Text = string.Format(FeaturesResources.EncapsulateField, field.Name);
+            var action1Text = string.Format(FeaturesResources.Encapsulate_field_colon_0_and_use_property, field.Name);
+            var action2Text = string.Format(FeaturesResources.Encapsulate_field_colon_0_but_still_use_field, field.Name);
 
             return new[]
             {
@@ -180,7 +180,8 @@ namespace Microsoft.CodeAnalysis.EncapsulateField
             var semanticModel = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
             var compilation = semanticModel.Compilation;
             field = field.GetSymbolKey().Resolve(compilation, cancellationToken: cancellationToken).Symbol as IFieldSymbol;
-            Solution solutionNeedingProperty = null;
+
+            var solutionNeedingProperty = solution;
 
             // We couldn't resolve field after annotating its declaration. Bail
             if (field == null)
@@ -188,53 +189,9 @@ namespace Microsoft.CodeAnalysis.EncapsulateField
                 return null;
             }
 
-            if (updateReferences)
-            {
-                var locationsToIgnore = SpecializedCollections.EmptySet<TextSpan>();
-                var optionSet = document.Project.Solution.Workspace.Options;
-
-                if (field.IsReadOnly)
-                {
-                    var locationSet = await RenameLocationSet.FindAsync(field, document.Project.Solution, optionSet, cancellationToken).ConfigureAwait(false);
-                    var constructorSyntaxes = GetConstructorNodes(field.ContainingType);
-                    var locations = locationSet.Locations.Where(l => constructorSyntaxes.Any(c => c.Span.IntersectsWith(l.Location.SourceSpan)));
-
-                    if (locations.Any())
-                    {
-                        locationsToIgnore = locations.Select(l => l.Location.SourceSpan).ToSet();
-                        locationSet = new RenameLocationSet(locations.ToSet(), field, document.Project.Solution, locationSet.ReferencedSymbols, locationSet.ImplicitLocations);
-
-                        var resolution = await ConflictResolver.ResolveConflictsAsync(locationSet, field.Name, finalFieldName, optionSet, cancellationToken).ConfigureAwait(false);
-                        document = resolution.NewSolution.GetDocument(document.Id);
-
-                        semanticModel = await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
-                        compilation = semanticModel.Compilation;
-                        field = field.GetSymbolKey().Resolve(compilation, cancellationToken: cancellationToken).Symbol as IFieldSymbol;
-                    }
-                }
-
-                var renameLocationSet = await RenameLocationSet.FindAsync(field, document.Project.Solution, optionSet, cancellationToken).ConfigureAwait(false);
-                renameLocationSet = new RenameLocationSet(renameLocationSet.Locations.Where(l => !locationsToIgnore.Contains(l.Location.SourceSpan)).ToSet(),
-                    renameLocationSet.Symbol, renameLocationSet.Solution, renameLocationSet.ReferencedSymbols, renameLocationSet.ImplicitLocations);
-
-                if (renameLocationSet.Locations.Any() || renameLocationSet.ImplicitLocations.Any())
-                {
-                    var conflictResolution = await ConflictResolver.ResolveConflictsAsync(renameLocationSet, field.Name, generatedPropertyName, optionSet, cancellationToken).ConfigureAwait(false);
-
-                    if (!conflictResolution.ReplacementTextValid)
-                    {
-                        return null;
-                    }
-
-                    solutionNeedingProperty = conflictResolution.NewSolution;
-                    document = solutionNeedingProperty.GetDocument(document.Id);
-                }
-            }
-            else
-            {
-                solutionNeedingProperty = document.Project.Solution;
-                document = solutionNeedingProperty.GetDocument(document.Id);
-            }
+            solutionNeedingProperty = await UpdateReferencesAsync(
+                updateReferences, solution, document, field, finalFieldName, generatedPropertyName, cancellationToken).ConfigureAwait(false);
+            document = solutionNeedingProperty.GetDocument(document.Id);
 
             var markFieldPrivate = field.DeclaredAccessibility != Accessibility.Private;
             var rewrittenFieldDeclaration = await RewriteFieldNameAndAccessibility(finalFieldName, markFieldPrivate, document, declarationAnnotation, cancellationToken).ConfigureAwait(false);
@@ -265,6 +222,40 @@ namespace Microsoft.CodeAnalysis.EncapsulateField
             var solutionWithProperty = await AddPropertyAsync(document, document.Project.Solution, field, generatedProperty, cancellationToken).ConfigureAwait(false);
 
             return new Result(solutionWithProperty, originalField.ToDisplayString(), originalField.GetGlyph());
+        }
+
+        private async Task<Solution> UpdateReferencesAsync(
+            bool updateReferences, Solution solution, Document document, IFieldSymbol field, string finalFieldName, string generatedPropertyName, CancellationToken cancellationToken)
+        {
+            if (!updateReferences)
+            {
+                return solution;
+            }
+
+            if (field.IsReadOnly)
+            {
+                // Inside the constructor we want to rename references the field to the final field name.
+                var constructorSyntaxes = GetConstructorNodes(field.ContainingType).ToSet();
+                if (finalFieldName != field.Name && constructorSyntaxes.Count > 0)
+                {
+                    solution = await Renamer.RenameSymbolAsync(solution, field, finalFieldName, solution.Options,
+                        location => constructorSyntaxes.Any(c => c.Span.IntersectsWith(location.SourceSpan)), cancellationToken: cancellationToken).ConfigureAwait(false);
+                    document = solution.GetDocument(document.Id);
+
+                    var compilation = await document.Project.GetCompilationAsync(cancellationToken).ConfigureAwait(false);
+
+                    field = field.GetSymbolKey().Resolve(compilation, cancellationToken: cancellationToken).Symbol as IFieldSymbol;
+                }
+
+                // Outside the constructor we want to rename references to the field to final property name.
+                return await Renamer.RenameSymbolAsync(solution, field, generatedPropertyName, solution.Options,
+                    location => !constructorSyntaxes.Any(c => c.Span.IntersectsWith(location.SourceSpan)), cancellationToken: cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                // Just rename everything.
+                return await Renamer.RenameSymbolAsync(solution, field, generatedPropertyName, solution.Options, cancellationToken).ConfigureAwait(false);
+            }
         }
 
         internal abstract IEnumerable<SyntaxNode> GetConstructorNodes(INamedTypeSymbol containingType);
@@ -340,8 +331,14 @@ namespace Microsoft.CodeAnalysis.EncapsulateField
 
         protected IMethodSymbol CreateGet(string originalFieldName, IFieldSymbol field, SyntaxGenerator factory)
         {
+            var value = !field.IsStatic
+                ? factory.MemberAccessExpression(
+                    factory.ThisExpression(),
+                    factory.IdentifierName(originalFieldName))
+                : factory.IdentifierName(originalFieldName);
+
             var body = factory.ReturnStatement(
-                factory.IdentifierName(originalFieldName));
+                value.WithAdditionalAnnotations(Simplifier.Annotation));
 
             return CodeGenerationSymbolFactory.CreateAccessorSymbol(SpecializedCollections.EmptyList<AttributeData>(),
                 Accessibility.NotApplicable,
@@ -367,9 +364,13 @@ namespace Microsoft.CodeAnalysis.EncapsulateField
                 baseName = fieldName;
             }
 
-            // Make uppercase the first letter
-            return char.ToUpper(baseName[0]).ToString() + baseName.Substring(1);
+            // Make the first character upper case using the "en-US" culture.  See discussion at
+            // https://github.com/dotnet/roslyn/issues/5524.
+            var firstCharacter = EnUSCultureInfo.TextInfo.ToUpper(baseName[0]);
+            return firstCharacter.ToString() + baseName.Substring(1);
         }
+
+        private static readonly CultureInfo EnUSCultureInfo = new CultureInfo("en-US");
 
         protected abstract Task<SyntaxNode> RewriteFieldNameAndAccessibility(string originalFieldName, bool makePrivate, Document document, SyntaxAnnotation declarationAnnotation, CancellationToken cancellationToken);
         protected abstract Task<IEnumerable<IFieldSymbol>> GetFieldsAsync(Document document, TextSpan span, CancellationToken cancellationToken);

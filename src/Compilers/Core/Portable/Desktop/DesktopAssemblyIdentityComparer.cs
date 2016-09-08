@@ -14,7 +14,7 @@ namespace Microsoft.CodeAnalysis
     {
         // Portability:
         //   If a reference or definition identity is strong, not retargetable, and portable (i.e. one of a few names hard-coded in Fusion) 
-        //   and the portability for its PublicKeyToken is not disabled in App.config file then the identity is replaced by a different identity 
+        //   and the portability for its PublicKeyToken is not disabled in app.config file then the identity is replaced by a different identity 
         //   before the match is performed.
         //
         //   Portable identities:
@@ -45,7 +45,7 @@ namespace Microsoft.CodeAnalysis
         }
 
         /// <summary>
-        /// Loads <see cref="AssemblyPortabilityPolicy"/> information from XML with App.config schema.
+        /// Loads <see cref="AssemblyPortabilityPolicy"/> information from XML with app.config schema.
         /// </summary>
         /// <exception cref="System.Xml.XmlException">The stream doesn't contain a well formed XML.</exception>
         /// <exception cref="ArgumentNullException"><paramref name="input"/> is null.</exception>
@@ -81,13 +81,13 @@ namespace Microsoft.CodeAnalysis
             ref AssemblyIdentity reference,
             ref AssemblyIdentity definition,
             AssemblyIdentityParts referenceParts,
-            out bool isFxAssembly)
+            out bool isDefinitionFxAssembly)
         {
             if (reference.ContentType == AssemblyContentType.Default &&
                 SimpleNameComparer.Equals(reference.Name, definition.Name) &&
                 SimpleNameComparer.Equals(reference.Name, "mscorlib"))
             {
-                isFxAssembly = true;
+                isDefinitionFxAssembly = true;
                 reference = definition;
                 return true;
             }
@@ -96,7 +96,7 @@ namespace Microsoft.CodeAnalysis
             {
                 // Reference is not retargetable, but definition is retargetable.
                 // Non-equivalent.
-                isFxAssembly = false;
+                isDefinitionFxAssembly = false;
                 return false;
             }
 
@@ -113,7 +113,7 @@ namespace Microsoft.CodeAnalysis
             {
                 if (!AssemblyIdentity.IsFullName(referenceParts))
                 {
-                    isFxAssembly = false;
+                    isDefinitionFxAssembly = false;
                     return false;
                 }
 
@@ -139,11 +139,11 @@ namespace Microsoft.CodeAnalysis
 
             if (reference.IsRetargetable && definition.IsRetargetable)
             {
-                isFxAssembly = IsRetargetableAssembly(definition);
+                isDefinitionFxAssembly = IsRetargetableAssembly(definition);
             }
             else
             {
-                isFxAssembly = IsFrameworkAssembly(definition);
+                isDefinitionFxAssembly = IsFrameworkAssembly(definition);
             }
 
             return true;

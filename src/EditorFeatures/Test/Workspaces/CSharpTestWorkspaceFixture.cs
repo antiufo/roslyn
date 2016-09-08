@@ -1,6 +1,8 @@
 // Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
+using System;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Symbols;
@@ -11,9 +13,9 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
 {
     public class CSharpTestWorkspaceFixture : TestWorkspaceFixture
     {
-        public CSharpTestWorkspaceFixture()
+        protected override Task<TestWorkspace> CreateWorkspaceAsync()
         {
-            this.Workspace = CSharpWorkspaceFactory.CreateWorkspaceFromFiles(
+            return TestWorkspace.CreateCSharpAsync(
                 new string[] { string.Empty, },
                 new CSharpParseOptions[] { new CSharpParseOptions(kind: SourceCodeKind.Regular), });
         }

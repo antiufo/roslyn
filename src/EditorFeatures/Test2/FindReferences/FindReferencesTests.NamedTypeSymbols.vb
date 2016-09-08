@@ -1,12 +1,14 @@
 ' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
+Imports System.Threading.Tasks
+
 Namespace Microsoft.CodeAnalysis.Editor.UnitTests.FindReferences
     Partial Public Class FindReferencesTests
 #Region "FAR on reference types"
 
-        <WorkItem(541155)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestInaccessibleVar1()
+        <WorkItem(541155, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541155")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestInaccessibleVar1() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -28,12 +30,12 @@ class B : A
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <WorkItem(541155)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestInaccessibleVar2()
+        <WorkItem(541155, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541155")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestInaccessibleVar2() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -55,12 +57,12 @@ class B : A
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <WorkItem(541151)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestGenericVar1()
+        <WorkItem(541151, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541151")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestGenericVar1() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -80,12 +82,12 @@ class {|Definition:$$var|}<T> { }
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <WorkItem(541151)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestGenericVar2()
+        <WorkItem(541151, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/541151")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestGenericVar2() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -105,11 +107,11 @@ class var<T> { }
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_Class()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_Class() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -130,11 +132,11 @@ class var<T> { }
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_NestedClass()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_NestedClass() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -150,11 +152,11 @@ class var<T> { }
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact(), Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_ExplicitCast()
+        <WpfFact(), Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_ExplicitCast() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -192,11 +194,11 @@ class var<T> { }
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_Events()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_Events() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -227,11 +229,11 @@ class var<T> { }
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_TypeOfOperator()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_TypeOfOperator() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -246,12 +248,12 @@ class var<T> { }
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <WorkItem(539799)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_InaccessibleType()
+        <WorkItem(539799, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539799")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_InaccessibleType() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -273,11 +275,11 @@ class A
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_OneDimensionalArray()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_OneDimensionalArray() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -294,11 +296,11 @@ class A
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_BaseList()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_BaseList() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -308,11 +310,11 @@ class A
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_StaticConstructor()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_StaticConstructor() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -326,11 +328,11 @@ class A
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_GenericClass()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_GenericClass() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -346,11 +348,11 @@ class A
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_GenericClass1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_GenericClass1() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -366,11 +368,11 @@ class A
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_GenericClass2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_GenericClass2() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -389,11 +391,11 @@ class A
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_GenericClass3()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_GenericClass3() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -412,12 +414,12 @@ class A
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <WorkItem(539883)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestCascadedMembersFromConstructedInterfaces1()
+        <WorkItem(539883, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539883")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCascadedMembersFromConstructedInterfaces1() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -445,12 +447,12 @@ public class Basic : I1<int>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <WorkItem(539883)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestCascadedMembersFromConstructedInterfaces2()
+        <WorkItem(539883, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539883")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCascadedMembersFromConstructedInterfaces2() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -478,12 +480,12 @@ public class Basic : I1<int>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <WorkItem(539883)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestCascadedMembersFromConstructedInterfaces3()
+        <WorkItem(539883, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539883")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCascadedMembersFromConstructedInterfaces3() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -511,12 +513,12 @@ public class Basic : I1<int>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <WorkItem(539883)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestCascadedMembersFromConstructedInterfaces4()
+        <WorkItem(539883, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539883")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCascadedMembersFromConstructedInterfaces4() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -535,12 +537,12 @@ class C : I<int>, I<string>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <WorkItem(539883)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestCascadedMembersFromConstructedInterfaces5()
+        <WorkItem(539883, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539883")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCascadedMembersFromConstructedInterfaces5() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -559,12 +561,12 @@ class C : I<int>, I<string>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <WorkItem(539883)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestCascadedMembersFromConstructedInterfaces6()
+        <WorkItem(539883, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539883")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCascadedMembersFromConstructedInterfaces6() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -583,11 +585,11 @@ class C : I<int>, I<string>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_MultipleFiles()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_MultipleFiles() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -604,11 +606,11 @@ class C : I<int>, I<string>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_MultipleFiles_InOneFileOnly()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_MultipleFiles_InOneFileOnly() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -626,11 +628,11 @@ class C : I<int>, I<string>
         </Document>
     </Project>
 </Workspace>
-            Test(input, searchSingleFileOnly:=True)
-        End Sub
+            Await TestAPIAndFeature(input, searchSingleFileOnly:=True)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_CSharpImplicitConstructor()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_CSharpImplicitConstructor() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -645,11 +647,11 @@ class C : I<int>, I<string>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_CSharpExplicitConstructor()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_CSharpExplicitConstructor() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -666,11 +668,11 @@ class C : I<int>, I<string>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact(), Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_VBImplicitConstructor()
+        <WpfFact(), Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_VBImplicitConstructor() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -678,16 +680,16 @@ class C : I<int>, I<string>
         Class {|Definition:$$C|}
             Shared Sub Main()
                 Dim c As [|C|] = New [|C|]()
-            End Sub
+            End Function
         End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_CSharpConstructorCallUsingNewOperator1()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_CSharpConstructorCallUsingNewOperator1() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -707,11 +709,11 @@ class C : I<int>, I<string>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_CSharpConstructorCallUsingNewOperator2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_CSharpConstructorCallUsingNewOperator2() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -731,11 +733,11 @@ class C : I<int>, I<string>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_VBConstructorCallUsingNewOperator()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_VBConstructorCallUsingNewOperator() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -743,7 +745,7 @@ class C : I<int>, I<string>
         Class C
             Sub New()
                 Dim m As [|M|] = New [|M|] (2)
-            End Sub
+            End Function
         End Class 
         Class {|Definition:$$M|}
              Sub {|Definition:New|}(ByVal i As Integer)
@@ -752,11 +754,11 @@ class C : I<int>, I<string>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_VBModule()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_VBModule() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -764,22 +766,22 @@ class C : I<int>, I<string>
         Module {|Definition:Program|}
             Sub Main(args As String())
 
-            End Sub
+            End Function
         End Module
 
         Class Test
             Sub Test()
                 [|$$Program|].Main("")
-            End Sub
+            End Function
         End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_PartialClass()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_PartialClass() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -798,11 +800,11 @@ class C : I<int>, I<string>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_Interface()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_Interface() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -818,11 +820,11 @@ class C : I<int>, I<string>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_GenericInterface()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_GenericInterface() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -840,12 +842,12 @@ class C : I<int>, I<string>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <WorkItem(539065)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_Delegate()
+        <WorkItem(539065, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539065")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_Delegate() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -864,12 +866,12 @@ class C : I<int>, I<string>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <WorkItem(539065)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_Delegate1()
+        <WorkItem(539065, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539065")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_Delegate1() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -886,12 +888,12 @@ class C : I<int>, I<string>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <WorkItem(539065)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_Delegate2()
+        <WorkItem(539065, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539065")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_Delegate2() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -908,12 +910,12 @@ class C : I<int>, I<string>
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <WorkItem(539614)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_Delegate3()
+        <WorkItem(539614, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539614")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_Delegate3() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -935,12 +937,12 @@ class Program
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <WorkItem(539614)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_Delegate4()
+        <WorkItem(539614, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539614")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_Delegate4() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -962,12 +964,12 @@ class Program
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <WorkItem(539614)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_Delegate5()
+        <WorkItem(539614, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539614")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_Delegate5() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -989,12 +991,12 @@ class Program
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <WorkItem(539646)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_Delegate6()
+        <WorkItem(539646, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539646")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_Delegate6() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1018,12 +1020,12 @@ class Program
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <WorkItem(537966)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_CalledDynamic1()
+        <WorkItem(537966, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537966")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_CalledDynamic1() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1037,12 +1039,12 @@ class Program
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <WorkItem(537966)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_CalledDynamic2()
+        <WorkItem(537966, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537966")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_CalledDynamic2() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1058,12 +1060,12 @@ class Program
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <WorkItem(538842)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_CalledSystemString1()
+        <WorkItem(538842, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538842")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_CalledSystemString1() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1079,12 +1081,12 @@ class Program
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <WorkItem(538842)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_CalledSystemString2()
+        <WorkItem(538842, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538842")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_CalledSystemString2() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1100,12 +1102,12 @@ class Program
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <WorkItem(538926)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_CalledSystemString3()
+        <WorkItem(538926, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/538926")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_CalledSystemString3() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1121,12 +1123,12 @@ namespace System
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <WorkItem(539299)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_LeftSideOfMemberAccessExpression1()
+        <WorkItem(539299, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539299")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_LeftSideOfMemberAccessExpression1() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1143,12 +1145,12 @@ public class C
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <WorkItem(539299)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_LeftSideOfMemberAccessExpression2()
+        <WorkItem(539299, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539299")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_LeftSideOfMemberAccessExpression2() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1165,12 +1167,12 @@ public class C
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <WorkItem(539299)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_LeftSideOfMemberAccessExpression3()
+        <WorkItem(539299, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539299")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_LeftSideOfMemberAccessExpression3() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -1185,12 +1187,12 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <WorkItem(539299)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_LeftSideOfMemberAccessExpression4()
+        <WorkItem(539299, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/539299")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_LeftSideOfMemberAccessExpression4() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -1205,11 +1207,11 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestCrefNamedType()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCrefNamedType() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1225,11 +1227,11 @@ class {|Definition:Program|}
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestCrefNamedType2()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestCrefNamedType2() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1245,12 +1247,12 @@ class {|Definition:Progr$$am|}
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <WorkItem(775925)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_LeftSideOfGreaterThanTokenInAttribute()
+        <WorkItem(775925, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/775925")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_LeftSideOfGreaterThanTokenInAttribute() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -1266,13 +1268,13 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 #End Region
 
 #Region "FAR on primitive types"
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_PrimitiveTypeAsMethodParameter()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_PrimitiveTypeAsMethodParameter() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1296,11 +1298,11 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_PrimitiveTypeAsField()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_PrimitiveTypeAsField() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1324,13 +1326,13 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 #End Region
 
 #Region "FAR on value types"
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_Struct()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_Struct() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1343,11 +1345,11 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_Enum()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_Enum() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1365,11 +1367,11 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_EnumMembers()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_EnumMembers() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1387,13 +1389,13 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 #End Region
 
 #Region "FAR on across projects"
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_NonDependentProjectCSharpRefsCSharp()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_NonDependentProjectCSharpRefsCSharp() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1412,11 +1414,11 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_NonDependentProjectVBRefsCSharp()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_NonDependentProjectVBRefsCSharp() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1434,11 +1436,11 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_InDependentProjectCSharpRefsCSharp()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_InDependentProjectCSharpRefsCSharp() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" AssemblyName="CSharpAssembly1" CommonReferences="true">
@@ -1458,11 +1460,11 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_InDependentProjectVBRefsCSharp()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_InDependentProjectVBRefsCSharp() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" AssemblyName="CSharpAssembly1" CommonReferences="true">
@@ -1481,13 +1483,13 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 #End Region
 
 #Region "FAR in namespaces"
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_InNamespace()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_InNamespace() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1505,13 +1507,13 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 #End Region
 
 #Region "FAR with case sensitivity"
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_CaseSensitivity()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_CaseSensitivity() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" AssemblyName="CSharpAssembly1" CommonReferences="true">
@@ -1548,13 +1550,13 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 #End Region
 
 #Region "FAR through alias"
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_ThroughAlias()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_ThroughAlias() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1575,11 +1577,11 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_ThroughAliasNestedType()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_ThroughAliasNestedType() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1603,11 +1605,11 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_ThroughAliasGenericType()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_ThroughAliasGenericType() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1628,13 +1630,13 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 #End Region
 
 #Region "FAR on object initializers"
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_ReferenceInObjectInitializers()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_ReferenceInObjectInitializers() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1650,11 +1652,11 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_ReferenceInObjectInitializersConstructorTakesNoParms()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_ReferenceInObjectInitializersConstructorTakesNoParms() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1676,13 +1678,13 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 #End Region
 
 #Region "FAR on collection initializers"
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestLocal_CSharpColInitWithMultipleExpressionContainSameIdentifier()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestLocal_CSharpColInitWithMultipleExpressionContainSameIdentifier() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1698,11 +1700,11 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestLocal_VBColInitWithMultipleExpressionContainSameIdentifier()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestLocal_VBColInitWithMultipleExpressionContainSameIdentifier() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -1718,13 +1720,13 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 #End Region
 
 #Region "FAR on array initializers"
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_CSharpArrayInitializerContainsALongExpression()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_CSharpArrayInitializerContainsALongExpression() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1744,11 +1746,11 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_VBArrayInitializerContainsALongExpression()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_VBArrayInitializerContainsALongExpression() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -1765,11 +1767,11 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_CSharpArrayInitializerContansANestedArrayInitializer()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_CSharpArrayInitializerContansANestedArrayInitializer() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1789,11 +1791,11 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_VBArrayInitializerContainsANestedArrayInitializer()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_VBArrayInitializerContainsANestedArrayInitializer() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -1810,11 +1812,11 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_CSharpArrayInitializerDifferentTypesWithImplicitCasting()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_CSharpArrayInitializerDifferentTypesWithImplicitCasting() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1831,11 +1833,11 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_VBArrayInitializerDifferentTypesWithImplicitCasting()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_VBArrayInitializerDifferentTypesWithImplicitCasting() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -1850,11 +1852,11 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_CSharpImplicitlyTypedArray()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_CSharpImplicitlyTypedArray() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1871,11 +1873,11 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_VBImplicitlyTypedArray()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_VBImplicitlyTypedArray() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -1890,13 +1892,13 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 #End Region
 
 #Region "FAR on query expressions"
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_CSharpQueryExpressionInitializedViaColInitializer()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_CSharpQueryExpressionInitializedViaColInitializer() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1912,11 +1914,11 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_VBQueryExpressionInitializedViaColInitializer()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_VBQueryExpressionInitializedViaColInitializer() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -1930,11 +1932,11 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_CSharpQueryExpressionThatIncludeColInit()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_CSharpQueryExpressionThatIncludeColInit() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1951,11 +1953,11 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_VBQueryExpressionThatIncludeColInit()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_VBQueryExpressionThatIncludeColInit() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" CommonReferences="true">
@@ -1970,15 +1972,15 @@ End Class
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 #End Region
 
 #Region "FAR in Venus Contexts"
 
-        <WorkItem(545325)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestHiddenCodeIsNotVisibleFromUI()
+        <WorkItem(545325, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545325")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestHiddenCodeIsNotVisibleFromUI() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -1993,12 +1995,12 @@ public class _Default
         </Document>
     </Project>
 </Workspace>
-            Test(input, uiVisibleOnly:=True)
-        End Sub
+            Await TestAPIAndFeature(input, uiVisibleOnly:=True)
+        End Function
 
-        <WorkItem(545325)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestHiddenCodeIsAccessibleViaApis()
+        <WorkItem(545325, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545325")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestHiddenCodeIsAccessibleViaApis() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -2013,14 +2015,14 @@ public class {|Definition:_Default|}
         </Document>
     </Project>
 </Workspace>
-            Test(input, uiVisibleOnly:=False)
-        End Sub
+            Await TestAPI(input, uiVisibleOnly:=False)
+        End Function
 
 #End Region
 
-        <WorkItem(542949)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_DoNotFindDestructor1()
+        <WorkItem(542949, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542949")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_DoNotFindDestructor1() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" CommonReferences="true">
@@ -2029,12 +2031,12 @@ class {|Definition:$$A|} {    ~{|Definition:A|}()    {        Console.WriteLine(
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <WorkItem(546229)>
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestNamedType_CrossLanguageModule()
+        <WorkItem(546229, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546229")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestNamedType_CrossLanguageModule() As Task
             Dim input =
 <Workspace>
     <Project Language="Visual Basic" AssemblyName="VBAssembly" CommonReferences="true">
@@ -2058,11 +2060,11 @@ class C
         </Document>
     </Project>
 </Workspace>
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestRetargetingType_Basic()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestRetargetingType_Basic() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" AssemblyName="PortableClassLibrary" CommonReferencesPortable="true">
@@ -2089,11 +2091,11 @@ class Class2
     </Project>
 </Workspace>
 
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub TestRetargetingType_GenericType()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestRetargetingType_GenericType() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" AssemblyName="PortableClassLibrary" CommonReferencesPortable="true">
@@ -2123,11 +2125,11 @@ class Class2
     </Project>
 </Workspace>
 
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        Public Sub DuplicatePublicTypeWithDuplicateConstructors()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        Public Async Function TestDuplicatePublicTypeWithDuplicateConstructors() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" AssemblyName="ClassLibrary1" CommonReferences="true">
@@ -2154,12 +2156,12 @@ public class D { }
     </Project>
 </Workspace>
 
-            Test(input)
-        End Sub
+            Await TestAPIAndFeature(input)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.FindReferences)>
-        <WorkItem(1174256)>
-        Public Sub TestFarWithInternalsVisibleToNull()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.FindReferences)>
+        <WorkItem(1174256, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1174256")>
+        Public Async Function TestFarWithInternalsVisibleToNull() As Task
             Dim input =
 <Workspace>
     <Project Language="C#" AssemblyName="ClassLibrary1" CommonReferences="true">
@@ -2181,9 +2183,9 @@ public class D { }
     </Project>
 </Workspace>
 
-            Test(input)
+            Await TestAPIAndFeature(input)
 
-        End Sub
+        End Function
 
     End Class
 End Namespace

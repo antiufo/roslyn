@@ -7,8 +7,8 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.ChangeSignature
     Partial Public Class ChangeSignatureTests
         Inherits AbstractChangeSignatureTests
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ReorderMethodParameters()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
+        Public Async Function TestReorderMethodParameters() As Task
 
             Dim markup = <Text><![CDATA[
 Class C
@@ -22,12 +22,12 @@ Class C
     End Sub
 End Class]]></Text>.NormalizedValue()
 
-            TestChangeSignatureViaCommand(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
+            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
 
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ReorderMethodParametersAndArguments()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
+        Public Async Function TestReorderMethodParametersAndArguments() As Task
 
             Dim markup = <Text><![CDATA[
 Class C
@@ -43,11 +43,11 @@ Class C
     End Sub
 End Class]]></Text>.NormalizedValue()
 
-            TestChangeSignatureViaCommand(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
-        End Sub
+            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ReorderMethodParametersAndArgumentsOfNestedCalls()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
+        Public Async Function TestReorderMethodParametersAndArgumentsOfNestedCalls() As Task
 
             Dim markup = <Text><![CDATA[
 Class C
@@ -63,11 +63,11 @@ Class C
     End Function
 End Class]]></Text>.NormalizedValue()
 
-            TestChangeSignatureViaCommand(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
-        End Sub
+            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ReorderConstructorParametersAndArguments()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
+        Public Async Function TestReorderConstructorParametersAndArguments() As Task
 
             Dim markup = <Text><![CDATA[
 Class D
@@ -107,11 +107,11 @@ Class C
     End Sub
 End Class]]></Text>.NormalizedValue()
 
-            TestChangeSignatureViaCommand(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
-        End Sub
+            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ReorderAttributeConstructorParametersAndArguments()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
+        Public Async Function TestReorderAttributeConstructorParametersAndArguments() As Task
 
             Dim markup = <Text><![CDATA[
 <C(1, "two")>
@@ -131,11 +131,11 @@ Class C
     End Sub
 End Class]]></Text>.NormalizedValue()
 
-            TestChangeSignatureViaCommand(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
-        End Sub
+            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ReorderExtensionMethodParametersAndArguments_StaticCall()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
+        Public Async Function TestReorderExtensionMethodParametersAndArguments_StaticCall() As Task
 
             Dim markup = <Text><![CDATA[
 Class C
@@ -163,11 +163,11 @@ Module CExt
     End Sub
 End Module]]></Text>.NormalizedValue()
 
-            TestChangeSignatureViaCommand(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
-        End Sub
+            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ReorderExtensionMethodParametersAndArguments_ExtensionCall()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
+        Public Async Function TestReorderExtensionMethodParametersAndArguments_ExtensionCall() As Task
 
             Dim markup = <Text><![CDATA[
 Class C
@@ -197,11 +197,11 @@ Module CExt
     End Sub
 End Module]]></Text>.NormalizedValue()
 
-            TestChangeSignatureViaCommand(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
-        End Sub
+            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ReorderParamsMethodParametersAndArguments_ParamsAsArray()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
+        Public Async Function TestReorderParamsMethodParametersAndArguments_ParamsAsArray() As Task
 
             Dim markup = <Text><![CDATA[
 Class C
@@ -217,11 +217,11 @@ Class C
     End Sub
 End Class]]></Text>.NormalizedValue()
 
-            TestChangeSignatureViaCommand(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
-        End Sub
+            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ReorderParamsMethodParametersAndArguments_ParamsExpanded()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
+        Public Async Function TestReorderParamsMethodParametersAndArguments_ParamsExpanded() As Task
 
             Dim markup = <Text><![CDATA[
 Class C
@@ -237,11 +237,11 @@ Class C
     End Sub
 End Class]]></Text>.NormalizedValue()
 
-            TestChangeSignatureViaCommand(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
-        End Sub
+            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ReorderExtensionAndParamsMethodParametersAndArguments_VariedCallsites()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
+        Public Async Function TestReorderExtensionAndParamsMethodParametersAndArguments_VariedCallsites() As Task
 
             Dim markup = <Text><![CDATA[
 Class C
@@ -281,11 +281,11 @@ Module CExt
     End Sub
 End Module]]></Text>.NormalizedValue()
 
-            TestChangeSignatureViaCommand(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
-        End Sub
+            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ReorderIndexerParametersAndArguments()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
+        Public Async Function TestReorderIndexerParametersAndArguments() As Task
 
             Dim markup = <Text><![CDATA[
 Class C
@@ -321,53 +321,11 @@ Class C
     End Sub
 End Class]]></Text>.NormalizedValue()
 
-            TestChangeSignatureViaCommand(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
-        End Sub
+            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
+        End Function
 
-        <Fact(Skip:="908023"), Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ReorderCollectionInitializerAddMethodParametersAndArguments()
-
-            Dim markup = <Text><![CDATA[
-Imports System.Collections
-
-Class C
-    Implements IEnumerable
-
-    Public Function GetEnumerator() As IEnumerator Implements IEnumerable.GetEnumerator
-        Throw New NotImplementedException()
-    End Function
-
-    $$Sub Add(x As Integer, y As Integer)
-    End Sub
-
-    Sub M()
-        Dim c = New C From {{1, 2}, {3, 4}}
-    End Sub
-End Class]]></Text>.NormalizedValue()
-            Dim permutation = {1, 0}
-            Dim updatedCode = <Text><![CDATA[
-Imports System.Collections
-
-Class C
-    Implements IEnumerable
-
-    Public Function GetEnumerator() As IEnumerator Implements IEnumerable.GetEnumerator
-        Throw New NotImplementedException()
-    End Function
-
-    Sub Add(y As Integer, x As Integer)
-    End Sub
-
-    Sub M()
-        Dim c = New C From {{2, 1}, {4, 3}}
-    End Sub
-End Class]]></Text>.NormalizedValue()
-
-            TestChangeSignatureViaCommand(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
-        End Sub
-
-        <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ReorderParamTagsInDocComments_OnIndividualLines()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
+        Public Async Function TestReorderParamTagsInDocComments_OnIndividualLines() As Task
 
             Dim markup = <Text><![CDATA[
 Class C
@@ -387,11 +345,11 @@ Class C
     End Sub
 End Class]]></Text>.NormalizedValue()
 
-            TestChangeSignatureViaCommand(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
-        End Sub
+            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ReorderParamTagsInDocComments_OnSameLine()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
+        Public Async Function TestReorderParamTagsInDocComments_OnSameLine() As Task
 
             Dim markup = <Text><![CDATA[
 Class C
@@ -407,11 +365,11 @@ Class C
     End Sub
 End Class]]></Text>.NormalizedValue()
 
-            TestChangeSignatureViaCommand(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
-        End Sub
+            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ReorderParamTagsInDocComments_OutOfOrder_MaintainsOrder()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
+        Public Async Function TestReorderParamTagsInDocComments_OutOfOrder_MaintainsOrder() As Task
 
             Dim markup = <Text><![CDATA[
 Class C
@@ -431,11 +389,11 @@ Class C
     End Sub
 End Class]]></Text>.NormalizedValue()
 
-            TestChangeSignatureViaCommand(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
-        End Sub
+            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ReorderParamTagsInDocComments_InsufficientTags_MaintainsOrder()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
+        Public Async Function TestReorderParamTagsInDocComments_InsufficientTags_MaintainsOrder() As Task
 
             Dim markup = <Text><![CDATA[
 Class C
@@ -453,11 +411,11 @@ Class C
     End Sub
 End Class]]></Text>.NormalizedValue()
 
-            TestChangeSignatureViaCommand(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
-        End Sub
+            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ReorderParamTagsInDocComments_ExcessiveTags_MaintainsOrder()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
+        Public Async Function TestReorderParamTagsInDocComments_ExcessiveTags_MaintainsOrder() As Task
 
             Dim markup = <Text><![CDATA[
 Class C
@@ -479,11 +437,11 @@ Class C
     End Sub
 End Class]]></Text>.NormalizedValue()
 
-            TestChangeSignatureViaCommand(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
-        End Sub
+            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ReorderParamTagsInDocComments_IncorrectlyNamedTags_MaintainsOrder()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
+        Public Async Function TestReorderParamTagsInDocComments_IncorrectlyNamedTags_MaintainsOrder() As Task
 
             Dim markup = <Text><![CDATA[
 Class C
@@ -503,11 +461,11 @@ Class C
     End Sub
 End Class]]></Text>.NormalizedValue()
 
-            TestChangeSignatureViaCommand(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
-        End Sub
+            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ReorderParamTagsInDocComments_OnFunctions()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
+        Public Async Function TestReorderParamTagsInDocComments_OnFunctions() As Task
 
             Dim markup = <Text><![CDATA[
 Class C
@@ -529,11 +487,11 @@ Class C
     End Sub
 End Class]]></Text>.NormalizedValue()
 
-            TestChangeSignatureViaCommand(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
-        End Sub
+            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ReorderParamTagsInDocComments_OnConstructors()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
+        Public Async Function TestReorderParamTagsInDocComments_OnConstructors() As Task
 
             Dim markup = <Text><![CDATA[
 Class C
@@ -553,11 +511,11 @@ Class C
     End Sub
 End Class]]></Text>.NormalizedValue()
 
-            TestChangeSignatureViaCommand(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
-        End Sub
+            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ReorderParamTagsInDocComments_OnProperties()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
+        Public Async Function TestReorderParamTagsInDocComments_OnProperties() As Task
 
             Dim markup = <Text><![CDATA[
 Class C
@@ -587,11 +545,11 @@ Class C
     End Property
 End Class]]></Text>.NormalizedValue()
 
-            TestChangeSignatureViaCommand(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
-        End Sub
+            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ReorderParametersInCrefs()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
+        Public Async Function TestReorderParametersInCrefs() As Task
 
             Dim markup = <Text><![CDATA[
 Class C
@@ -611,7 +569,7 @@ Class C
     End Sub
 End Class]]></Text>.NormalizedValue()
 
-            TestChangeSignatureViaCommand(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
-        End Sub
+            Await TestChangeSignatureViaCommandAsync(LanguageNames.VisualBasic, markup, updatedSignature:=permutation, expectedUpdatedInvocationDocumentCode:=updatedCode)
+        End Function
     End Class
 End Namespace

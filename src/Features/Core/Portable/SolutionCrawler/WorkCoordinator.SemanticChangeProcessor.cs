@@ -176,9 +176,7 @@ namespace Microsoft.CodeAnalysis.SolutionCrawler
                         Contract.Requires(location.IsInSource);
 
                         var document = solution.GetDocument(location.SourceTree, projectId);
-                        Contract.Requires(document != null);
-
-                        if (thisDocument == document)
+                        if (document == null || thisDocument == document)
                         {
                             continue;
                         }
@@ -222,9 +220,7 @@ namespace Microsoft.CodeAnalysis.SolutionCrawler
                     // most likely we got here since we are called due to typing.
                     // calculate dependency here and register each affected project to the next pipe line
                     var solution = document.Project.Solution;
-
-                    var graph = solution.GetProjectDependencyGraph();
-                    foreach (var projectId in graph.GetProjectsThatTransitivelyDependOnThisProject(self).Concat(self))
+                    foreach (var projectId in GetProjectsToAnalyze(solution, self))
                     {
                         var project = solution.GetProject(projectId);
                         if (project == null)
@@ -289,6 +285,20 @@ namespace Microsoft.CodeAnalysis.SolutionCrawler
 
                         return first.Value;
                     }
+                }
+
+                private static IEnumerable<ProjectId> GetProjectsToAnalyze(Solution solution, ProjectId projectId)
+                {
+                    var graph = solution.GetProjectDependencyGraph();
+
+                    if (solution.Workspace.Options.GetOption(InternalSolutionCrawlerOptions.DirectDependencyPropagationOnly))
+                    {
+                        return graph.GetProjectsThatDirectlyDependOnThisProject(projectId).Concat(projectId);
+                    }
+
+                    // re-analyzing all transitive dependencies is very expensive. by default we will only
+                    // re-analyze direct dependency for now. and consider flipping the default only if we must.
+                    return graph.GetProjectsThatTransitivelyDependOnThisProject(projectId).Concat(projectId);
                 }
 
                 private struct Data
@@ -394,9 +404,7 @@ namespace Microsoft.CodeAnalysis.SolutionCrawler
 
                             // do dependency tracking here with current solution
                             var solution = _registration.CurrentSolution;
-
-                            var graph = solution.GetProjectDependencyGraph();
-                            foreach (var projectId in graph.GetProjectsThatTransitivelyDependOnThisProject(data.ProjectId).Concat(data.ProjectId))
+                            foreach (var projectId in GetProjectsToAnalyze(solution, data.ProjectId))
                             {
                                 project = solution.GetProject(projectId);
                                 await EnqueueWorkItemAsync(project).ConfigureAwait(false);
@@ -416,9 +424,9 @@ namespace Microsoft.CodeAnalysis.SolutionCrawler
                             return;
                         }
 
-                        foreach (var documentId in project.DocumentIds)
+                        foreach (var document in project.Documents)
                         {
-                            await EnqueueWorkItemAsync(project.GetDocument(documentId)).ConfigureAwait(false);
+                            await EnqueueWorkItemAsync(document).ConfigureAwait(false);
                         }
                     }
 

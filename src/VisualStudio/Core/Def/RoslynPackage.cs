@@ -2,6 +2,7 @@
 
 using System;
 using System.ComponentModel.Design;
+using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using Microsoft.CodeAnalysis;
@@ -9,25 +10,32 @@ using Microsoft.CodeAnalysis.Editor;
 using Microsoft.CodeAnalysis.Editor.Host;
 using Microsoft.CodeAnalysis.Editor.Shared.Utilities;
 using Microsoft.CodeAnalysis.ErrorReporting;
+using Microsoft.CodeAnalysis.Packaging;
+using Microsoft.CodeAnalysis.SymbolSearch;
 using Microsoft.CodeAnalysis.Versions;
 using Microsoft.VisualStudio.ComponentModelHost;
 using Microsoft.VisualStudio.LanguageServices.Implementation;
+using Microsoft.VisualStudio.LanguageServices.Implementation.Interactive;
+using Microsoft.VisualStudio.LanguageServices.Implementation.LanguageService;
 using Microsoft.VisualStudio.LanguageServices.Implementation.Library.FindResults;
+using Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem;
 using Microsoft.VisualStudio.LanguageServices.Implementation.ProjectSystem.RuleSets;
 using Microsoft.VisualStudio.LanguageServices.Implementation.TableDataSource;
-using Microsoft.VisualStudio.LanguageServices.Implementation.TaskList;
+using Microsoft.VisualStudio.LanguageServices.Packaging;
+using Microsoft.VisualStudio.LanguageServices.SymbolSearch;
 using Microsoft.VisualStudio.LanguageServices.Utilities;
 using Microsoft.VisualStudio.PlatformUI;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
+using static Microsoft.CodeAnalysis.Utilities.ForegroundThreadDataKind;
 using Task = System.Threading.Tasks.Task;
 
 namespace Microsoft.VisualStudio.LanguageServices.Setup
 {
     [Guid(Guids.RoslynPackageIdString)]
     [PackageRegistration(UseManagedResourcesOnly = true)]
-    [ProvideMenuResource("Menus.ctmenu", version: 10)]
-    internal class RoslynPackage : Package
+    [ProvideMenuResource("Menus.ctmenu", version: 16)]
+    internal class RoslynPackage : AbstractPackage
     {
         private LibraryManager _libraryManager;
         private uint _libraryManagerCookie;
@@ -40,8 +48,6 @@ namespace Microsoft.VisualStudio.LanguageServices.Setup
         protected override void Initialize()
         {
             base.Initialize();
-
-            ForegroundThreadAffinitizedObject.Initialize();
 
             FatalError.Handler = FailFast.OnFatalException;
             FatalError.NonFatalHandler = WatsonReporter.Report;
@@ -73,7 +79,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Setup
             InitializeColors();
 
             // load some services that have to be loaded in UI thread
-            LoadComponentsInUIContext();
+            LoadComponentsInUIContextOnceSolutionFullyLoaded();
 
             _solutionEventMonitor = new SolutionEventMonitor(_workspace);
         }
@@ -110,47 +116,26 @@ namespace Microsoft.VisualStudio.LanguageServices.Setup
             CodeAnalysisColors.AccentBarColorKey = EnvironmentColors.FileTabInactiveDocumentBorderEdgeBrushKey;
         }
 
-        private void LoadComponentsInUIContext()
-        {
-            if (KnownUIContexts.SolutionExistsAndFullyLoadedContext.IsActive)
-            {
-                // if we are already in the right UI context, load it right away
-                LoadComponents();
-            }
-            else
-            {
-                // load them when it is a right context.
-                KnownUIContexts.SolutionExistsAndFullyLoadedContext.UIContextChanged += OnSolutionExistsAndFullyLoadedContext;
-            }
-        }
-
-        private void OnSolutionExistsAndFullyLoadedContext(object sender, UIContextChangedEventArgs e)
-        {
-            if (e.Activated)
-            {
-                // unsubscribe from it
-                KnownUIContexts.SolutionExistsAndFullyLoadedContext.UIContextChanged -= OnSolutionExistsAndFullyLoadedContext;
-
-                // load components
-                LoadComponents();
-            }
-        }
-
-        private void LoadComponents()
+        protected override void LoadComponentsInUIContext()
         {
             // we need to load it as early as possible since we can have errors from
             // package from each language very early
             this.ComponentModel.GetService<VisualStudioDiagnosticListTable>();
             this.ComponentModel.GetService<VisualStudioTodoListTable>();
+            this.ComponentModel.GetService<VisualStudioDiagnosticListTableCommandHandler>().Initialize(this);
 
             this.ComponentModel.GetService<HACK_ThemeColorFixer>();
-            this.ComponentModel.GetExtensions<IReferencedSymbolsPresenter>();
+            this.ComponentModel.GetExtensions<IDefinitionsAndReferencesPresenter>();
             this.ComponentModel.GetExtensions<INavigableItemsPresenter>();
             this.ComponentModel.GetService<VisualStudioMetadataAsSourceFileSupportService>();
             this.ComponentModel.GetService<VirtualMemoryNotificationListener>();
 
-            LoadAnalyzerNodeComponents();
+            // The misc files workspace needs to be loaded on the UI thread.  This way it will have
+            // the appropriate task scheduler to report events on.
+            this.ComponentModel.GetService<MiscellaneousFilesWorkspace>();
 
+            LoadAnalyzerNodeComponents();
+            
             Task.Run(() => LoadComponentsBackground());
         }
 
@@ -159,9 +144,22 @@ namespace Microsoft.VisualStudio.LanguageServices.Setup
             // Perf: Initialize the command handlers.
             var commandHandlerServiceFactory = this.ComponentModel.GetService<ICommandHandlerServiceFactory>();
             commandHandlerServiceFactory.Initialize(ContentTypeNames.RoslynContentType);
+            LoadInteractiveMenus();
 
             this.ComponentModel.GetService<MiscellaneousTodoListTable>();
             this.ComponentModel.GetService<MiscellaneousDiagnosticListTable>();
+        }
+
+        private void LoadInteractiveMenus()
+        {
+            var menuCommandService = (OleMenuCommandService)GetService(typeof(IMenuCommandService));
+            var monitorSelectionService = (IVsMonitorSelection)this.GetService(typeof(SVsShellMonitorSelection));
+
+            new CSharpResetInteractiveMenuCommand(menuCommandService, monitorSelectionService, ComponentModel)
+                .InitializeResetInteractiveFromProjectCommand();
+
+            new VisualBasicResetInteractiveMenuCommand(menuCommandService, monitorSelectionService, ComponentModel)
+                .InitializeResetInteractiveFromProjectCommand();
         }
 
         internal IComponentModel ComponentModel
@@ -200,6 +198,7 @@ namespace Microsoft.VisualStudio.LanguageServices.Setup
         private void ReportSessionWideTelemetry()
         {
             PersistedVersionStampLogger.LogSummary();
+            LinkedFileDiffMergingLogger.ReportTelemetry();
         }
 
         private void RegisterFindResultsLibraryManager()

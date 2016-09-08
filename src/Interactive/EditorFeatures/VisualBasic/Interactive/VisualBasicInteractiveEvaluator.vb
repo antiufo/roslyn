@@ -11,10 +11,10 @@ Imports Microsoft.VisualStudio.InteractiveWindow.Commands
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.Interactive
 
-    Public NotInheritable Class VisualBasicInteractiveEvaluator
+    Friend NotInheritable Class VisualBasicInteractiveEvaluator
         Inherits InteractiveEvaluator
 
-        Private Shared ReadOnly s_parseOptions As ParseOptions = New VisualBasicParseOptions(languageVersion:=LanguageVersion.VisualBasic11, kind:=SourceCodeKind.Interactive)
+        Private Shared ReadOnly s_parseOptions As ParseOptions = New VisualBasicParseOptions(languageVersion:=LanguageVersion.VisualBasic11, kind:=SourceCodeKind.Script)
 
         Private Const s_interactiveResponseFile As String = "VisualBasicInteractive.rsp"
 
@@ -34,7 +34,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.Interactive
                        Path.Combine(responseFileDirectory, s_interactiveResponseFile),
                        initialWorkingDirectory,
                        GetType(InteractiveHostEntryPoint).Assembly.Location,
-                       GetType(VisualBasicRepl))
+                       GetType(VisualBasicReplServiceProvider))
         End Sub
 
         Protected Overrides ReadOnly Property LanguageName As String
@@ -51,15 +51,19 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.Interactive
 
         Protected Overrides ReadOnly Property CommandLineParser As CommandLineParser
             Get
-                Return VisualBasicCommandLineParser.Interactive
+                Return VisualBasicCommandLineParser.ScriptRunner
             End Get
         End Property
 
-        Protected Overrides Function GetSubmissionCompilationOptions(name As String, metadataReferenceResolver As MetadataReferenceResolver) As CompilationOptions
-            Return New VisualBasicCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
-                                            scriptClassName:=name,
-                                            metadataReferenceResolver:=metadataReferenceResolver,
-                                            assemblyIdentityComparer:=DesktopAssemblyIdentityComparer.Default)
+        Protected Overrides Function GetSubmissionCompilationOptions(name As String, metadataReferenceResolver As MetadataReferenceResolver, sourceReferenceResolver As SourceReferenceResolver, [imports] As ImmutableArray(Of String)) As CompilationOptions
+            Dim globalImports = [imports].Select(AddressOf GlobalImport.Parse)
+            Return New VisualBasicCompilationOptions(
+                OutputKind.DynamicallyLinkedLibrary,
+                scriptClassName:=name,
+                globalImports:=globalImports,
+                metadataReferenceResolver:=metadataReferenceResolver,
+                sourceReferenceResolver:=sourceReferenceResolver,
+                assemblyIdentityComparer:=DesktopAssemblyIdentityComparer.Default)
         End Function
 
         Public Overrides Function CanExecuteCode(text As String) As Boolean
@@ -67,8 +71,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.Interactive
                 Return True
             End If
 
-            ' TODO (tomat): Return Syntax.IsCompleteSubmission(SyntaxTree.ParseCompilationUnit(text, options:=ParseOptions))
-            Return True
+            Return SyntaxFactory.IsCompleteSubmission(SyntaxFactory.ParseSyntaxTree(text, options:=ParseOptions))
         End Function
     End Class
 End Namespace

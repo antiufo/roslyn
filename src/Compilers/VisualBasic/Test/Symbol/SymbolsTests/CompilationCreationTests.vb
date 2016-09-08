@@ -96,7 +96,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
 
             Assert.Equal(SpecialType.None, c107.SpecialType)
 
-            Dim arrayOfc107 = New ArrayTypeSymbol(c107, Nothing, 1, c1)
+            Dim arrayOfc107 = ArrayTypeSymbol.CreateVBArray(c107, Nothing, 1, c1)
 
             Assert.Equal(SpecialType.None, arrayOfc107.SpecialType)
 
@@ -196,7 +196,7 @@ End Namespace
 
         End Sub
 
-        <WorkItem(753078, "DevDiv")>
+        <WorkItem(753078, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/753078")>
         <Fact()>
         Public Sub RootNamespaceUpdateViaChangeInCompilationOptions()
             Dim sourceTree = ParserTestUtilities.Parse(
@@ -2130,7 +2130,7 @@ End Class
             CheckCompilationSyntaxTrees(compilation4, tree2, tree3)
         End Sub
 
-        <WorkItem(578706, "DevDiv")>
+        <WorkItem(578706, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/578706")>
         <Fact>
         Public Sub DeclaringCompilationOfAddedModule()
             Dim source1 =

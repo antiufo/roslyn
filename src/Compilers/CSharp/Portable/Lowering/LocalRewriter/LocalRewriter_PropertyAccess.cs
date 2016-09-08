@@ -22,7 +22,7 @@ namespace Microsoft.CodeAnalysis.CSharp
         }
 
         private BoundExpression MakePropertyAccess(
-            CSharpSyntaxNode syntax,
+            SyntaxNode syntax,
             BoundExpression rewrittenReceiverOpt,
             PropertySymbol propertySymbol,
             LookupResultKind resultKind,
@@ -35,7 +35,7 @@ namespace Microsoft.CodeAnalysis.CSharp
             if (rewrittenReceiverOpt != null && rewrittenReceiverOpt.Type.IsArray() && !isLeftOfAssignment)
             {
                 var asArrayType = (ArrayTypeSymbol)rewrittenReceiverOpt.Type;
-                if (asArrayType.Rank == 1)
+                if (asArrayType.IsSZArray)
                 {
                     // NOTE: we are not interested in potential badness of Array.Length property.
                     // If it is bad reference compare will not succeed.
@@ -47,7 +47,7 @@ namespace Microsoft.CodeAnalysis.CSharp
                 }
             }
 
-            if (isLeftOfAssignment)
+            if (isLeftOfAssignment && propertySymbol.RefKind == RefKind.None)
             {
                 // This is a property set access. We return a BoundPropertyAccess node here.
                 // This node will be rewritten with MakePropertyAssignment when rewriting the enclosing BoundAssignmentOperator.
@@ -63,13 +63,13 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
         }
 
-        private BoundExpression MakePropertyGetAccess(CSharpSyntaxNode syntax, BoundExpression rewrittenReceiver, PropertySymbol property, BoundPropertyAccess oldNodeOpt)
+        private BoundExpression MakePropertyGetAccess(SyntaxNode syntax, BoundExpression rewrittenReceiver, PropertySymbol property, BoundPropertyAccess oldNodeOpt)
         {
             return MakePropertyGetAccess(syntax, rewrittenReceiver, property, ImmutableArray<BoundExpression>.Empty, null, oldNodeOpt);
         }
 
         private BoundExpression MakePropertyGetAccess(
-            CSharpSyntaxNode syntax,
+            SyntaxNode syntax,
             BoundExpression rewrittenReceiver,
             PropertySymbol property,
             ImmutableArray<BoundExpression> rewrittenArguments,

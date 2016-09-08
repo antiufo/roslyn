@@ -277,6 +277,19 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
             return false;
         }
 
+        private static bool IsDynamicAssignment(ExpressionSyntax castExpression, SemanticModel semanticModel, CancellationToken cancellationToken)
+        {
+            if (castExpression.IsRightSideOfAnyAssignExpression())
+            {
+                var assignmentExpression = (AssignmentExpressionSyntax)castExpression.Parent;
+                var assignmentType = semanticModel.GetTypeInfo(assignmentExpression.Left, cancellationToken).Type;
+
+                return assignmentType?.Kind == SymbolKind.DynamicType;
+            }
+
+            return false;
+        }
+
         public static bool IsUnnecessaryCast(this CastExpressionSyntax cast, SemanticModel semanticModel, CancellationToken cancellationToken)
         {
             var speculationAnalyzer = new SpeculationAnalyzer(cast,
@@ -307,10 +320,12 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
             // 1. Dynamic Expressions
             // 2. If there is any other argument which is dynamic
             // 3. Dynamic Invocation
+            // 4. Assignment to dynamic
             if ((expressionType != null &&
                 (expressionType.IsErrorType() ||
                  expressionType.Kind == SymbolKind.DynamicType)) ||
-                IsDynamicInvocation(cast, semanticModel, cancellationToken))
+                IsDynamicInvocation(cast, semanticModel, cancellationToken) ||
+                IsDynamicAssignment(cast, semanticModel, cancellationToken))
             {
                 return false;
             }
@@ -323,6 +338,14 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions
             if (CastPassedToParamsArrayDefinitelyCantBeRemoved(cast, castType, semanticModel, cancellationToken))
             {
                 return false;
+            }
+
+            // A casts to object can always be removed from an expression inside of an interpolation, since it'll be converted to object
+            // in order to call string.Format(...) anyway.
+            if (castType?.SpecialType == SpecialType.System_Object &&
+                cast.WalkUpParentheses().IsParentKind(SyntaxKind.Interpolation))
+            {
+                return true;
             }
 
             if (speculationAnalyzer.ReplacementChangesSemantics())

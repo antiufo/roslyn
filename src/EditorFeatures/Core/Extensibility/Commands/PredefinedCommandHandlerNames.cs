@@ -25,6 +25,11 @@ namespace Microsoft.CodeAnalysis.Editor
         public const string ChangeSignature = "Change Signature";
 
         /// <summary>
+        /// Command handler name for Class View.
+        /// </summary>
+        public const string ClassView = "Class View";
+
+        /// <summary>
         /// Command handler name for Comment Selection.
         /// </summary>
         /// <remarks></remarks>
@@ -50,7 +55,7 @@ namespace Microsoft.CodeAnalysis.Editor
         /// <summary>
         /// Command handler name for Encapsulate Field.
         /// </summary>
-        public const string EncapsulateField = "EncapsulateField";
+        public const string EncapsulateField = nameof(EncapsulateField);
 
         /// <summary>
         /// Command handler name for End Construct.
@@ -88,6 +93,16 @@ namespace Microsoft.CodeAnalysis.Editor
         public const string GoToDefinition = "Go To Definition Command Handler";
 
         /// <summary>
+        /// Command handler name for Go to Implementation.
+        /// </summary>
+        public const string GoToImplementation = "Go To Implementation Command Handler";
+
+        /// <summary>
+        /// Command handler name for Go to Adjacent Member.
+        /// </summary>
+        public const string GoToAdjacentMember = "Go To Adjacent Member Command Handler";
+
+        /// <summary>
         /// Command handler name for Indent.
         /// </summary>
         public const string Indent = "Indent Command Handler";
@@ -96,7 +111,7 @@ namespace Microsoft.CodeAnalysis.Editor
         /// Command handler name for IntelliSense. This command handler handles some commands for
         /// <see cref="Completion"/>, <see cref="QuickInfo"/>, and <see cref="SignatureHelp"/>.
         /// </summary>
-        public const string IntelliSense = "IntelliSense";
+        public const string IntelliSense = nameof(IntelliSense);
 
         /// <summary>
         /// Command handler name for Navigate to Highlighted Reference.
@@ -129,5 +144,10 @@ namespace Microsoft.CodeAnalysis.Editor
         /// handled by the <see cref="IntelliSense"/> command handler.
         /// </summary>
         public const string SignatureHelp = "Signature Help Command Handler";
+
+        /// <summary>
+        /// Command handler name for Paste Content in Interactive Format. 
+        /// </summary>
+        public const string InteractivePaste = "Interactive Paste Command Handler";
     }
 }

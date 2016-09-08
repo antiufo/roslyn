@@ -5,10 +5,8 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeGeneration;
-using Microsoft.CodeAnalysis.FindSymbols;
 using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Shared.Extensions
@@ -23,24 +21,6 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
                 yield return current;
                 current = current.BaseType;
             }
-        }
-
-        public static Task<IEnumerable<INamedTypeSymbol>> FindDerivedClassesAsync(
-            this INamedTypeSymbol type,
-            Solution solution,
-            IImmutableSet<Project> projects,
-            CancellationToken cancellationToken)
-        {
-            return DependentTypeFinder.FindDerivedClassesAsync(type, solution, projects, cancellationToken);
-        }
-
-        public static Task<IEnumerable<INamedTypeSymbol>> FindImplementingTypesAsync(
-            this INamedTypeSymbol type,
-            Solution solution,
-            IImmutableSet<Project> projects,
-            CancellationToken cancellationToken)
-        {
-            return DependentTypeFinder.FindImplementingTypesAsync(type, solution, projects, cancellationToken);
         }
 
         public static IEnumerable<ITypeParameterSymbol> GetAllTypeParameters(this INamedTypeSymbol symbol)
@@ -357,7 +337,7 @@ namespace Microsoft.CodeAnalysis.Shared.Extensions
             var interfacesToImplement = new List<INamedTypeSymbol>(
                 interfaces.SelectMany(i => i.GetAllInterfacesIncludingThis()).Distinct());
 
-            // However, there's no need to reimplement any interfaces that our base types already
+            // However, there's no need to re-implement any interfaces that our base types already
             // implement.  By definition they must contain all the necessary methods.
             var baseType = classOrStructType.BaseType;
             var alreadyImplementedInterfaces = baseType == null || allowReimplementation

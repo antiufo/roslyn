@@ -1,12 +1,7 @@
 ﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 Imports Microsoft.CodeAnalysis
-Imports Microsoft.CodeAnalysis.Test.Utilities
-Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.CodeAnalysis.VisualBasic
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-
 Imports Roslyn.Test.Utilities
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests.Semantics
@@ -120,7 +115,7 @@ Imports System.Reflection
             libCompilation.VerifyDiagnostics()
         End Sub
 
-        <WorkItem(546110, "DevDiv")>
+        <WorkItem(546110, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546110")>
         <Fact()>
         Public Sub TestAssemblyImport1()
             Dim compilation = CreateCompilationWithMscorlib(
@@ -138,7 +133,7 @@ End Class
             compilation.AssertTheseDiagnostics(<errors></errors>, suppressInfos:=False)
         End Sub
 
-        <WorkItem(546110, "DevDiv")>
+        <WorkItem(546110, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546110")>
         <Fact()>
         Public Sub TestAssemblyImport2()
             Dim compilation = CreateCompilationWithMscorlib(
@@ -162,7 +157,7 @@ Imports System.Runtime.CompilerServices
             'Assert.Equal(1, unusedImports.Count)
         End Sub
 
-        <WorkItem(747219, "DevDiv")>
+        <WorkItem(747219, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/747219")>
         <Fact()>
         Public Sub SemanticModelCallDoesNotCountsAsUse()
             Dim compilation = CreateCompilationWithMscorlib(
@@ -195,7 +190,7 @@ Imports System.Collections.Generic
                                                </errors>, suppressInfos:=False)
         End Sub
 
-        <WorkItem(747219, "DevDiv")>
+        <WorkItem(747219, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/747219")>
         <Fact()>
         Public Sub INF_UnusedImportStatement_Single()
             Dim compilation = CreateCompilationWithMscorlib(
@@ -212,7 +207,7 @@ Imports System
                                                </errors>, suppressInfos:=False)
         End Sub
 
-        <WorkItem(747219, "DevDiv")>
+        <WorkItem(747219, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/747219")>
         <Fact()>
         Public Sub INF_UnusedImportStatement_Multiple()
             Dim compilation = CreateCompilationWithMscorlib(
@@ -229,7 +224,7 @@ Imports System, System.Diagnostics
                                                </errors>, suppressInfos:=False)
         End Sub
 
-        <WorkItem(747219, "DevDiv")>
+        <WorkItem(747219, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/747219")>
         <Fact()>
         Public Sub INF_UnusedImportClause_Single()
             Dim compilation = CreateCompilationWithMscorlib(
@@ -249,7 +244,7 @@ Imports System, System.Diagnostics
                                                </errors>, suppressInfos:=False)
         End Sub
 
-        <WorkItem(747219, "DevDiv")>
+        <WorkItem(747219, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/747219")>
         <Fact()>
         Public Sub INF_UnusedImportClause_Multiple()
             Dim compilation = CreateCompilationWithMscorlibAndVBRuntime(
@@ -275,7 +270,7 @@ Imports System, System.Diagnostics, System.Collections
                                                </errors>, suppressInfos:=False)
         End Sub
 
-        <WorkItem(747219, "DevDiv")>
+        <WorkItem(747219, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/747219")>
         <Fact()>
         Public Sub CrefCountsAsUse()
             Dim source =
@@ -301,17 +296,17 @@ Imports System
             CreateCompilationWithMscorlib(source, parseOptions:=New VisualBasicParseOptions(documentationMode:=DocumentationMode.Diagnose)).AssertTheseDiagnostics(<errors></errors>, suppressInfos:=False)
         End Sub
 
-        <ClrOnlyFact(ClrOnlyReason.Submission)>
+        <Fact>
         Public Sub UnusedImportInteractive()
-            Dim tree = Parse("Imports System", options:=TestOptions.Interactive)
-            Dim compilation = VisualBasicCompilation.CreateSubmission("sub1", tree, {MscorlibRef_v4_0_30316_17626})
+            Dim tree = Parse("Imports System", options:=TestOptions.Script)
+            Dim compilation = VisualBasicCompilation.CreateScriptCompilation("sub1", tree, {MscorlibRef_v4_0_30316_17626})
             compilation.AssertNoDiagnostics(suppressInfos:=False)
         End Sub
 
         <Fact()>
         Public Sub UnusedImportScript()
             Dim tree = Parse("Imports System", options:=TestOptions.Script)
-            Dim compilation = CreateCompilationWithMscorlib(tree)
+            Dim compilation = CreateCompilationWithMscorlib45({tree})
             compilation.AssertTheseDiagnostics(
                 <errors>
 BC50001: Unused import statement.

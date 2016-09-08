@@ -93,6 +93,9 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions.ContextQuery
             // using (expr)
             //   |
 
+            // fixed (void* v = &expr)
+            //   |
+
             // lock (expr)
             //   |
 
@@ -167,10 +170,12 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions.ContextQuery
                 var parent = token.Parent;
                 if (parent.IsKind(SyntaxKind.ForStatement) ||
                     parent.IsKind(SyntaxKind.ForEachStatement) ||
+                    parent.IsKind(SyntaxKind.ForEachComponentStatement) ||
                     parent.IsKind(SyntaxKind.WhileStatement) ||
                     parent.IsKind(SyntaxKind.IfStatement) ||
                     parent.IsKind(SyntaxKind.LockStatement) ||
-                    parent.IsKind(SyntaxKind.UsingStatement))
+                    parent.IsKind(SyntaxKind.UsingStatement) ||
+                    parent.IsKind(SyntaxKind.FixedStatement))
                 {
                     return true;
                 }
@@ -459,15 +464,23 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions.ContextQuery
                 }
             }
 
+
             if (targetToken.Kind() == SyntaxKind.OpenParenToken ||
                 targetToken.Kind() == SyntaxKind.CommaToken)
             {
                 if (targetToken.Parent.IsKind(SyntaxKind.ArgumentList))
                 {
-                    if (targetToken.Parent.IsParentKind(SyntaxKind.InvocationExpression) ||
-                        targetToken.Parent.IsParentKind(SyntaxKind.ObjectCreationExpression) ||
+                    if (targetToken.Parent.IsParentKind(SyntaxKind.ObjectCreationExpression) ||
                         targetToken.Parent.IsParentKind(SyntaxKind.BaseConstructorInitializer) ||
                         targetToken.Parent.IsParentKind(SyntaxKind.ThisConstructorInitializer))
+                    {
+                        return true;
+                    }
+
+                    // var( |
+                    // var(expr, |
+                    // Those are more likely to be deconstruction-declarations being typed than invocations a method "var"
+                    if (targetToken.Parent.IsParentKind(SyntaxKind.InvocationExpression) && !targetToken.IsInvocationOfVarExpression())
                     {
                         return true;
                     }
@@ -508,10 +521,17 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions.ContextQuery
             return false;
         }
 
+        public static bool IsAnyAccessorDeclarationContext(this SyntaxToken targetToken, int position, SyntaxKind kind = SyntaxKind.None)
+        {
+            return targetToken.IsAccessorDeclarationContext<EventDeclarationSyntax>(position, kind) ||
+                targetToken.IsAccessorDeclarationContext<PropertyDeclarationSyntax>(position, kind) ||
+                targetToken.IsAccessorDeclarationContext<IndexerDeclarationSyntax>(position, kind);
+        }
+
         public static bool IsAccessorDeclarationContext<TMemberNode>(this SyntaxToken targetToken, int position, SyntaxKind kind = SyntaxKind.None)
             where TMemberNode : SyntaxNode
         {
-            if (!IsAccessorDeclarationContextWorker(targetToken))
+            if (!IsAccessorDeclarationContextWorker(ref targetToken))
             {
                 return false;
             }
@@ -541,7 +561,7 @@ namespace Microsoft.CodeAnalysis.CSharp.Extensions.ContextQuery
             return decl != null;
         }
 
-        private static bool IsAccessorDeclarationContextWorker(SyntaxToken targetToken)
+        private static bool IsAccessorDeclarationContextWorker(ref SyntaxToken targetToken)
         {
             // cases:
             //   int Foo { |

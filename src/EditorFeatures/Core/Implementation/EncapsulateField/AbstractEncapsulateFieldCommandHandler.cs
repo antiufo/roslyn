@@ -1,11 +1,11 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System;
 using System.Linq;
 using Microsoft.CodeAnalysis.Editor.Commands;
 using Microsoft.CodeAnalysis.Editor.Host;
+using Microsoft.CodeAnalysis.Editor.Shared;
 using Microsoft.CodeAnalysis.Editor.Shared.Extensions;
-using Microsoft.CodeAnalysis.Editor.Shared.SuggestionSupport;
 using Microsoft.CodeAnalysis.EncapsulateField;
 using Microsoft.CodeAnalysis.Notification;
 using Microsoft.CodeAnalysis.Shared.Extensions;
@@ -38,8 +38,8 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.EncapsulateField
             }
 
             var workspace = document.Project.Solution.Workspace;
-            var supportSuggestionService = workspace.Services.GetService<IDocumentSupportsSuggestionService>();
-            if (!supportSuggestionService.SupportsRefactorings(document))
+            var supportsFeatureService = workspace.Services.GetService<IDocumentSupportsFeatureService>();
+            if (!supportsFeatureService.SupportsRefactorings(document))
             {
                 nextHandler();
                 return;
@@ -47,8 +47,8 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.EncapsulateField
 
             bool executed = false;
             _waitIndicator.Wait(
-                title: EditorFeaturesResources.Encapsulatefield,
-                message: EditorFeaturesResources.ApplyingEncapsulateField,
+                title: EditorFeaturesResources.Encapsulate_Field,
+                message: EditorFeaturesResources.Applying_Encapsulate_Field_refactoring,
                 allowCancel: true,
                 action: waitContext =>
             {
@@ -93,7 +93,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.EncapsulateField
             if (result == null)
             {
                 var notificationService = workspace.Services.GetService<INotificationService>();
-                notificationService.SendNotification(EditorFeaturesResources.PleaseSelectTheDefinitionOf, severity: NotificationSeverity.Error);
+                notificationService.SendNotification(EditorFeaturesResources.Please_select_the_definition_of_the_field_to_encapsulate, severity: NotificationSeverity.Error);
                 return false;
             }
 
@@ -105,9 +105,9 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.EncapsulateField
             if (previewService != null)
             {
                 finalSolution = previewService.PreviewChanges(
-                    string.Format(EditorFeaturesResources.PreviewChangesOf, EditorFeaturesResources.Encapsulatefield),
+                    string.Format(EditorFeaturesResources.Preview_Changes_0, EditorFeaturesResources.Encapsulate_Field),
                      "vs.csharp.refactoring.preview",
-                    EditorFeaturesResources.EncapsulateFieldTitle,
+                    EditorFeaturesResources.Encapsulate_Field_colon,
                     result.GetNameAsync(cancellationToken).WaitAndGetResult(cancellationToken),
                     result.GetGlyphAsync(cancellationToken).WaitAndGetResult(cancellationToken),
                     finalSolution,
@@ -120,7 +120,7 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.EncapsulateField
                 return true;
             }
 
-            using (var undoTransaction = _undoManager.GetTextBufferUndoManager(args.SubjectBuffer).TextBufferUndoHistory.CreateTransaction(EditorFeaturesResources.Encapsulatefield))
+            using (var undoTransaction = _undoManager.GetTextBufferUndoManager(args.SubjectBuffer).TextBufferUndoHistory.CreateTransaction(EditorFeaturesResources.Encapsulate_Field))
             {
                 if (!workspace.TryApplyChanges(finalSolution))
                 {
@@ -142,8 +142,8 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.EncapsulateField
                 return nextHandler();
             }
 
-            var supportSuggestionService = document.Project.Solution.Workspace.Services.GetService<IDocumentSupportsSuggestionService>();
-            if (!supportSuggestionService.SupportsRefactorings(document))
+            var supportsFeatureService = document.Project.Solution.Workspace.Services.GetService<IDocumentSupportsFeatureService>();
+            if (!supportsFeatureService.SupportsRefactorings(document))
             {
                 return nextHandler();
             }

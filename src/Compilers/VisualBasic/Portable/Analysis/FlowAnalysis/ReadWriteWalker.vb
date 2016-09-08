@@ -139,7 +139,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             End Select
         End Sub
 
-        Private Function IsCompilerGeneratedTempLocal(variable As Symbol) As Boolean
+        Private Shared Function IsCompilerGeneratedTempLocal(variable As Symbol) As Boolean
             Return TypeOf (variable) Is SynthesizedLocal
         End Function
 
@@ -196,7 +196,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 NoteWrite(node.RangeVariableOpt, Nothing)
             End If
 
-            Visit(node.Source)
+            VisitRvalue(node.Source)
             Return Nothing
         End Function
 
@@ -205,7 +205,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 NoteWrite(node.RangeVariable, Nothing)
             End If
 
-            Visit(node.Value)
+            VisitRvalue(node.Value)
             Return Nothing
         End Function
 

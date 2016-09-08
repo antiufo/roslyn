@@ -18,7 +18,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.ChangeSignature
     Public Class ReorderParametersViewModelTests
 
         <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ReorderParameters_MethodWithTwoNormalParameters_UpDownArrowsNotOfferedWhenNoSelection()
+        Public Async Function ReorderParameters_MethodWithTwoNormalParameters_UpDownArrowsNotOfferedWhenNoSelection() As Tasks.Task
             Dim markup = <Text><![CDATA[
 class MyClass
 {
@@ -27,7 +27,7 @@ class MyClass
     }
 }"]]></Text>
 
-            Dim viewModelTestState = GetViewModelTestState(markup, LanguageNames.CSharp)
+            Dim viewModelTestState = Await GetViewModelTestStateAsync(markup, LanguageNames.CSharp)
             Dim viewModel = viewModelTestState.ViewModel
             VerifyOpeningState(viewModel, "public void M(int x, string y)")
 
@@ -44,10 +44,10 @@ class MyClass
                 canMoveDown:=False)
 
             monitor.Detach()
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ReorderParameters_MethodWithTwoNormalParameters_OkButtonNotOfferedAfterPermutationsResultingInOriginalOrdering()
+        Public Async Function ReorderParameters_MethodWithTwoNormalParameters_OkButtonNotOfferedAfterPermutationsResultingInOriginalOrdering() As Tasks.Task
             Dim markup = <Text><![CDATA[
 class MyClass
 {
@@ -56,7 +56,7 @@ class MyClass
     }
 }"]]></Text>
 
-            Dim viewModelTestState = GetViewModelTestState(markup, LanguageNames.CSharp)
+            Dim viewModelTestState = Await GetViewModelTestStateAsync(markup, LanguageNames.CSharp)
             Dim viewModel = viewModelTestState.ViewModel
             VerifyOpeningState(viewModel, "public void M(int x, string y)")
 
@@ -71,10 +71,10 @@ class MyClass
                 isOkButtonEnabled:=False,
                 canMoveUp:=False,
                 canMoveDown:=True)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ReorderParameters_MethodWithTwoNormalParameters_MoveFirstParameterDown()
+        Public Async Function ReorderParameters_MethodWithTwoNormalParameters_MoveFirstParameterDown() As Tasks.Task
             Dim markup = <Text><![CDATA[
 class MyClass
 {
@@ -83,16 +83,19 @@ class MyClass
     }
 }"]]></Text>
 
-            Dim viewModelTestState = GetViewModelTestState(markup, LanguageNames.CSharp)
+            Dim viewModelTestState = Await GetViewModelTestStateAsync(markup, LanguageNames.CSharp)
             Dim viewModel = viewModelTestState.ViewModel
             VerifyOpeningState(viewModel, "public void M(int x, string y)")
 
             Dim monitor = New PropertyChangedTestMonitor(viewModel)
             monitor.AddExpectation(Function() viewModel.IsOkButtonEnabled)
             monitor.AddExpectation(Function() viewModel.SignatureDisplay)
+            monitor.AddExpectation(Function() viewModel.SignaturePreviewAutomationText)
             monitor.AddExpectation(Function() viewModel.AllParameters)
             monitor.AddExpectation(Function() viewModel.CanMoveUp)
+            monitor.AddExpectation(Function() viewModel.MoveUpAutomationText)
             monitor.AddExpectation(Function() viewModel.CanMoveDown)
+            monitor.AddExpectation(Function() viewModel.MoveDownAutomationText)
 
             viewModel.MoveDown()
 
@@ -106,10 +109,10 @@ class MyClass
                 signatureDisplay:="public void M(string y, int x)")
 
             monitor.Detach()
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ReorderParameters_MethodWithTwoNormalParameters_MoveSecondParameterUp()
+        Public Async Function ReorderParameters_MethodWithTwoNormalParameters_RemoveFirstParameter() As Tasks.Task
             Dim markup = <Text><![CDATA[
 class MyClass
 {
@@ -118,7 +121,45 @@ class MyClass
     }
 }"]]></Text>
 
-            Dim viewModelTestState = GetViewModelTestState(markup, LanguageNames.CSharp)
+            Dim viewModelTestState = Await GetViewModelTestStateAsync(markup, LanguageNames.CSharp)
+            Dim viewModel = viewModelTestState.ViewModel
+            VerifyOpeningState(viewModel, "public void M(int x, string y)")
+
+            Dim monitor = New PropertyChangedTestMonitor(viewModel)
+            monitor.AddExpectation(Function() viewModel.IsOkButtonEnabled)
+            monitor.AddExpectation(Function() viewModel.SignatureDisplay)
+            monitor.AddExpectation(Function() viewModel.SignaturePreviewAutomationText)
+            monitor.AddExpectation(Function() viewModel.AllParameters)
+            monitor.AddExpectation(Function() viewModel.CanRemove)
+            monitor.AddExpectation(Function() viewModel.RemoveAutomationText)
+            monitor.AddExpectation(Function() viewModel.CanRestore)
+            monitor.AddExpectation(Function() viewModel.RestoreAutomationText)
+
+            viewModel.Remove()
+
+            VerifyAlteredState(
+                viewModelTestState,
+                monitor,
+                isOkButtonEnabled:=True,
+                canMoveUp:=False,
+                canMoveDown:=True,
+                permutation:={1},
+                signatureDisplay:="public void M(string y)")
+
+            monitor.Detach()
+        End Function
+
+        <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
+        Public Async Function ReorderParameters_MethodWithTwoNormalParameters_MoveSecondParameterUp() As Tasks.Task
+            Dim markup = <Text><![CDATA[
+class MyClass
+{
+    public void $$M(int x, string y)
+    {
+    }
+}"]]></Text>
+
+            Dim viewModelTestState = Await GetViewModelTestStateAsync(markup, LanguageNames.CSharp)
             Dim viewModel = viewModelTestState.ViewModel
             VerifyOpeningState(viewModel, "public void M(int x, string y)")
 
@@ -132,9 +173,12 @@ class MyClass
             Dim monitor = New PropertyChangedTestMonitor(viewModel)
             monitor.AddExpectation(Function() viewModel.IsOkButtonEnabled)
             monitor.AddExpectation(Function() viewModel.SignatureDisplay)
+            monitor.AddExpectation(Function() viewModel.SignaturePreviewAutomationText)
             monitor.AddExpectation(Function() viewModel.AllParameters)
             monitor.AddExpectation(Function() viewModel.CanMoveUp)
+            monitor.AddExpectation(Function() viewModel.MoveUpAutomationText)
             monitor.AddExpectation(Function() viewModel.CanMoveDown)
+            monitor.AddExpectation(Function() viewModel.MoveDownAutomationText)
 
             viewModel.MoveUp()
 
@@ -149,10 +193,10 @@ class MyClass
 
             monitor.VerifyExpectations()
             monitor.Detach()
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.ChangeSignature)>
-        Public Sub ChangeSignature_ParameterDisplay_MultidimensionalArray()
+        Public Async Function ChangeSignature_ParameterDisplay_MultidimensionalArray() As Tasks.Task
             Dim markup = <Text><![CDATA[
 class MyClass
 {
@@ -161,14 +205,14 @@ class MyClass
     }
 }"]]></Text>
 
-            Dim viewModelTestState = GetViewModelTestState(markup, LanguageNames.CSharp)
+            Dim viewModelTestState = Await GetViewModelTestStateAsync(markup, LanguageNames.CSharp)
             Dim viewModel = viewModelTestState.ViewModel
             VerifyOpeningState(viewModel, "public void M(int[,] x)")
             VerifyParameterInfo(
                 viewModel,
                 parameterIndex:=0,
                 type:="int[,]")
-        End Sub
+        End Function
 
         Private Sub VerifyAlteredState(
            viewModelTestState As ChangeSignatureViewModelTestState,
@@ -198,7 +242,7 @@ class MyClass
             End If
 
             If permutation IsNot Nothing Then
-                AssertPermuted({1, 0}, viewModel.AllParameters, viewModelTestState.OriginalParameterList)
+                AssertPermuted(permutation, viewModel.AllParameters, viewModelTestState.OriginalParameterList)
             End If
 
             If signatureDisplay IsNot Nothing Then
@@ -208,9 +252,10 @@ class MyClass
         End Sub
 
         Private Sub AssertPermuted(permutation As Integer(), actualParameterList As List(Of ChangeSignatureDialogViewModel.ParameterViewModel), originalParameterList As ImmutableArray(Of IParameterSymbol))
+            Dim finalParameterList = actualParameterList.Where(Function(p) Not p.IsRemoved)
             For index = 0 To permutation.Length - 1
                 Dim expected = originalParameterList(permutation(index))
-                Assert.Equal(expected, actualParameterList(index).ParameterSymbol)
+                Assert.Equal(expected, finalParameterList(index).ParameterSymbol)
             Next
         End Sub
 
@@ -265,7 +310,7 @@ class MyClass
 
         End Sub
 
-        Private Function GetViewModelTestState(markup As XElement, languageName As String) As ChangeSignatureViewModelTestState
+        Private Async Function GetViewModelTestStateAsync(markup As XElement, languageName As String) As Tasks.Task(Of ChangeSignatureViewModelTestState)
 
             Dim workspaceXml =
             <Workspace>
@@ -274,15 +319,16 @@ class MyClass
                 </Project>
             </Workspace>
 
-            Using workspace = TestWorkspaceFactory.CreateWorkspace(workspaceXml)
+            Using workspace = Await TestWorkspace.CreateAsync(workspaceXml)
                 Dim doc = workspace.Documents.Single()
                 Dim workspaceDoc = workspace.CurrentSolution.GetDocument(doc.Id)
                 If (Not doc.CursorPosition.HasValue) Then
                     Assert.True(False, "Missing caret location in document.")
                 End If
 
-                Dim token = workspaceDoc.GetSyntaxTreeAsync().Result.GetTouchingWord(doc.CursorPosition.Value, workspaceDoc.Project.LanguageServices.GetService(Of ISyntaxFactsService)(), CancellationToken.None)
-                Dim symbol = workspaceDoc.GetSemanticModelAsync().Result.GetDeclaredSymbol(token.Parent)
+                Dim tree = Await workspaceDoc.GetSyntaxTreeAsync()
+                Dim token = Await tree.GetTouchingWordAsync(doc.CursorPosition.Value, workspaceDoc.Project.LanguageServices.GetService(Of ISyntaxFactsService)(), CancellationToken.None)
+                Dim symbol = (Await workspaceDoc.GetSemanticModelAsync()).GetDeclaredSymbol(token.Parent)
 
                 Dim viewModel = New ChangeSignatureDialogViewModel(New TestNotificationService(), ParameterConfiguration.Create(symbol.GetParameters().ToList(), symbol.IsExtensionMethod()), symbol, workspace.ExportProvider.GetExport(Of ClassificationTypeMap)().Value)
                 Return New ChangeSignatureViewModelTestState(viewModel, symbol.GetParameters())

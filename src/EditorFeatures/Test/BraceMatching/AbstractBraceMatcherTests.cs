@@ -3,8 +3,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Editor;
 using Microsoft.CodeAnalysis.Editor.Shared.Extensions;
 using Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces;
 using Microsoft.CodeAnalysis.Text;
@@ -20,17 +20,17 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.BraceMatching
             return workspace.CurrentSolution.GetDocument(workspace.Documents.First().Id);
         }
 
-        protected abstract TestWorkspace CreateWorkspaceFromCode(string code);
+        protected abstract Task<TestWorkspace> CreateWorkspaceFromCodeAsync(string code, ParseOptions options);
 
-        protected void Test(string markup, string expectedCode)
+        protected async Task TestAsync(string markup, string expectedCode, ParseOptions options = null)
         {
-            using (var workspace = CreateWorkspaceFromCode(markup))
+            using (var workspace = await CreateWorkspaceFromCodeAsync(markup, options))
             {
                 var position = workspace.Documents.Single().CursorPosition.Value;
                 var document = GetDocument(workspace);
                 var braceMatcher = workspace.GetService<IBraceMatchingService>();
 
-                var foundSpan = braceMatcher.FindMatchingSpanAsync(document, position, CancellationToken.None).Result;
+                var foundSpan = await braceMatcher.FindMatchingSpanAsync(document, position, CancellationToken.None);
 
                 string parsedExpectedCode;
                 IList<TextSpan> expectedSpans;

@@ -1,7 +1,5 @@
 ﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
-using Microsoft.CodeAnalysis.CSharp.Symbols;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
 using Microsoft.CodeAnalysis.Test.Utilities;
 using Roslyn.Test.Utilities;
@@ -121,7 +119,7 @@ public class C
 }
 ";
 
-            var compilation = CreateCompilationWithMscorlib(
+            var compilation = CreateCompilationWithMscorlib45(
                 new[]
                 {
                     Parse(csx, options: TestOptions.Script),
@@ -136,7 +134,7 @@ public class C
                 Diagnostic(ErrorCode.WRN_MainIgnored, "Main").WithArguments("C.Main()"));
         }
 
-        [WorkItem(528677, "DevDiv")]
+        [WorkItem(528677, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/528677")]
         [Fact]
         public void ERR_OneEntryPointAndOverload()
         {
@@ -768,7 +766,7 @@ class C
 }
 ";
 
-            var compilation = CreateCompilationWithMscorlib(
+            var compilation = CreateCompilationWithMscorlib45(
                 new[]
                 {
                     SyntaxFactory.ParseSyntaxTree(csx, options: TestOptions.Script),
@@ -1073,7 +1071,7 @@ class C
                 Diagnostic(ErrorCode.ERR_NoEntryPoint));
         }
 
-        [WorkItem(543468, "DevDiv")]
+        [WorkItem(543468, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543468")]
         [Fact()]
         public void RefParameterForMain()
         {
@@ -1090,7 +1088,7 @@ class C
                 Diagnostic(ErrorCode.ERR_NoEntryPoint));
         }
 
-        [WorkItem(544478, "DevDiv")]
+        [WorkItem(544478, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544478")]
         [Fact()]
         public void ArglistParameterForMain()
         {
@@ -1114,7 +1112,7 @@ class D
                 Diagnostic(ErrorCode.ERR_NoEntryPoint));
         }
 
-        [WorkItem(543467, "DevDiv")]
+        [WorkItem(543467, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543467")]
         [Fact()]
         public void OutParameterForMain()
         {
@@ -1236,7 +1234,7 @@ class D
                 Diagnostic(ErrorCode.ERR_NoMainInClass, "D").WithArguments("D"));
         }
 
-        [WorkItem(753028, "DevDiv")]
+        [WorkItem(753028, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/753028")]
         [Fact]
         public void RootMemberNamedScript()
         {
@@ -1358,7 +1356,7 @@ static class Main
                 Diagnostic(ErrorCode.ERR_NoMainInClass, "Main").WithArguments("Main"));
         }
 
-        [WorkItem(543511, "DevDiv")]
+        [WorkItem(543511, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543511")]
         [Fact()]
         public void ExplicitMainType_OneDefineTwoDeclareValidMainForPartial()
         {
@@ -1377,7 +1375,7 @@ partial class Program
             CreateCompilationWithMscorlib(source, options: TestOptions.ReleaseExe.WithMainTypeName("Program")).VerifyDiagnostics();
         }
 
-        [Fact, WorkItem(543512, "DevDiv")]
+        [Fact, WorkItem(543512, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/543512")]
         public void DynamicParameterForMain()
         {
             // TODO: This should produce:
@@ -1398,7 +1396,7 @@ class Myderive : Mybase
                     Diagnostic(ErrorCode.WRN_InvalidMainSig, "Main").WithArguments("Mybase.Main(dynamic)"));
         }
 
-        [WorkItem(630763, "DevDiv")]
+        [WorkItem(630763, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/630763")]
         [Fact()]
         public void Bug630763()
         {
@@ -1424,6 +1422,26 @@ public class C
             compilation.VerifyDiagnostics(
     // error CS5001: Program does not contain a static 'Main' method suitable for an entry point
     Diagnostic(ErrorCode.ERR_NoEntryPoint)
+                );
+        }
+
+        [Fact, WorkItem(12113, "https://github.com/dotnet/roslyn/issues/12113")]
+        public void LazyEntryPoint()
+        {
+            string source = @"
+class Program
+{
+    public static void Main() {}
+    public static void Main(string[] args) {}
+}
+";
+            var compilation = CreateCompilationWithMscorlib(source, options: TestOptions.DebugExe);
+            var model = compilation.GetSemanticModel(compilation.SyntaxTrees[0]);
+            Assert.Empty(model.GetDiagnostics());
+            compilation.VerifyDiagnostics(
+                // (4,24): error CS0017: Program has more than one entry point defined. Compile with /main to specify the type that contains the entry point.
+                //     public static void Main() {}
+                Diagnostic(ErrorCode.ERR_MultipleEntryPoints, "Main").WithLocation(4, 24)
                 );
         }
     }

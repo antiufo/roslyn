@@ -1,26 +1,21 @@
 ' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
-Imports System.Xml
 Imports System.Xml.Linq
 Imports Microsoft.CodeAnalysis.Editor.Commands
-Imports Microsoft.CodeAnalysis.Editor.Host
 Imports Microsoft.CodeAnalysis.Editor.Shared.Options
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Extensions
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
 Imports Microsoft.CodeAnalysis.Editor.VisualBasic.ImplementInterface
-Imports Microsoft.CodeAnalysis.Options
 Imports Microsoft.CodeAnalysis.Text
 Imports Microsoft.VisualStudio.Text
-Imports Microsoft.VisualStudio.Text.Classification
 Imports Microsoft.VisualStudio.Text.Editor
 Imports Microsoft.VisualStudio.Text.Operations
-Imports Roslyn.Test.Utilities
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.CodeActions.ImplementInterface
     Public Class ImplementInterfaceCommandHandlerTests
 
-        Private Sub Test(code As XElement, expectedText As XElement, nextHandler As Action(Of IWpfTextView, TestWorkspace), assertion As Action(Of String, String, IWpfTextView))
-            Using workspace = GetWorkspace(code.NormalizedValue)
+        Private Async Function TestAsync(code As XElement, expectedText As XElement, nextHandler As Action(Of IWpfTextView, TestWorkspace), assertion As Action(Of String, String, IWpfTextView)) As Threading.Tasks.Task
+            Using workspace = Await GetWorkspaceAsync(code.NormalizedValue)
                 Dim commandHandler = MoveCaretAndCreateCommandHandler(workspace)
                 Dim view = workspace.Documents.Single().GetTextView()
 
@@ -30,7 +25,7 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.CodeActions.Implem
 
                 assertion(expectedText.NormalizedValue, text, view)
             End Using
-        End Sub
+        End Function
 
         Private Shared Function MoveCaretAndCreateCommandHandler(workspace As TestWorkspace) As ICommandHandler(Of ReturnKeyCommandArgs)
             Dim document = workspace.Documents.Single()
@@ -41,8 +36,8 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.CodeActions.Implem
             Return New ImplementInterfaceCommandHandler(workspace.GetService(Of IEditorOperationsFactoryService))
         End Function
 
-        Private Function GetWorkspace(code As String) As TestWorkspace
-            Return TestWorkspaceFactory.CreateWorkspace(
+        Private Function GetWorkspaceAsync(code As String) As Threading.Tasks.Task(Of TestWorkspace)
+            Return TestWorkspace.CreateAsync(
                 <Workspace>
                     <Project Language="Visual Basic" AssemblyName="Assembly" CommonReferences="true">
                         <Document>
@@ -52,9 +47,9 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.CodeActions.Implem
                 </Workspace>)
         End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
-        Public Sub FeatureDoesNothingIfDisabled()
-            Using workspace = GetWorkspace("
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
+        Public Async Function FeatureDoesNothingIfDisabled() As Threading.Tasks.Task
+            Using workspace = Await GetWorkspaceAsync("
 Imports System
 
 Class Foo
@@ -65,19 +60,17 @@ Interface IFoo
 End Interface")
 
                 Dim commandHandler = MoveCaretAndCreateCommandHandler(workspace)
-
-                Dim optionServices = workspace.Services.GetService(Of IOptionService)()
-                optionServices.SetOptions(optionServices.GetOptions().WithChangedOption(FeatureOnOffOptions.AutomaticInsertionOfAbstractOrInterfaceMembers, LanguageNames.VisualBasic, False))
+                workspace.Options = workspace.Options.WithChangedOption(FeatureOnOffOptions.AutomaticInsertionOfAbstractOrInterfaceMembers, LanguageNames.VisualBasic, False)
 
                 Dim nextHandlerCalled = False
                 Dim view = workspace.Documents.Single().GetTextView()
                 commandHandler.ExecuteCommand(New ReturnKeyCommandArgs(view, view.TextBuffer), Sub() nextHandlerCalled = True)
                 Assert.True(nextHandlerCalled, "Next handler wasn't called, which means the feature did run")
             End Using
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
-        Public Sub TestInterfaceWithSingleSub()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
+        Public Async Function TestInterfaceWithSingleSub() As Task
             Dim code = <text>
 Imports System
 
@@ -93,15 +86,15 @@ End Interface</text>
         Throw New NotImplementedException()
     End Sub</text>
 
-            Test(code,
+            Await TestAsync(code,
              expectedText,
              Sub() Throw New Exception("The operation should have been handled."),
              Sub(expected, actual, view) AssertEx.AssertContainsToleratingWhitespaceDifferences(expected, actual))
-        End Sub
+        End Function
 
-        <WorkItem(544161)>
-        <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
-        Public Sub TestInterfacesWithDuplicateMember()
+        <WorkItem(544161, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544161")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
+        Public Async Function TestInterfacesWithDuplicateMember() As Task
             Dim code = <text>
 Interface IFoo
     Sub Foo()
@@ -122,14 +115,14 @@ End Class</text>
         Throw New NotImplementedException()
     End Sub</text>
 
-            Test(code,
+            Await TestAsync(code,
              expectedText,
              Sub() Throw New Exception("The operation should have been handled."),
              Sub(expected, actual, view) AssertEx.AssertContainsToleratingWhitespaceDifferences(expected, actual))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
-        Public Sub TestInterfaceWithManyMembers()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
+        Public Async Function TestInterfaceWithManyMembers() As Task
             Dim code = <text>
 Imports System
 
@@ -161,14 +154,14 @@ End Interface</text>
         Throw New NotImplementedException()
     End Function</text>
 
-            Test(code,
+            Await TestAsync(code,
              expectedText,
              Sub() Throw New Exception("The operation should have been handled."),
              Sub(expected, actual, view) AssertEx.AssertContainsToleratingWhitespaceDifferences(expected, actual))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
-        Public Sub TestMultipleInterfaces()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
+        Public Async Function TestMultipleInterfaces() As Task
             Dim code = <text>
 Imports System
 
@@ -191,14 +184,14 @@ End Interface</text>
         Throw New NotImplementedException()
     End Function</text>
 
-            Test(code,
+            Await TestAsync(code,
                  expectedText,
                  Sub() Throw New Exception("The operation should have been handled."),
                  Sub(expected, actual, view) AssertEx.AssertContainsToleratingWhitespaceDifferences(expected, actual))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
-        Public Sub TestWrongCursorPlacement()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
+        Public Async Function TestWrongCursorPlacement() As Task
             Dim code = <text>
 Imports System
 
@@ -218,7 +211,7 @@ Class Foo
     , IBar
 End Class</text>
 
-            Test(code,
+            Await TestAsync(code,
                  expectedText,
                  Sub(view, workspace)
                      Dim operations = workspace.GetService(Of IEditorOperationsFactoryService)() _
@@ -226,12 +219,12 @@ End Class</text>
                      operations.InsertNewLine()
                  End Sub,
                  Sub(expected, actual, view) AssertEx.AssertContainsToleratingWhitespaceDifferences(expected, actual))
-        End Sub
+        End Function
 
-        <WorkItem(530553)>
-        <WorkItem(544087)>
-        <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
-        Public Sub TestInvocationAfterWhitespaceTrivia()
+        <WorkItem(530553, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530553")>
+        <WorkItem(544087, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544087")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
+        Public Async Function TestInvocationAfterWhitespaceTrivia() As Task
             Dim code = <text>
 Imports System
 
@@ -247,16 +240,16 @@ End Interface</text>
         Throw New NotImplementedException()
     End Sub</text>
 
-            Test(code,
+            Await TestAsync(code,
                  expectedText,
                  Sub() Throw New Exception("The operation should have been handled."),
                  Sub(expected, actual, view) AssertEx.AssertContainsToleratingWhitespaceDifferences(expected, actual))
 
-        End Sub
+        End Function
 
-        <WorkItem(544089)>
-        <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
-        Public Sub TestInvocationAfterCommentTrivia()
+        <WorkItem(544089, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544089")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
+        Public Async Function TestInvocationAfterCommentTrivia() As Task
             Dim code = <text>
 Imports System
 
@@ -273,14 +266,14 @@ End Interface</text>
         Throw New NotImplementedException()
     End Sub</text>
 
-            Test(code,
+            Await TestAsync(code,
                  expectedText,
                  Sub() Throw New Exception("The operation should have been handled."),
                  Sub(expected, actual, view) AssertEx.AssertContainsToleratingWhitespaceDifferences(expected, actual))
-        End Sub
+        End Function
 
-        <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
-        Public Sub TestNoMembersToImplement()
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
+        Public Async Function TestNoMembersToImplement() As Task
             Dim code = <text>
 Class Foo
     Implements IFoo$$
@@ -297,7 +290,7 @@ End Class
 Interface IFoo
 End Interface</text>
 
-            Test(code,
+            Await TestAsync(code,
                  expectedText,
                  Sub(view, workspace)
                      Dim operations = workspace.GetService(Of IEditorOperationsFactoryService)() _
@@ -305,11 +298,11 @@ End Interface</text>
                      operations.InsertNewLine()
                  End Sub,
                  Sub(expected, actual, view) Assert.Equal(expected.Trim(), actual.Trim()))
-        End Sub
+        End Function
 
-        <WorkItem(544211)>
-        <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
-        Public Sub TestWithEndBlockMissing()
+        <WorkItem(544211, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544211")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
+        Public Async Function TestWithEndBlockMissing() As Task
             Dim code = <text>
 Imports System
 
@@ -327,15 +320,15 @@ Class Foo
     End Function
 End Class</text>
 
-            Test(code,
+            Await TestAsync(code,
                  expectedText,
                  Sub() Throw New Exception("The operation should have been handled."),
                  Sub(expected, actual, view) AssertEx.AssertEqualToleratingWhitespaceDifferences(expected, actual))
-        End Sub
+        End Function
 
-        <WorkItem(529302)>
-        <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
-        Public Sub TestWithEndBlockMissing2()
+        <WorkItem(529302, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529302")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
+        Public Async Function TestWithEndBlockMissing2() As Task
             Dim code = <text>
 Imports System
 Class Foo
@@ -357,17 +350,17 @@ Class Foo
     End Interface
 End Class</text>
 
-            Test(code,
+            Await TestAsync(code,
                  expectedText,
                  Sub() Throw New Exception("The operation should have been handled."),
                  Sub(expected, actual, view) AssertEx.AssertEqualToleratingWhitespaceDifferences(expected, actual))
-        End Sub
+        End Function
 
-        <WorkItem(530553)>
-        <WorkItem(529337)>
-        <WorkItem(674621)>
-        <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
-        Public Sub TestWithStatementSeparator()
+        <WorkItem(530553, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530553")>
+        <WorkItem(529337, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529337")>
+        <WorkItem(674621, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/674621")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
+        Public Async Function TestWithStatementSeparator() As Task
             Dim code = <text>
 Imports System
 Interface IFoo
@@ -389,7 +382,7 @@ Class CFoo : Implements IFoo
     End Sub
 End Class
 </text>
-            Test(code,
+            Await TestAsync(code,
                  expectedText,
                  Sub(view, workspace)
                      Dim operations = workspace.GetService(Of IEditorOperationsFactoryService)() _
@@ -397,11 +390,11 @@ End Class
                      operations.InsertNewLine()
                  End Sub,
                  Sub(expected, actual, view) AssertEx.AssertEqualToleratingWhitespaceDifferences(expected, actual))
-        End Sub
+        End Function
 
-        <WorkItem(529360)>
-        <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
-        Public Sub TestCursorNotOnSameLine()
+        <WorkItem(529360, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529360")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
+        Public Async Function TestCursorNotOnSameLine() As Task
             Dim code = <text>
 Imports System
 Interface IFoo
@@ -424,7 +417,7 @@ Public Class Bar
 
 End Class
 </text>
-            Test(code,
+            Await TestAsync(code,
                  expectedText,
                  Sub(view, workspace)
                      Dim operations = workspace.GetService(Of IEditorOperationsFactoryService)() _
@@ -432,11 +425,11 @@ End Class
                      operations.InsertNewLine()
                  End Sub,
                  Sub(expected, actual, view) AssertEx.AssertEqualToleratingWhitespaceDifferences(expected, actual))
-        End Sub
+        End Function
 
-        <WorkItem(529722)>
-        <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
-        Public Sub TestCursorPlacedOnBlankLineAfter()
+        <WorkItem(529722, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529722")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
+        Public Async Function TestCursorPlacedOnBlankLineAfter() As Task
             Dim code = <text>
 Imports System
 Public Class Bar
@@ -455,7 +448,7 @@ Public Class Bar
       End Function
 End Class
 </text>
-            Test(code,
+            Await TestAsync(code,
                  expectedText,
                  Sub(view, workspace)
                      Dim operations = workspace.GetService(Of IEditorOperationsFactoryService)() _
@@ -467,11 +460,11 @@ End Class
                      Assert.Equal(4, view.Caret.Position.BufferPosition.GetContainingLine().LineNumber)
                      Assert.Equal(4, view.Caret.Position.VirtualSpaces)
                  End Sub)
-        End Sub
+        End Function
 
-        <WorkItem(545867)>
-        <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
-        Public Sub TestMultipleImplementationWithCaseDifference()
+        <WorkItem(545867, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545867")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
+        Public Async Function TestMultipleImplementationWithCaseDifference() As Task
             Dim code = <text>
 Interface IA
     Sub foo()
@@ -499,15 +492,15 @@ Class C
     End Sub
 End Class</text>
 
-            Test(code,
+            Await TestAsync(code,
              expectedText,
              Sub() Throw New Exception("The operation should have been handled."),
              Sub(expected, actual, view) AssertEx.AssertContainsToleratingWhitespaceDifferences(expected, actual))
-        End Sub
+        End Function
 
-        <WorkItem(927478)>
-        <Fact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
-        Public Sub TestFullyQualifiedName()
+        <WorkItem(927478, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/927478")>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.CodeActionsImplementInterface)>
+        Public Async Function TestFullyQualifiedName() As Task
             Dim code = <text>
 Namespace N
     Interface IA
@@ -529,10 +522,10 @@ Class C
     End Sub
 End Class</text>
 
-            Test(code,
+            Await TestAsync(code,
              expectedText,
              Sub() Throw New Exception("The operation should have been handled."),
              Sub(expected, actual, view) AssertEx.AssertContainsToleratingWhitespaceDifferences(expected, actual))
-        End Sub
+        End Function
     End Class
 End Namespace

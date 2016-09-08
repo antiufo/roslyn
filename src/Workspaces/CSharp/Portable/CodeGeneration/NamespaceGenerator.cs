@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
+// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System;
 using System.Collections.Generic;
@@ -21,12 +21,13 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGeneration
             NamespaceDeclarationSyntax destination,
             INamespaceSymbol @namespace,
             CodeGenerationOptions options,
-            IList<bool> availableIndices)
+            IList<bool> availableIndices,
+            CancellationToken cancellationToken)
         {
-            var declaration = GenerateNamespaceDeclaration(service, @namespace, options);
+            var declaration = GenerateNamespaceDeclaration(service, @namespace, options, cancellationToken);
             if (!(declaration is NamespaceDeclarationSyntax))
             {
-                throw new ArgumentException(CSharpWorkspaceResources.NamespaceCanNotBeAddedIn);
+                throw new ArgumentException(CSharpWorkspaceResources.Namespace_can_not_be_added_in_this_destination);
             }
 
             var members = Insert(destination.Members, (NamespaceDeclarationSyntax)declaration, options, availableIndices);
@@ -38,12 +39,13 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGeneration
             CompilationUnitSyntax destination,
             INamespaceSymbol @namespace,
             CodeGenerationOptions options,
-            IList<bool> availableIndices)
+            IList<bool> availableIndices,
+            CancellationToken cancellationToken)
         {
-            var declaration = GenerateNamespaceDeclaration(service, @namespace, options);
+            var declaration = GenerateNamespaceDeclaration(service, @namespace, options, cancellationToken);
             if (!(declaration is NamespaceDeclarationSyntax))
             {
-                throw new ArgumentException(CSharpWorkspaceResources.NamespaceCanNotBeAddedIn);
+                throw new ArgumentException(CSharpWorkspaceResources.Namespace_can_not_be_added_in_this_destination);
             }
 
             var members = Insert(destination.Members, (NamespaceDeclarationSyntax)declaration, options, availableIndices);
@@ -53,7 +55,8 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGeneration
         internal static SyntaxNode GenerateNamespaceDeclaration(
             ICodeGenerationService service,
             INamespaceSymbol @namespace,
-            CodeGenerationOptions options)
+            CodeGenerationOptions options,
+            CancellationToken cancellationToken)
         {
             options = options ?? CodeGenerationOptions.Default;
 
@@ -64,7 +67,7 @@ namespace Microsoft.CodeAnalysis.CSharp.CodeGeneration
             var declaration = GetDeclarationSyntaxWithoutMembers(@namespace, innermostNamespace, name, options);
 
             declaration = options.GenerateMembers
-                    ? service.AddMembers(declaration, innermostNamespace.GetMembers(), options)
+                    ? service.AddMembers(declaration, innermostNamespace.GetMembers(), options, cancellationToken)
                     : declaration;
 
             return AddCleanupAnnotationsTo(declaration);

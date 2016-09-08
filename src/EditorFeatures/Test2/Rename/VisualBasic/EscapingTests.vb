@@ -4,10 +4,16 @@ Imports Microsoft.CodeAnalysis.Rename.ConflictEngine
 
 Namespace Microsoft.CodeAnalysis.Editor.UnitTests.Rename.VisualBasic
     Public Class EscapingTests
+        Private ReadOnly _outputHelper As Abstractions.ITestOutputHelper
+
+        Public Sub New(outputHelper As Abstractions.ITestOutputHelper)
+            _outputHelper = outputHelper
+        End Sub
+
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub EscapeTypeWhenRenamingToKeyword()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -28,7 +34,7 @@ End Module
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub DoNotEscapeMethodAfterDotWhenRenamingToKeyword()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -50,7 +56,7 @@ End Module
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub EscapeAttributeWhenRenamingToRegularKeyword()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document><![CDATA[
@@ -76,7 +82,7 @@ End Module
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub EscapeAttributeUsageWhenRenamingToAssembly()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document><![CDATA[
@@ -103,7 +109,7 @@ End Module
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub EscapeAttributeUsageWhenRenamingToModule()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document><![CDATA[
@@ -130,7 +136,7 @@ End Module
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub EscapeWhenRenamingMethodToNew()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -159,7 +165,7 @@ End Class
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub EscapeWhenRenamingMethodToRem()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -179,10 +185,10 @@ End Module
         End Sub
 
         <Fact>
-        <WorkItem(542104)>
+        <WorkItem(542104, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542104")>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub EscapeWhenRenamingPropertyToMid()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -206,10 +212,10 @@ End Module
         End Sub
 
         <Fact>
-        <WorkItem(542104)>
+        <WorkItem(542104, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542104")>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub EscapeWhenRenamingPropertyToStrangelyCasedMid()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -233,10 +239,10 @@ End Module
         End Sub
 
         <Fact>
-        <WorkItem(542166)>
+        <WorkItem(542166, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542166")>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub EscapeWhenRenamingToMidWithTypeCharacters1()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -260,10 +266,10 @@ End Module
         End Sub
 
         <Fact>
-        <WorkItem(542166)>
+        <WorkItem(542166, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542166")>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub EscapeWhenRenamingToMidWithTypeCharacters2()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -289,7 +295,7 @@ End Module
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub EscapePreserveKeywordWhenRenamingWithRedim()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -310,9 +316,9 @@ End Module
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
-        <WorkItem(542322)>
+        <WorkItem(542322, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542322")>
         Public Sub EscapeRemKeywordWhenDoingTypeNameQualification()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -336,9 +342,9 @@ End Module
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
-        <WorkItem(542322)>
+        <WorkItem(542322, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542322")>
         Public Sub EscapeNewKeywordWhenDoingTypeNameQualification()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -362,9 +368,9 @@ End Module
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
-        <WorkItem(542322)>
+        <WorkItem(542322, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542322")>
         Public Sub EscapeRemKeywordWhenDoingMeQualification()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -388,9 +394,9 @@ End Class
 
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
-        <WorkItem(542322)>
+        <WorkItem(542322, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/542322")>
         Public Sub DoNotEscapeIfKeywordWhenDoingMeQualification()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -412,11 +418,11 @@ End Class
             End Using
         End Sub
 
-        <WorkItem(529935)>
+        <WorkItem(529935, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529935")>
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub EscapeIdentifierWhenRenamingToRemKeyword()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -434,11 +440,11 @@ End Module
             End Using
         End Sub
 
-        <WorkItem(529935)>
+        <WorkItem(529935, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529935")>
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub EscapeIdentifierWhenRenamingToRemKeyword2()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -457,11 +463,11 @@ End Module
             End Using
         End Sub
 
-        <WorkItem(529938)>
+        <WorkItem(529938, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529938")>
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub RenamingToEscapedIdentifierWithFullwidthSquareBracket()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document>
@@ -478,11 +484,11 @@ End Module
             End Using
         End Sub
 
-        <WorkItem(529932)>
+        <WorkItem(529932, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529932")>
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub EscapeContextualKeywordsInQuery1()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document><![CDATA[
@@ -518,11 +524,11 @@ End Module
             End Using
         End Sub
 
-        <WorkItem(530805)>
+        <WorkItem(530805, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/530805")>
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub EscapeMidIfNeeded()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document><![CDATA[
@@ -542,11 +548,11 @@ End Module
             End Using
         End Sub
 
-        <WorkItem(607067)>
+        <WorkItem(607067, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/607067")>
         <Fact>
         <Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub RenamingToRemAndUsingTypeCharactersIsNotAllowed()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                 <Workspace>
                     <Project Language="Visual Basic" CommonReferences="true">
                         <Document><![CDATA[
@@ -565,9 +571,9 @@ End Module
             End Using
         End Sub
 
-        <Fact(Skip:="668158"), Trait(Traits.Feature, Traits.Features.Rename)>
+        <WpfFact, Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub RenameIdentifierBracketed()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                     <Workspace>
                         <Project Language="Visual Basic" AssemblyName="VBAssembly" CommonReferences="true">
                             <Document FilePath="Test.vb">
@@ -588,7 +594,7 @@ End Module
 
         <Fact, Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub RenameToIdentifierBracketed()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                     <Workspace>
                         <Project Language="Visual Basic" AssemblyName="VBAssembly" CommonReferences="true">
                             <Document FilePath="Test.vb">
@@ -609,7 +615,7 @@ End Module
 
         <Fact, Trait(Traits.Feature, Traits.Features.Rename)>
         Public Sub RenameToIdentifierBracketed_2()
-            Using result = RenameEngineResult.Create(
+            Using result = RenameEngineResult.Create(_outputHelper,
                     <Workspace>
                         <Project Language="Visual Basic" AssemblyName="VBAssembly" CommonReferences="true">
                             <Document FilePath="Test.vb">

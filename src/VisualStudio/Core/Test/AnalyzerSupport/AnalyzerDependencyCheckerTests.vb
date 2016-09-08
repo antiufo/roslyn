@@ -1,5 +1,6 @@
 ﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
+Imports System.Collections.Immutable
 Imports System.IO
 Imports System.Text
 Imports Microsoft.CodeAnalysis
@@ -7,6 +8,8 @@ Imports Microsoft.CodeAnalysis.Test.Utilities
 Imports Microsoft.VisualStudio.LanguageServices.Implementation
 Imports Microsoft.Win32
 Imports Roslyn.Test.Utilities
+
+Imports System.FormattableString
 
 Namespace Microsoft.VisualStudio.LanguageServices.UnitTests
     Public Class AnalyzerDependencyCheckerTests
@@ -16,7 +19,8 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests
         Private Shared ReadOnly Property MSBuildDirectory As String
             Get
                 If s_msbuildDirectory Is Nothing Then
-                    Dim key = Registry.LocalMachine.OpenSubKey("SOFTWARE\Microsoft\MSBuild\ToolsVersions\14.0", False)
+                    Dim vsVersion = If(Environment.GetEnvironmentVariable("VisualStudioVersion"), "14.0")
+                    Dim key = Registry.LocalMachine.OpenSubKey(Invariant($"SOFTWARE\Microsoft\MSBuild\ToolsVersions\{vsVersion}"), False)
 
                     If key IsNot Nothing Then
                         Dim toolsPath = key.GetValue("MSBuildToolsPath")
@@ -40,7 +44,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests
             Return {New IgnorableAssemblyIdentityList({mscorlib})}
         End Function
 
-        <Fact, WorkItem(1064914)>
+        <Fact, WorkItem(1064914, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064914")>
         Public Sub ConflictsTest1()
             ' Dependency Graph:
             '   A
@@ -56,7 +60,7 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests
 
         End Sub
 
-        <Fact, WorkItem(1064914)>
+        <Fact, WorkItem(1064914, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064914")>
         Public Sub ConflictsTest2()
             ' Dependency graph:
             '   A --> B
@@ -83,7 +87,7 @@ public class A
             End Using
         End Sub
 
-        <Fact, WorkItem(1064914)>
+        <Fact, WorkItem(1064914, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064914")>
         Public Sub ConflictsTest3()
             ' Dependency graph:
             '   A --> B
@@ -117,7 +121,7 @@ public class A
 
         End Sub
 
-        <Fact, WorkItem(1064914)>
+        <Fact, WorkItem(1064914, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064914")>
         Public Sub ConflictsTest4()
             ' Dependency graph:
             '   A --> B
@@ -157,7 +161,7 @@ public class C
             End Using
         End Sub
 
-        <Fact, WorkItem(1064914)>
+        <Fact, WorkItem(1064914, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064914")>
         Public Sub ConflictsTest5()
             ' Dependency graph:
             '   Directory 1:
@@ -199,7 +203,7 @@ public class C
             End Using
         End Sub
 
-        <Fact, WorkItem(1064914)>
+        <Fact, WorkItem(1064914, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064914")>
         Public Sub ConflictsTest6()
             ' Dependency graph:
             ' A -
@@ -240,7 +244,7 @@ public class B
             End Using
         End Sub
 
-        <Fact, WorkItem(1064914)>
+        <Fact, WorkItem(1064914, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064914")>
         Public Sub ConflictsTest7()
             ' Dependency graph:
             '   Directory 1:
@@ -281,7 +285,7 @@ public class B
             End Using
         End Sub
 
-        <Fact, WorkItem(1064914)>
+        <Fact, WorkItem(1064914, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064914")>
         Public Sub ConflictsTest8()
             ' Dependency graph:
             '   Directory 1:
@@ -341,7 +345,7 @@ public class C
             End Using
         End Sub
 
-        <Fact, WorkItem(1064914)>
+        <Fact, WorkItem(1064914, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064914")>
         Public Sub ConflictsTest9()
             ' Dependency graph:
             '   Directory 1:
@@ -411,7 +415,7 @@ public class D
             End Using
         End Sub
 
-        <Fact, WorkItem(1064914)>
+        <Fact, WorkItem(1064914, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064914")>
         Public Sub ConflictsTest10()
             ' Dependency graph:
             '   Directory 1:
@@ -491,7 +495,7 @@ public class E
             End Using
         End Sub
 
-        <Fact, WorkItem(1064914)>
+        <Fact, WorkItem(1064914, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064914")>
         Public Sub ConflictsTest11()
             ' Dependency graph:
             '   Directory 1:
@@ -542,7 +546,7 @@ public class B
             End Using
         End Sub
 
-        <Fact, WorkItem(1064914)>
+        <Fact, WorkItem(1064914, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064914")>
         Public Sub ConflictsTest12()
             ' Dependency graph:
             '   Directory 1:
@@ -599,7 +603,7 @@ public class B
             End Using
         End Sub
 
-        <Fact, WorkItem(1064914)>
+        <Fact, WorkItem(1064914, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064914")>
         Public Sub ConflictsTest13()
             ' Dependency graph:
             '   Directory 1:
@@ -657,7 +661,7 @@ public class B
             End Using
         End Sub
 
-        <Fact, WorkItem(1064914)>
+        <Fact, WorkItem(1064914, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1064914")>
         Public Sub ConflictsTest14()
             ' Dependency graph:
             '   Directory 1:
@@ -825,6 +829,49 @@ public class A
         <Fact, WorkItem(3020, "https://github.com/dotnet/roslyn/issues/3020")>
         Public Sub IgnorableAssemblyNamePrefixList_DoesNotIncludeItem()
             Dim ignorableAssemblyList = New IgnorableAssemblyNamePrefixList("Beta")
+
+            Dim alpha As AssemblyIdentity = Nothing
+            AssemblyIdentity.TryParseDisplayName("Alpha, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089", alpha)
+
+            Assert.False(ignorableAssemblyList.Includes(alpha))
+        End Sub
+
+        <Fact, WorkItem(3020, "https://github.com/dotnet/roslyn/issues/3020")>
+        Public Sub IgnorableAssemblyNameList_IncludesItem_Prefix()
+            Dim ignorableAssemblyList = New IgnorableAssemblyNameList(ImmutableHashSet.Create("Alpha"))
+
+            Dim alphaBeta As AssemblyIdentity = Nothing
+            AssemblyIdentity.TryParseDisplayName("Alpha.Beta, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089", alphaBeta)
+
+            Assert.False(ignorableAssemblyList.Includes(alphaBeta))
+        End Sub
+
+        <Fact, WorkItem(3020, "https://github.com/dotnet/roslyn/issues/3020")>
+        Public Sub IgnorableAssemblyNameList_IncludesItem_WholeName()
+            Dim ignorableAssemblyList = New IgnorableAssemblyNameList(ImmutableHashSet.Create("Alpha"))
+
+            ' No version
+            Dim alpha As AssemblyIdentity = Nothing
+            AssemblyIdentity.TryParseDisplayName("Alpha", alpha)
+
+            Assert.True(ignorableAssemblyList.Includes(alpha))
+
+            ' With a version.
+            alpha = Nothing
+            AssemblyIdentity.TryParseDisplayName("Alpha, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089", alpha)
+
+            Assert.True(ignorableAssemblyList.Includes(alpha))
+
+            ' Version doesn't matter.
+            alpha = Nothing
+            AssemblyIdentity.TryParseDisplayName("Alpha, Version=5.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089", alpha)
+
+            Assert.True(ignorableAssemblyList.Includes(alpha))
+        End Sub
+
+        <Fact, WorkItem(3020, "https://github.com/dotnet/roslyn/issues/3020")>
+        Public Sub IgnorableAssemblyNameList_DoesNotIncludeItem()
+            Dim ignorableAssemblyList = New IgnorableAssemblyNameList(ImmutableHashSet.Create("Beta"))
 
             Dim alpha As AssemblyIdentity = Nothing
             AssemblyIdentity.TryParseDisplayName("Alpha, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089", alpha)

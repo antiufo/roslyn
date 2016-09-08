@@ -18,7 +18,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         Inherits AbstractRegionDataFlowPass
 
         ' TODO: normalize the result by removing variables that are unassigned in an unmodified flow analysis.
-        Public Sub New(info As FlowAnalysisInfo, region As FlowAnalysisRegionInfo, unassignedVariables As HashSet(Of Symbol))
+        Private Sub New(info As FlowAnalysisInfo, region As FlowAnalysisRegionInfo, unassignedVariables As HashSet(Of Symbol))
             MyBase.New(info, region, unassignedVariables, trackStructsWithIntrinsicTypedFields:=True)
         End Sub
 
@@ -103,7 +103,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         End Sub
 
         Protected Overrides Sub ReportUnassigned(local As Symbol,
-                                                 node As VisualBasicSyntaxNode,
+                                                 node As SyntaxNode,
                                                  rwContext As ReadWriteContext,
                                                  Optional slot As Integer = SlotKind.NotTracked,
                                                  Optional boundFieldAccess As BoundFieldAccess = Nothing)

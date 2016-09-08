@@ -11,8 +11,8 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.KeywordHighlightin
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestPropertySample1_1()
-            Test(<Text>
+        Public Async Function TestPropertySample1_1() As Task
+            Await TestAsync(<Text>
 Class C
 {|Cursor:[|Public Property|]|} Foo As Integer [|Implements|] IFoo.Foo
     Get
@@ -23,11 +23,11 @@ Class C
     End Set
 [|End Property|]
 End Class</Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestPropertySample1_2()
-            Test(<Text>
+        Public Async Function TestPropertySample1_2() As Task
+            Await TestAsync(<Text>
 Class C
 [|Public Property|] Foo As Integer {|Cursor:[|Implements|]|} IFoo.Foo
     Get
@@ -38,11 +38,11 @@ Class C
     End Set
 [|End Property|]
 End Class</Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestPropertySample1_3()
-            Test(<Text>
+        Public Async Function TestPropertySample1_3() As Task
+            Await TestAsync(<Text>
 Class C
 [|Public Property|] Foo As Integer [|Implements|] IFoo.Foo
     Get
@@ -53,6 +53,6 @@ Class C
     End Set
 {|Cursor:[|End Property|]|}
 End Class</Text>)
-        End Sub
+        End Function
     End Class
 End Namespace

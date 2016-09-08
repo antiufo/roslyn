@@ -1,13 +1,16 @@
 // Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Linq;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
+using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Editor.Host;
+using Microsoft.CodeAnalysis.Shared.TestHooks;
 using Microsoft.VisualStudio.Language.Intellisense;
 using Microsoft.VisualStudio.Text;
-using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
 {
@@ -23,10 +26,13 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
             Workspace workspace,
             ITextBuffer subjectBuffer,
             ICodeActionEditHandlerService editHandler,
+            IWaitIndicator waitIndicator,
             CodeFix fix,
+            CodeAction action,
             object provider,
-            SuggestedActionSet fixAllSuggestedActionSet)
-            : base(workspace, subjectBuffer, editHandler, fix.Action, provider)
+            SuggestedActionSet fixAllSuggestedActionSet,
+            IAsynchronousOperationListener operationListener)
+            : base(workspace, subjectBuffer, editHandler, waitIndicator, action, provider, operationListener)
         {
             _fix = fix;
             _fixAllSuggestedActionSet = fixAllSuggestedActionSet;
@@ -39,12 +45,16 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
         internal static SuggestedActionSet GetFixAllSuggestedActionSet(
             CodeAction action,
             int actionCount,
-            FixAllCodeActionContext fixAllCodeActionContext,
+            FixAllState fixAllState,
+            IEnumerable<FixAllScope> supportedScopes,
+            Diagnostic firstDiagnostic,
             Workspace workspace,
             ITextBuffer subjectBuffer,
-            ICodeActionEditHandlerService editHandler)
+            ICodeActionEditHandlerService editHandler,
+            IWaitIndicator waitIndicator,
+            IAsynchronousOperationListener operationListener)
         {
-            if (fixAllCodeActionContext == null)
+            if (fixAllState == null)
             {
                 return null;
             }
@@ -55,16 +65,17 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
             }
 
             var fixAllSuggestedActions = ImmutableArray.CreateBuilder<FixAllSuggestedAction>();
-            foreach (var scope in fixAllCodeActionContext.SupportedScopes)
+            foreach (var scope in supportedScopes)
             {
-                var fixAllContext = fixAllCodeActionContext.GetContextForScopeAndActionId(scope, action.EquivalenceKey);
-                var fixAllAction = new FixAllCodeAction(fixAllContext, fixAllCodeActionContext.FixAllProvider);
-                var fixAllSuggestedAction = new FixAllSuggestedAction(workspace, subjectBuffer, editHandler,
-                    fixAllAction, fixAllCodeActionContext.FixAllProvider, fixAllCodeActionContext.OriginalDiagnostics.First());
+                var fixAllStateForScope = fixAllState.WithScopeAndEquivalenceKey(scope, action.EquivalenceKey);
+                var fixAllAction = new FixAllCodeAction(fixAllStateForScope, showPreviewChangesDialog: true);
+                var fixAllSuggestedAction = new FixAllSuggestedAction(
+                    workspace, subjectBuffer, editHandler, waitIndicator, fixAllAction,
+                    fixAllStateForScope.FixAllProvider, firstDiagnostic, operationListener);
                 fixAllSuggestedActions.Add(fixAllSuggestedAction);
             }
 
-            return new SuggestedActionSet(fixAllSuggestedActions.ToImmutable(), title: EditorFeaturesResources.FixAllOccurrencesIn);
+            return new SuggestedActionSet(fixAllSuggestedActions.ToImmutable(), title: EditorFeaturesResources.Fix_all_occurrences_in);
         }
 
         public string GetDiagnosticID()
@@ -81,9 +92,9 @@ namespace Microsoft.CodeAnalysis.Editor.Implementation.Suggestions
             return diagnostic.GetHashCode().ToString(CultureInfo.InvariantCulture);
         }
 
-        protected override Diagnostic GetDiagnostic()
+        protected override DiagnosticData GetDiagnostic()
         {
-            return _fix.PrimaryDiagnostic;
+            return _fix.GetPrimaryDiagnosticData();
         }
 
         protected override SuggestedActionSet GetFixAllSuggestedActionSet()

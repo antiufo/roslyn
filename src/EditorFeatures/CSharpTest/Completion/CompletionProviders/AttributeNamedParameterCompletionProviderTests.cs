@@ -1,8 +1,10 @@
 ﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Completion;
 using Microsoft.CodeAnalysis.CSharp.Completion.Providers;
 using Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Completion.CompletionProviders;
+using Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces;
 using Roslyn.Test.Utilities;
 using Xunit;
 
@@ -10,13 +12,17 @@ namespace Microsoft.CodeAnalysis.Editor.CSharp.UnitTests.Completion.CompletionSe
 {
     public class AttributeNamedParameterCompletionProviderTests : AbstractCSharpCompletionProviderTests
     {
-        internal override CompletionListProvider CreateCompletionProvider()
+        public AttributeNamedParameterCompletionProviderTests(CSharpTestWorkspaceFixture workspaceFixture) : base(workspaceFixture)
+        {
+        }
+
+        internal override CompletionProvider CreateCompletionProvider()
         {
             return new AttributeNamedParameterCompletionProvider();
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void SendEnterThroughToEditorTest()
+        public async Task SendEnterThroughToEditorTest()
         {
             const string markup = @"
 using System;
@@ -33,12 +39,13 @@ public class TestAttribute : Attribute
     public ConsoleColor Color { get; set; }
 }";
 
-            VerifySendEnterThroughToEnter(markup, "Color =", sendThroughEnterEnabled: false, expected: false);
-            VerifySendEnterThroughToEnter(markup, "Color =", sendThroughEnterEnabled: true, expected: true);
+            await VerifySendEnterThroughToEnterAsync(markup, "Color =", sendThroughEnterOption: EnterKeyRule.Never, expected: false);
+            await VerifySendEnterThroughToEnterAsync(markup, "Color =", sendThroughEnterOption: EnterKeyRule.AfterFullyTypedWord, expected: true);
+            await VerifySendEnterThroughToEnterAsync(markup, "Color =", sendThroughEnterOption: EnterKeyRule.Always, expected: true);
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void CommitCharacterTest()
+        public async Task CommitCharacterTest()
         {
             const string markup = @"
 using System;
@@ -55,11 +62,11 @@ public class TestAttribute : Attribute
     public ConsoleColor Color { get; set; }
 }";
 
-            VerifyCommonCommitCharacters(markup, textTypedSoFar: "");
+            await VerifyCommonCommitCharactersAsync(markup, textTypedSoFar: "");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void SimpleAttributeUsage()
+        public async Task SimpleAttributeUsage()
         {
             var markup = @"
 using System;
@@ -76,11 +83,11 @@ public class TestAttribute : Attribute
     public ConsoleColor Color { get; set; }
 }";
 
-            VerifyItemExists(markup, "Color =");
+            await VerifyItemExistsAsync(markup, "Color =");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void AfterComma()
+        public async Task AfterComma()
         {
             var markup = @"
 using System;
@@ -98,12 +105,12 @@ public class TestAttribute : Attribute
     public string Text { get; set; }
 }";
 
-            VerifyItemExists(markup, "Text =");
+            await VerifyItemExistsAsync(markup, "Text =");
         }
 
-        [WorkItem(544345)]
+        [WorkItem(544345, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/544345")]
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void ExistingItemsAreFiltered()
+        public async Task ExistingItemsAreFiltered()
         {
             var markup = @"
 using System;
@@ -121,12 +128,12 @@ public class TestAttribute : Attribute
     public string Text { get; set; }
 }";
 
-            VerifyItemExists(markup, "Text =");
-            VerifyItemIsAbsent(markup, "Color =");
+            await VerifyItemExistsAsync(markup, "Text =");
+            await VerifyItemIsAbsentAsync(markup, "Color =");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void AttributeConstructor()
+        public async Task AttributeConstructor()
         {
             var markup = @"
 using System;
@@ -141,11 +148,11 @@ class Foo
 { }
 ";
 
-            VerifyItemExists(markup, "a:");
+            await VerifyItemExistsAsync(markup, "a:");
         }
 
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void AttributeConstructorAfterComma()
+        public async Task AttributeConstructorAfterComma()
         {
             var markup = @"
 using System;
@@ -160,12 +167,12 @@ class Foo
 { }
 ";
 
-            VerifyItemExists(markup, "a:");
+            await VerifyItemExistsAsync(markup, "a:");
         }
 
-        [WorkItem(545426)]
+        [WorkItem(545426, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545426")]
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void TestPropertiesInScript()
+        public async Task TestPropertiesInScript()
         {
             var markup = @"
 using System;
@@ -183,12 +190,12 @@ class Foo
 {
 }";
 
-            VerifyItemExists(markup, "Text =");
+            await VerifyItemExistsAsync(markup, "Text =");
         }
 
-        [WorkItem(1075278)]
+        [WorkItem(1075278, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1075278")]
         [Fact, Trait(Traits.Feature, Traits.Features.Completion)]
-        public void NotInComment()
+        public async Task NotInComment()
         {
             var markup = @"
 using System;
@@ -205,7 +212,7 @@ public class TestAttribute : Attribute
     public ConsoleColor Color { get; set; }
 }";
 
-            VerifyNoItemsExist(markup);
+            await VerifyNoItemsExistAsync(markup);
         }
     }
 }

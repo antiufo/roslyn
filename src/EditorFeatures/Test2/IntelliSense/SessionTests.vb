@@ -1,10 +1,8 @@
 ' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
-Imports System.Threading
 Imports System.Threading.Tasks
 Imports Microsoft.CodeAnalysis.Editor.Implementation.IntelliSense
 Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
-Imports Microsoft.CodeAnalysis.Shared.TestHooks
 Imports Moq
 
 Namespace Microsoft.CodeAnalysis.Editor.UnitTests.IntelliSense
@@ -19,7 +17,7 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.IntelliSense
         Public Class Model
         End Class
 
-        <Fact>
+        <WpfFact>
         Public Sub SessionStopsWhenPresenterIsDismissed()
             Dim presenter = New Mock(Of IIntelliSensePresenterSession)
             Dim controller = New Mock(Of IController(Of Model))
@@ -33,7 +31,7 @@ Namespace Microsoft.CodeAnalysis.Editor.UnitTests.IntelliSense
             controller.Verify(Sub(c) c.StopModelComputation())
         End Sub
 
-        <Fact>
+        <WpfFact>
         Public Sub PresenterIsDismissedWhenSessionIsStopped()
             Dim presenter = New Mock(Of IIntelliSensePresenterSession)
             Dim controller = New Mock(Of IController(Of Model))

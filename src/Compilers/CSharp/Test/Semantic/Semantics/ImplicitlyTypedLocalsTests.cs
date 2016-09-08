@@ -1,15 +1,13 @@
 ﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using Microsoft.CodeAnalysis.CSharp.Symbols;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.CSharp.Test.Utilities;
-using Microsoft.CodeAnalysis.Text;
 using Roslyn.Test.Utilities;
 using Xunit;
 
 namespace Microsoft.CodeAnalysis.CSharp.UnitTests
 {
-    public partial class SyntaxBinderTests : CompilingTestBase
+    public partial class ImplicitlyTypedLocalTests : CompilingTestBase
     {
         [Fact]
         public void ConstVarField1()
@@ -50,7 +48,7 @@ class C
             string text = @"
 var array = { 1, 2 };
 ";
-            CreateCompilationWithMscorlib(text, parseOptions: TestOptions.Script).VerifyDiagnostics(
+            CreateCompilationWithMscorlib45(text, parseOptions: TestOptions.Script).VerifyDiagnostics(
                 // (2,5): error CS0820: Cannot initialize an implicitly-typed variable with an array initializer
                 // var array = { 1, 2 };
                 Diagnostic(ErrorCode.ERR_ImplicitlyTypedVariableAssignedArrayInitializer, "array = { 1, 2 }"));
@@ -71,19 +69,17 @@ class Program
             CreateCompilationWithMscorlib(text).VerifyDiagnostics(
                 // (6,23): error CS0841: Cannot use local variable 'x' before it is declared
                 //         var x = y.Foo(x);
-                Diagnostic(ErrorCode.ERR_VariableUsedBeforeDeclaration, "x").WithArguments("x"),
+                Diagnostic(ErrorCode.ERR_VariableUsedBeforeDeclaration, "x").WithArguments("x").WithLocation(6, 23),
                 // (6,17): error CS0841: Cannot use local variable 'y' before it is declared
                 //         var x = y.Foo(x);
-                Diagnostic(ErrorCode.ERR_VariableUsedBeforeDeclaration, "y").WithArguments("y"),
+                Diagnostic(ErrorCode.ERR_VariableUsedBeforeDeclaration, "y").WithArguments("y").WithLocation(6, 17),
                 // (7,23): error CS0841: Cannot use local variable 'y' before it is declared
                 //         var y = x.Foo(y);
-                Diagnostic(ErrorCode.ERR_VariableUsedBeforeDeclaration, "y").WithArguments("y"),
-                // (6,23): error CS0165: Use of unassigned local variable 'x'
-                //         var x = y.Foo(x);
-                Diagnostic(ErrorCode.ERR_UseDefViolation, "x").WithArguments("x"));
+                Diagnostic(ErrorCode.ERR_VariableUsedBeforeDeclaration, "y").WithArguments("y").WithLocation(7, 23)
+                );
         }
 
-        [WorkItem(545612, "DevDiv")]
+        [WorkItem(545612, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/545612")]
         [Fact]
         public void VarTypeConflictsWithAlias()
         {

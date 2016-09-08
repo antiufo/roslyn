@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Editor.Commands;
 using Microsoft.CodeAnalysis.Editor.Host;
 using Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces;
@@ -22,7 +23,7 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.AutomaticCompletion
 {
     public abstract class AbstractAutomaticLineEnderTests
     {
-        protected abstract TestWorkspace CreateWorkspace(string[] code);
+        protected abstract Task<TestWorkspace> CreateWorkspaceAsync(string code);
         protected abstract Action CreateNextHandler(TestWorkspace workspace);
 
         internal abstract ICommandHandler<AutomaticLineEnderCommandArgs> CreateCommandHandler(
@@ -30,12 +31,13 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.AutomaticCompletion
             ITextUndoHistoryRegistry undoRegistry,
             IEditorOperationsFactoryService editorOperations);
 
-        protected void Test(string expected, string code, bool completionActive = false)
+        protected async Task TestAsync(string expected, string code, bool completionActive = false, bool assertNextHandlerInvoked = false)
         {
-            using (var workspace = CreateWorkspace(new string[] { code }))
+            using (var workspace = await CreateWorkspaceAsync(code))
             {
                 var view = workspace.Documents.Single().GetTextView();
                 var buffer = workspace.Documents.Single().GetTextBuffer();
+                var nextHandlerInvoked = false;
 
                 view.Caret.MoveTo(new SnapshotPoint(buffer.CurrentSnapshot, workspace.Documents.Single(d => d.CursorPosition.HasValue).CursorPosition.Value));
 
@@ -44,9 +46,14 @@ namespace Microsoft.CodeAnalysis.Editor.UnitTests.AutomaticCompletion
                                         GetExportedValue<ITextUndoHistoryRegistry>(workspace),
                                         GetExportedValue<IEditorOperationsFactoryService>(workspace));
 
-                commandHandler.ExecuteCommand(new AutomaticLineEnderCommandArgs(view, buffer), CreateNextHandler(workspace));
+                commandHandler.ExecuteCommand(new AutomaticLineEnderCommandArgs(view, buffer),
+                                                    assertNextHandlerInvoked
+                                                        ? () => { nextHandlerInvoked = true; }
+                : CreateNextHandler(workspace));
 
                 Test(view, buffer, expected);
+
+                Assert.Equal(assertNextHandlerInvoked, nextHandlerInvoked);
             }
         }
 

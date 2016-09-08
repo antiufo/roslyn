@@ -11,8 +11,8 @@ Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.KeywordHighlightin
         End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestUsingBlock1()
-            Test(<Text>
+        Public Async Function TestUsingBlock1() As Task
+            Await TestAsync(<Text>
 Class C
 Sub M()
 {|Cursor:[|Using|]|} f = File.Open(name)
@@ -20,11 +20,11 @@ Sub M()
 [|End Using|]
 End Sub
 End Class</Text>)
-        End Sub
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.KeywordHighlighting)>
-        Public Sub TestUsingBlock2()
-            Test(<Text>
+        Public Async Function TestUsingBlock2() As Task
+            Await TestAsync(<Text>
 Class C
 Sub M()
 [|Using|] f = File.Open(name)
@@ -32,6 +32,6 @@ Sub M()
 {|Cursor:[|End Using|]|}
 End Sub
 End Class</Text>)
-        End Sub
+        End Function
     End Class
 End Namespace

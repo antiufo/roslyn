@@ -24,9 +24,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
 
             _syntaxReference = syntaxReference
             CalculateReturnType(containingType.DeclaringCompilation, diagnostics, ResultType, _returnType)
-            FunctionLocal = If(ResultType Is Nothing,
-                Nothing,
-                New SynthesizedLocal(Me, ResultType, SynthesizedLocalKind.FunctionReturnValue, Syntax))
+            FunctionLocal = New SynthesizedLocal(Me, ResultType, SynthesizedLocalKind.FunctionReturnValue, Syntax)
             ExitLabel = New GeneratedLabelSymbol("exit")
         End Sub
 
@@ -126,18 +124,18 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End Get
         End Property
 
-        Friend Overrides ReadOnly Property Syntax As VisualBasicSyntaxNode
+        Friend Overrides ReadOnly Property Syntax As SyntaxNode
             Get
                 Return DirectCast(_syntaxReference.GetSyntax(), VisualBasicSyntaxNode)
             End Get
         End Property
 
-        Friend Overrides Function GetBoundMethodBody(diagnostics As DiagnosticBag, Optional ByRef methodBodyBinder As Binder = Nothing) As BoundBlock
-            Dim syntax As VisualBasicSyntaxNode = Me.Syntax
+        Friend Overrides Function GetBoundMethodBody(compilationState As TypeCompilationState, diagnostics As DiagnosticBag, Optional ByRef methodBodyBinder As Binder = Nothing) As BoundBlock
+            Dim syntax As SyntaxNode = Me.Syntax
             Return New BoundBlock(
                 syntax,
                 Nothing,
-                If(FunctionLocal Is Nothing, ImmutableArray(Of LocalSymbol).Empty, ImmutableArray.Create(FunctionLocal)),
+                ImmutableArray.Create(FunctionLocal),
                 ImmutableArray.Create(Of BoundStatement)(New BoundLabelStatement(syntax, ExitLabel)))
         End Function
 
@@ -151,19 +149,26 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             ByRef resultType As TypeSymbol,
             ByRef returnType As TypeSymbol)
 
-            Dim submissionReturnType = compilation.SubmissionReturnType
-            If submissionReturnType Is Nothing Then
-                resultType = Nothing
-                returnType = compilation.GetSpecialType(SpecialType.System_Void)
-            Else
-                Dim taskT = compilation.GetWellKnownType(WellKnownType.System_Threading_Tasks_Task_T)
-                Dim useSiteDiagnostic = taskT.GetUseSiteErrorInfo()
-                If useSiteDiagnostic IsNot Nothing Then
-                    diagnostics.Add(useSiteDiagnostic, NoLocation.Singleton)
-                End If
-                resultType = compilation.GetTypeByReflectionType(submissionReturnType, diagnostics)
-                returnType = taskT.Construct(resultType)
+            Dim submissionReturnType As Type = Nothing
+            If compilation.ScriptCompilationInfo IsNot Nothing Then
+                submissionReturnType = compilation.ScriptCompilationInfo.ReturnTypeOpt
             End If
+
+            Dim taskT = compilation.GetWellKnownType(WellKnownType.System_Threading_Tasks_Task_T)
+            Dim useSiteDiagnostic = taskT.GetUseSiteErrorInfo()
+            If useSiteDiagnostic IsNot Nothing Then
+                diagnostics.Add(useSiteDiagnostic, NoLocation.Singleton)
+            End If
+            ' If no explicit return type is set on ScriptCompilationInfo, default to
+            ' System.Object from the target corlib. This allows cross compiling scripts
+            ' to run on a target corlib that may differ from the host compiler's corlib.
+            ' cf. https://github.com/dotnet/roslyn/issues/8506
+            If submissionReturnType Is Nothing Then
+                resultType = compilation.GetSpecialType(SpecialType.System_Object)
+            Else
+                resultType = compilation.GetTypeByReflectionType(submissionReturnType, diagnostics)
+            End If
+            returnType = taskT.Construct(resultType)
         End Sub
 
     End Class

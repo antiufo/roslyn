@@ -22,7 +22,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
     ''' Then we make frame, or compiler-generated class, represented by an instance of
     ''' LambdaRewriter.Frame for each scope with captured variables.  The generated frames are kept
     ''' in LambdaRewriter.frames.  Each frame is given a single field for each captured
-    ''' variable in the corresponding scope.  These are are maintained in LambdaRewriter.proxies.
+    ''' variable in the corresponding scope.  These are maintained in LambdaRewriter.proxies.
     ''' 
     ''' Finally, we walk and rewrite the input bound tree, keeping track of the following:
     ''' (1) The current set of active frame pointers, in LambdaRewriter.framePointers
@@ -47,7 +47,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
     ''' the returned bound node.  For example, the caller will typically perform iterator method and
     ''' asynchronous method transformations, and emit IL instructions into an assembly.
     ''' </summary>
-    Partial Friend Class LambdaRewriter
+    Partial Friend NotInheritable Class LambdaRewriter
         Inherits MethodToClassRewriter(Of FieldSymbol)
 
         Private ReadOnly _analysis As Analysis
@@ -92,7 +92,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         'such situation happens when lifting Me in a ctor.
         'CLR requires that the first use of "Me" must be a constructor call for which "Me" is a receiver
         'only after that we can proceed with lifting "Me"
-        Private _thisProxyInitDeferred As BoundExpression
+        Private _meProxyDeferredInit As BoundExpression
+        Private _meIsInitialized As Boolean
+        Private _meProxyDeferredInitDone As Boolean
 
         ' Are we code that will be rewritten into an expression tree?
         Private _inExpressionLambda As Boolean
@@ -176,6 +178,8 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             rewriter.MakeFrames(closureDebugInfoBuilder)
 
             Dim body = DirectCast(rewriter.Visit(node), BoundBlock)
+
+            Debug.Assert(rewriter._meProxyDeferredInitDone OrElse rewriter._meProxyDeferredInit Is Nothing)
 
             ' The dispenser could be updated during the lambda rewrite:
             delegateRelaxationIdDispenser = rewriter._delegateRelaxationIdDispenser
@@ -316,7 +320,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     ' add frame type
                     CompilationState.ModuleBuilderOpt.AddSynthesizedDefinition(_topLevelMethod.ContainingType, frame)
 
-                    ' associate the frame with the the first lambda that caused it to exist. 
+                    ' associate the frame with the first lambda that caused it to exist. 
                     ' we need to associate this with some syntax.
                     ' unfortunately either containing method or containing class could be synthetic
                     ' therefore could have no syntax.
@@ -348,7 +352,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <param name="syntax">The syntax to attach to the bound nodes produced</param>
         ''' <param name="frameType">The type of frame to be returned</param>
         ''' <returns>A bound node that computes the pointer to the required frame</returns>
-        Private Function FrameOfType(syntax As VisualBasicSyntaxNode, frameType As NamedTypeSymbol) As BoundExpression
+        Private Function FrameOfType(syntax As SyntaxNode, frameType As NamedTypeSymbol) As BoundExpression
             Dim result As BoundExpression = FramePointer(syntax, frameType.OriginalDefinition)
             Debug.Assert(result.Type = frameType)
             Return result
@@ -362,7 +366,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <param name="syntax">The syntax to attach to the bound nodes produced</param>
         ''' <param name="frameClass">The class type of frame to be returned</param>
         ''' <returns>A bound node that computes the pointer to the required frame</returns>
-        Friend Overrides Function FramePointer(syntax As VisualBasicSyntaxNode, frameClass As NamedTypeSymbol) As BoundExpression
+        Friend Overrides Function FramePointer(syntax As SyntaxNode, frameClass As NamedTypeSymbol) As BoundExpression
             Debug.Assert(frameClass.IsDefinition)
             If _currentFrameThis IsNot Nothing AndAlso _currentFrameThis.Type = frameClass Then
                 Return New BoundMeReference(syntax, frameClass)
@@ -396,7 +400,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
         Private Function MakeFrameCtor(frame As LambdaFrame, diagnostics As DiagnosticBag) As BoundBlock
             Dim constructor = frame.Constructor
-            Dim syntaxNode As VisualBasicSyntaxNode = constructor.Syntax
+            Dim syntaxNode As SyntaxNode = constructor.Syntax
 
             Dim builder = ArrayBuilder(Of BoundStatement).GetInstance
             builder.Add(MethodCompiler.BindDefaultConstructorInitializer(constructor, diagnostics))
@@ -500,7 +504,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             Dim constructor As MethodSymbol = frame.Constructor.AsMember(frameType)
             Debug.Assert(frameType = constructor.ContainingType)
 
-            Dim syntaxNode As VisualBasicSyntaxNode = node.Syntax
+            Dim syntaxNode As SyntaxNode = node.Syntax
 
             Dim frameAccess = New BoundLocal(syntaxNode, framePointer, frameType)
 
@@ -534,9 +538,10 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                     Dim assignment = New BoundAssignmentOperator(syntaxNode, left, right, True, left.Type)
 
                     ' if we are capturing "Me" in a ctor, we should do it after "Me" is initialized
-                    If _innermostFramePointer.Kind = SymbolKind.Parameter AndAlso _topLevelMethod.MethodKind = MethodKind.Constructor AndAlso _topLevelMethod Is _currentMethod Then
-                        Debug.Assert(_thisProxyInitDeferred Is Nothing, "we should be capturing 'Me' only once")
-                        _thisProxyInitDeferred = assignment
+                    If _innermostFramePointer.Kind = SymbolKind.Parameter AndAlso _topLevelMethod.MethodKind = MethodKind.Constructor AndAlso
+                       _topLevelMethod Is _currentMethod AndAlso Not _meIsInitialized Then
+                        Debug.Assert(_meProxyDeferredInit Is Nothing, "we should be capturing 'Me' only once")
+                        _meProxyDeferredInit = assignment
                     Else
                         prologue.Add(assignment)
                     End If
@@ -605,7 +610,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         ''' <summary>
         ''' If parameter (or variable in the EE) is lifted, initialize its proxy.
         ''' </summary>
-        Private Sub InitVariableProxy(syntaxNode As VisualBasicSyntaxNode,
+        Private Sub InitVariableProxy(syntaxNode As SyntaxNode,
                                       originalSymbol As Symbol,
                                       framePointer As LocalSymbol,
                                       frameType As NamedTypeSymbol,
@@ -774,7 +779,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             '                        when Catch is entered.
             ' 3) Code (Filter and Body)
             '
-            ' It is important to note that all these 3 parts do not have any any dependencies on each other 
+            ' It is important to note that all these 3 parts do not have any dependencies on each other 
             ' except that assignment must happen before any other Catch code is executed.
             '
             ' When LocalOpt is present, ExceptionVariable typically holds a reference to it, but it is not a requirement.
@@ -815,7 +820,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             ' If exception variable got lifted, IntroduceFrame will give us frame init prologue.
             ' It needs to run before the exception variable is accessed.
-            ' To ensure that, we will make exception variable a sequence that performs prologue as its its sideeffects.
+            ' To ensure that, we will make exception variable a sequence that performs prologue as its sideeffects.
             If prologue.Count <> 0 Then
                 rewrittenExceptionSource = New BoundSequence(
                     rewrittenExceptionSource.Syntax,
@@ -893,7 +898,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
             ' produce a unique method ordinal for the corresponding state machine type, whose name includes the (unique) method name.
             Const methodOrdinal As Integer = -1
 
-            Dim slotAllocatorOpt = CompilationState.ModuleBuilderOpt.TryCreateVariableSlotAllocator(method, method.TopLevelMethod)
+            Dim slotAllocatorOpt = CompilationState.ModuleBuilderOpt.TryCreateVariableSlotAllocator(method, method.TopLevelMethod, Diagnostics)
             Return Rewriter.RewriteIteratorAndAsync(loweredBody, method, methodOrdinal, CompilationState, Diagnostics, slotAllocatorOpt, stateMachineTypeOpt)
         End Function
 
@@ -1024,7 +1029,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 If Not wasInExpressionLambda Then
                     ' Rewritten outermost lambda as expression tree
                     Dim delegateType = type.ExpressionTargetDelegate(CompilationState.Compilation)
-                    rewrittenNode = ExpressionLambdaRewriter.RewriteLambda(node, Me._currentMethod, delegateType, Me.CompilationState, Me.TypeMap, Me.Diagnostics, Me._rewrittenNodes)
+                    rewrittenNode = ExpressionLambdaRewriter.RewriteLambda(node, Me._currentMethod, delegateType, Me.CompilationState, Me.TypeMap, Me.Diagnostics, Me._rewrittenNodes, Me.RecursionDepth)
                 End If
 
                 _inExpressionLambda = wasInExpressionLambda
@@ -1135,7 +1140,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             ' static lambdas are emitted as instance methods on a singleton receiver
             ' delegates invoke dispatch is optimized for instance delegates so 
-            ' it is preferrable to emit lambdas as instance methods enven when lambdas 
+            ' it is preferable to emit lambdas as instance methods even when lambdas 
             ' do Not capture anything
             Dim result As BoundExpression = New BoundDelegateCreationExpression(
                          node.Syntax,
@@ -1221,7 +1226,7 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         '                end if
         '            Next
         '
-        Private Function InLoopOrLambda(lambdaSyntax As SyntaxNode, scopeSyntax As SyntaxNode) As Boolean
+        Private Shared Function InLoopOrLambda(lambdaSyntax As SyntaxNode, scopeSyntax As SyntaxNode) As Boolean
             Dim curSyntax = lambdaSyntax.Parent
             While (curSyntax IsNot Nothing AndAlso curSyntax IsNot scopeSyntax)
                 Select Case curSyntax.Kind
@@ -1356,21 +1361,23 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
 
             If rewritten.Kind = BoundKind.Call Then
                 Dim rewrittenCall As BoundCall = DirectCast(rewritten, BoundCall)
-                Dim rewrittenMethod As MethodSymbol = rewrittenCall.Method
-                Dim rewrittenReceiverOpt As BoundExpression = rewrittenCall.ReceiverOpt
-                Dim rewrittenArguments As ImmutableArray(Of BoundExpression) = rewrittenCall.Arguments
-
-                rewrittenCall = OptimizeMethodCallForDelegateInvoke(rewrittenCall, rewrittenMethod, rewrittenReceiverOpt, rewrittenArguments)
+                rewrittenCall = OptimizeMethodCallForDelegateInvoke(rewrittenCall)
 
                 ' Check if we need to init Me proxy and this is a ctor call
-                If _thisProxyInitDeferred IsNot Nothing AndAlso _currentMethod Is _topLevelMethod Then
+                If _currentMethod Is _topLevelMethod Then
                     Dim receiver As BoundExpression = node.ReceiverOpt
                     ' are we calling a ctor on Me or MyBase?
                     If node.Method.MethodKind = MethodKind.Constructor AndAlso receiver IsNot Nothing AndAlso receiver.IsInstanceReference Then
-                        Return LocalRewriter.GenerateSequenceValueSideEffects(Me._currentMethod,
+                        Debug.Assert(Not _meProxyDeferredInitDone)
+                        _meIsInitialized = True
+
+                        If _meProxyDeferredInit IsNot Nothing Then
+                            _meProxyDeferredInitDone = True
+                            Return LocalRewriter.GenerateSequenceValueSideEffects(Me._currentMethod,
                                                                               rewrittenCall,
                                                                               ImmutableArray(Of LocalSymbol).Empty,
-                                                                              ImmutableArray.Create(Of BoundExpression)(_thisProxyInitDeferred))
+                                                                              ImmutableArray.Create(Of BoundExpression)(_meProxyDeferredInit))
+                        End If
                     End If
                 End If
 
@@ -1402,8 +1409,9 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
         '''           If we decide to do this, we should be careful with extension methods because they have
         '''           special treatment of 'this' parameter. 
         ''' </summary>
-        Private Function OptimizeMethodCallForDelegateInvoke(node As BoundCall, method As MethodSymbol, receiver As BoundExpression, arguments As ImmutableArray(Of BoundExpression)) As BoundCall
-
+        Private Function OptimizeMethodCallForDelegateInvoke(node As BoundCall) As BoundCall
+            Dim method = node.Method
+            Dim receiver = node.ReceiverOpt
             Dim useSiteDiagnostics As HashSet(Of DiagnosticInfo) = Nothing
 
             If method.MethodKind = MethodKind.DelegateInvoke AndAlso
@@ -1419,7 +1427,15 @@ Namespace Microsoft.CodeAnalysis.VisualBasic
                 If Not delegateCreation.Method.IsReducedExtensionMethod Then
                     method = delegateCreation.Method
                     receiver = delegateCreation.ReceiverOpt
-                    node = node.Update(method, Nothing, receiver, arguments, Nothing, node.SuppressObjectClone, node.Type)
+                    node = node.Update(
+                        method,
+                        Nothing,
+                        receiver,
+                        node.Arguments,
+                        Nothing,
+                        isLValue:=False,
+                        suppressObjectClone:=node.SuppressObjectClone,
+                        type:=node.Type)
                 End If
             End If
 

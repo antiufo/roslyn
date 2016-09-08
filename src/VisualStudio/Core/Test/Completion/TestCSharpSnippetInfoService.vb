@@ -1,6 +1,8 @@
 ' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
+Imports System.Collections.Immutable
 Imports System.Composition
+Imports System.Threading.Tasks
 Imports Microsoft.CodeAnalysis
 Imports Microsoft.CodeAnalysis.Host.Mef
 Imports Microsoft.CodeAnalysis.Shared.TestHooks
@@ -19,10 +21,8 @@ Namespace Microsoft.VisualStudio.LanguageServices.UnitTests.Completion
         End Sub
 
         Friend Sub SetSnippetShortcuts(newSnippetShortcuts As String())
-            InitialCachePopulationTask.PumpingWait()
-
             SyncLock cacheGuard
-                snippets = newSnippetShortcuts.Select(Function(shortcut) New SnippetInfo(shortcut, "title", "description", "path")).ToList()
+                snippets = newSnippetShortcuts.Select(Function(shortcut) New SnippetInfo(shortcut, "title", "description", "path")).ToImmutableArray()
                 snippetShortcuts = GetShortcutsHashFromSnippets(snippets)
             End SyncLock
         End Sub

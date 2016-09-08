@@ -1,10 +1,8 @@
 ﻿// Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
 using System;
-using System.IO;
 using System.Threading;
 using Microsoft.CodeAnalysis.Text;
-using Roslyn.Utilities;
 
 namespace Microsoft.CodeAnalysis.Diagnostics
 {
@@ -38,7 +36,7 @@ namespace Microsoft.CodeAnalysis.Diagnostics
         /// </summary>
         public override SourceText GetText(CancellationToken cancellationToken = default(CancellationToken))
         {
-            var text = _document.GetTextAsync(cancellationToken).WaitAndGetResult(cancellationToken);
+            var text = _document.GetText(cancellationToken);
             return text;
         }
     }

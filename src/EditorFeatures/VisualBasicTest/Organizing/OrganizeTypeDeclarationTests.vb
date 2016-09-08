@@ -1,23 +1,16 @@
 ' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
-Imports System
-Imports System.Collections.Generic
-Imports System.Linq
-Imports System.Text
-Imports System.Threading
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax
-Imports Roslyn.Test.EditorUtilities
-Imports Roslyn.Test.Utilities
-Imports Xunit
-Imports ParseOptions = Microsoft.CodeAnalysis.VisualBasic.VisualBasicParseOptions
+Imports Microsoft.CodeAnalysis.Editor.Implementation.Interactive
+Imports Microsoft.CodeAnalysis.Editor.Implementation.Organizing
+Imports Microsoft.CodeAnalysis.Editor.UnitTests
+Imports Microsoft.CodeAnalysis.Editor.UnitTests.Workspaces
 
 Namespace Microsoft.CodeAnalysis.Editor.VisualBasic.UnitTests.Organizing
     Public Class OrganizeTypeDeclarationTests
         Inherits AbstractOrganizerTests
 
         <Fact, Trait(Traits.Feature, Traits.Features.Organizing)>
-        Public Sub TestFieldsWithoutInitializers1()
+        Public Async Function TestFieldsWithoutInitializers1() As Task
             Dim initial =
     <element>class C 
     dim A as Integer
@@ -31,11 +24,11 @@ end class</element>
     dim B as Integer
     dim C as Integer
 end class</element>
-            Check(initial, final)
-        End Sub
+            Await CheckAsync(initial, final)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Organizing)>
-        Public Sub TestFieldsWithoutInitializers2()
+        Public Async Function TestFieldsWithoutInitializers2() As Task
 
             Dim initial =
     <element>class C 
@@ -50,11 +43,11 @@ end class</element>
     dim B as Integer
     dim C as Integer
 end class</element>
-            Check(initial, final)
-        End Sub
+            Await CheckAsync(initial, final)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Organizing)>
-        Public Sub TestFieldsWithInitializers1()
+        Public Async Function TestFieldsWithInitializers1() As Task
 
             Dim initial =
     <element>class C 
@@ -69,30 +62,30 @@ end class</element>
     dim B as Integer
     dim C as Integer = 0
 end class</element>
-            Check(initial, final)
-        End Sub
+            Await CheckAsync(initial, final)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Organizing)>
-        Public Sub TestFieldsWithInitializers2()
+        Public Async Function TestFieldsWithInitializers2() As Task
 
             Dim initial =
     <element>class C 
-    dim C as Integer = 0
-    dim B as Integer = 0
-    dim A as Integer
-end class</element>
-
-            Dim final =
-    <element>class C 
-    dim A as Integer
     dim C as Integer = 0
     dim B as Integer = 0
+    dim A as Integer
 end class</element>
-            Check(initial, final)
-        End Sub
+
+            Dim final =
+    <element>class C 
+    dim A as Integer
+    dim C as Integer = 0
+    dim B as Integer = 0
+end class</element>
+            Await CheckAsync(initial, final)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Organizing)>
-        Public Sub TestEnumStatement()
+        Public Async Function TestEnumStatement() As Task
 
             Dim initial =
     <element>class C 
@@ -111,11 +104,11 @@ end class</element>
            create = 1
      End Enum
 end class</element>
-            Check(initial, final)
-        End Sub
+            Await CheckAsync(initial, final)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Organizing)>
-        Public Sub TestSharedInstance()
+        Public Async Function TestSharedInstance() As Task
 
             Dim initial =
     <element>class C 
@@ -132,11 +125,11 @@ end class</element>
     dim A as Integer
     dim C as Integer
 end class</element>
-            Check(initial, final)
-        End Sub
+            Await CheckAsync(initial, final)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Organizing)>
-        Public Sub TestAccessibility()
+        Public Async Function TestAccessibility() As Task
 
             Dim initial =
     <element>class C 
@@ -155,11 +148,11 @@ end class</element>
     dim A as Integer
     private B as Integer
 end class</element>
-            Check(initial, final)
-        End Sub
+            Await CheckAsync(initial, final)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Organizing)>
-        Public Sub TestSharedAccessibility()
+        Public Async Function TestSharedAccessibility() As Task
 
             Dim initial =
     <element>class C 
@@ -188,11 +181,11 @@ end class</element>
     dim A1 as Integer
     private B1 as Integer
 end class</element>
-            Check(initial, final)
-        End Sub
+            Await CheckAsync(initial, final)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Organizing)>
-        Public Sub TestMethodsAccessModifiers()
+        Public Async Function TestMethodsAccessModifiers() As Task
 
             Dim initial =
     <element>class C 
@@ -221,11 +214,11 @@ End class</element>
         Function Goo() As Integer
         End Function  
 End class</element>
-            Check(initial, final)
-        End Sub
+            Await CheckAsync(initial, final)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Organizing)>
-        Public Sub TestGenerics()
+        Public Async Function TestGenerics() As Task
 
             Dim initial =
 <element>class C 
@@ -258,11 +251,11 @@ end class</element>
     sub B(of X,Y)()
     end sub
 end class</element>
-            Check(initial, final)
-        End Sub
+            Await CheckAsync(initial, final)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Organizing)>
-        Public Sub TestInsidePPRegion()
+        Public Async Function TestInsidePPRegion() As Task
 
             Dim initial =
 <element>class C 
@@ -281,11 +274,11 @@ end class</element>
     dim c as Integer
 #End If
 end class</element>
-            Check(initial, final)
-        End Sub
+            Await CheckAsync(initial, final)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Organizing)>
-        Public Sub TestInsidePPRegion2()
+        Public Async Function TestInsidePPRegion2() As Task
 
             Dim initial =
     <element>class C 
@@ -314,11 +307,11 @@ end class</element>
     dim c as Integer
 #End If
 end class</element>
-            Check(initial, final)
-        End Sub
+            Await CheckAsync(initial, final)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Organizing)>
-        Public Sub TestInsidePPRegion3()
+        Public Async Function TestInsidePPRegion3() As Task
 
             Dim initial =
     <element>class C 
@@ -343,11 +336,11 @@ end class</element>
     dim a as Integer
     dim b as Integer
 end class</element>
-            Check(initial, final)
-        End Sub
+            Await CheckAsync(initial, final)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Organizing)>
-        Public Sub TestInsidePPRegion4()
+        Public Async Function TestInsidePPRegion4() As Task
 
             Dim initial =
     <element>class C 
@@ -372,11 +365,11 @@ end class</element>
     sub c()
     end sub
 end class</element>
-            Check(initial, final)
-        End Sub
+            Await CheckAsync(initial, final)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Organizing)>
-        Public Sub TestInsidePPRegion5()
+        Public Async Function TestInsidePPRegion5() As Task
 
             Dim initial =
     <element>class C 
@@ -403,11 +396,11 @@ end class</element>
     sub c()
     end sub
 end class</element>
-            Check(initial, final)
-        End Sub
+            Await CheckAsync(initial, final)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Organizing)>
-        Public Sub TestInsidePPRegion6()
+        Public Async Function TestInsidePPRegion6() As Task
 
             Dim initial =
     <element>class C 
@@ -444,11 +437,11 @@ end class</element>
     end sub
 #end region
 end class</element>
-            Check(initial, final)
-        End Sub
+            Await CheckAsync(initial, final)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Organizing)>
-        Public Sub TestPinned()
+        Public Async Function TestPinned() As Task
 
             Dim initial =
     <element>class C 
@@ -489,11 +482,11 @@ end class</element>
     sub b()
     end sub
 end class</element>
-            Check(initial, final)
-        End Sub
+            Await CheckAsync(initial, final)
+        End Function
 
         <Fact, Trait(Traits.Feature, Traits.Features.Organizing)>
-        Public Sub TestSensitivity()
+        Public Async Function TestSensitivity() As Task
             Dim initial =
 <element>class 
     dim Bb as Integer
@@ -580,14 +573,14 @@ end class</element>
     dim ああ as Integer
 end class</element>
 
-            Check(initial, final)
-        End Sub
+            Await CheckAsync(initial, final)
+        End Function
 
 
 
-        <WorkItem(537614)>
+        <WorkItem(537614, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537614")>
         <Fact>
-        Public Sub TestWhitespaceBetweenMethods1()
+        Public Async Function TestWhitespaceBetweenMethods1() As Task
             Dim initial =
 <element>class Program
     sub B()
@@ -605,12 +598,12 @@ end class</element>
     sub B()
     end sub
 end class</element>
-            Check(initial, final)
-        End Sub
+            Await CheckAsync(initial, final)
+        End Function
 
-        <WorkItem(537614)>
+        <WorkItem(537614, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537614")>
         <Fact>
-        Public Sub TestWhitespaceBetweenMethods2()
+        Public Async Function TestWhitespaceBetweenMethods2() As Task
             Dim initial =
 <element>class Program
     sub B()
@@ -630,12 +623,12 @@ end class</element>
     sub B()
     end sub
 end class</element>
-            Check(initial, final)
-        End Sub
+            Await CheckAsync(initial, final)
+        End Function
 
-        <WorkItem(537614)>
+        <WorkItem(537614, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537614")>
         <Fact>
-        Public Sub TestWhitespaceBetweenMethods3()
+        Public Async Function TestWhitespaceBetweenMethods3() As Task
             Dim initial =
 <element>class Program
 
@@ -655,12 +648,12 @@ end class</element>
     sub B()
     end sub
 end class</element>
-            Check(initial, final)
-        End Sub
+            Await CheckAsync(initial, final)
+        End Function
 
-        <WorkItem(537614)>
+        <WorkItem(537614, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537614")>
         <Fact>
-        Public Sub TestWhitespaceBetweenMethods4()
+        Public Async Function TestWhitespaceBetweenMethods4() As Task
             Dim initial =
 <element>class Program
 
@@ -682,12 +675,12 @@ end class</element>
     sub B()
     end sub
 end class</element>
-            Check(initial, final)
-        End Sub
+            Await CheckAsync(initial, final)
+        End Function
 
-        <WorkItem(537614)>
+        <WorkItem(537614, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537614")>
         <Fact>
-        Public Sub TestWhitespaceBetweenMethods5()
+        Public Async Function TestWhitespaceBetweenMethods5() As Task
             Dim initial =
 <element>class Program
 
@@ -711,12 +704,12 @@ end class</element>
     sub B()
     end sub
 end class</element>
-            Check(initial, final)
-        End Sub
+            Await CheckAsync(initial, final)
+        End Function
 
-        <WorkItem(537614)>
+        <WorkItem(537614, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537614")>
         <Fact>
-        Public Sub TestWhitespaceBetweenMethods6()
+        Public Async Function TestWhitespaceBetweenMethods6() As Task
             Dim initial =
 <element>class Program
 
@@ -742,12 +735,12 @@ end class</element>
     sub B()
     end sub
 end class</element>
-            Check(initial, final)
-        End Sub
+            Await CheckAsync(initial, final)
+        End Function
 
-        <WorkItem(537614)>
+        <WorkItem(537614, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537614")>
         <Fact>
-        Public Sub TestMoveComments1()
+        Public Async Function TestMoveComments1() As Task
             Dim initial =
 <element>class Program
     ' B
@@ -767,12 +760,12 @@ end class</element>
     sub B()
     end sub
 end class</element>
-            Check(initial, final)
-        End Sub
+            Await CheckAsync(initial, final)
+        End Function
 
-        <WorkItem(537614)>
+        <WorkItem(537614, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537614")>
         <Fact>
-        Public Sub TestMoveComments2()
+        Public Async Function TestMoveComments2() As Task
             Dim initial =
 <element>class Program
     ' B
@@ -794,12 +787,12 @@ end class</element>
     sub B()
     end sub
 end class</element>
-            Check(initial, final)
-        End Sub
+            Await CheckAsync(initial, final)
+        End Function
 
-        <WorkItem(537614)>
+        <WorkItem(537614, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537614")>
         <Fact>
-        Public Sub TestMoveDocComments1()
+        Public Async Function TestMoveDocComments1() As Task
             Dim initial =
 <element>class Program
     ''' B
@@ -819,12 +812,12 @@ end class</element>
     sub B()
     end sub
 end class</element>
-            Check(initial, final)
-        End Sub
+            Await CheckAsync(initial, final)
+        End Function
 
-        <WorkItem(537614)>
+        <WorkItem(537614, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537614")>
         <Fact>
-        Public Sub TestMoveDocComments2()
+        Public Async Function TestMoveDocComments2() As Task
             Dim initial =
 <element>class Program
     ''' B
@@ -846,12 +839,12 @@ end class</element>
     sub B()
     end sub
 end class</element>
-            Check(initial, final)
-        End Sub
+            Await CheckAsync(initial, final)
+        End Function
 
-        <WorkItem(537614)>
+        <WorkItem(537614, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537614")>
         <Fact>
-        Public Sub TestDontMoveBanner()
+        Public Async Function TestDontMoveBanner() As Task
             Dim initial =
 <element>class Program
     ' Banner
@@ -873,12 +866,12 @@ end class</element>
     sub B()
     end sub
 end class</element>
-            Check(initial, final)
-        End Sub
+            Await CheckAsync(initial, final)
+        End Function
 
-        <WorkItem(537614)>
+        <WorkItem(537614, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537614")>
         <Fact>
-        Public Sub TestDontMoveBanner2()
+        Public Async Function TestDontMoveBanner2() As Task
             Dim initial =
 <element>class Program
     ' Banner
@@ -906,12 +899,12 @@ end class</element>
     sub B()
     end sub
 end class</element>
-            Check(initial, final)
-        End Sub
+            Await CheckAsync(initial, final)
+        End Function
 
-        <WorkItem(537614)>
+        <WorkItem(537614, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/537614")>
         <Fact>
-        Public Sub Bug2592()
+        Public Async Function TestBug2592() As Task
             Dim initial =
 <element>Namespace Acme
     Public Class Foo
@@ -937,7 +930,49 @@ End Namespace</element>
         End Sub
     End Class
 End Namespace</element>
-            Check(initial, final)
-        End Sub
+            Await CheckAsync(initial, final)
+        End Function
+
+        <WpfFact>
+        <Trait(Traits.Feature, Traits.Features.Organizing)>
+        <Trait(Traits.Feature, Traits.Features.Interactive)>
+        Public Async Function TestOrganizingCommandsDisabledInSubmission() As Task
+            Dim exportProvider = MinimalTestExportProvider.CreateExportProvider(
+                TestExportProvider.EntireAssemblyCatalogWithCSharpAndVisualBasic.WithParts(GetType(InteractiveDocumentSupportsFeatureService)))
+
+            Using workspace = Await TestWorkspace.CreateAsync(
+                <Workspace>
+                    <Submission Language="Visual Basic" CommonReferences="true">  
+                        Class C
+                            Private $foo As Object
+                        End Class
+                    </Submission>
+                </Workspace>,
+                workspaceKind:=WorkspaceKind.Interactive,
+                exportProvider:=exportProvider)
+
+                ' Force initialization.
+                workspace.GetOpenDocumentIds().Select(Function(id) workspace.GetTestDocument(id).GetTextView()).ToList()
+
+                Dim textView = workspace.Documents.Single().GetTextView()
+
+                Dim handler = New OrganizeDocumentCommandHandler(workspace.GetService(Of Host.IWaitIndicator))
+                Dim delegatedToNext = False
+                Dim nextHandler =
+                    Function()
+                        delegatedToNext = True
+                        Return CommandState.Unavailable
+                    End Function
+
+                Dim state = handler.GetCommandState(New Commands.SortAndRemoveUnnecessaryImportsCommandArgs(textView, textView.TextBuffer), nextHandler)
+                Assert.True(delegatedToNext)
+                Assert.False(state.IsAvailable)
+                delegatedToNext = False
+
+                state = handler.GetCommandState(New Commands.OrganizeDocumentCommandArgs(textView, textView.TextBuffer), nextHandler)
+                Assert.True(delegatedToNext)
+                Assert.False(state.IsAvailable)
+            End Using
+        End Function
     End Class
 End Namespace

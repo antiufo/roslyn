@@ -1,29 +1,17 @@
-{
-  "dependencies": {
-    "Microsoft.NETCore.Platforms": "1.0.0",
-    "System.Collections": "4.0.10",
-    "System.Console": "4.0.0-beta-23123",
-    "System.Diagnostics.Debug": "4.0.10",
-    "System.Globalization": "4.0.10",
-    "System.IO.FileSystem": "4.0.0",
-    "System.IO.FileSystem.Primitives": "4.0.0",
-    "System.Reflection": "4.0.10",
-    "System.Runtime": "4.0.20",
-    "System.Runtime.InteropServices": "4.0.20",
-    "System.Runtime.Extensions": "4.0.10",
-    "System.Text.Encoding": "4.0.10",
-    "System.Threading": "4.0.10",
-    "System.Threading.Tasks": "4.0.10",
-    "System.Threading.Thread": "4.0.0-beta-23123",
-    "System.Xml.XDocument": "4.0.10",
-    "System.Xml.XmlDocument": "4.0.0",
-    "System.IO.Pipes": "4.0.0-beta-23123",
-    "System.Diagnostics.Process": "4.0.0-beta-23123",
-    "System.AppContext": "4.0.0",
-    "System.Security.Cryptography.Hashing.Algorithms": "4.0.0-beta-23123",
-    "System.Linq": "4.0.0"
-  },
+﻿{
+  "dependencies": { },
   "frameworks": {
-      "dnxcore50": {}
+    // We don't actually target netstandard1.6; this is to work around https://github.com/dotnet/roslyn/issues/12458
+    "netstandard1.6": {
+      "imports": "portable-net452"
+    },
+    "NETCoreApp1.0": {
+      "imports": "portable-net452"
+    }
+  },
+  "runtimes": {
+    "win7-x64": {},
+    "ubuntu.14.04-x64": {},
+    "osx.10.10-x64": {}
   }
 }

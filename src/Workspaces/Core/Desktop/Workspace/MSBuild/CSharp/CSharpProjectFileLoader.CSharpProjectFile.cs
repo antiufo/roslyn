@@ -30,20 +30,18 @@ namespace Microsoft.CodeAnalysis.CSharp
 
             public override SourceCodeKind GetSourceCodeKind(string documentFileName)
             {
-                return documentFileName.EndsWith(".csx", StringComparison.OrdinalIgnoreCase)
-                    ? SourceCodeKind.Script
-                    : SourceCodeKind.Regular;
+                // TODO: uncomment when fixing https://github.com/dotnet/roslyn/issues/5325
+                //return documentFileName.EndsWith(".csx", StringComparison.OrdinalIgnoreCase)
+                //    ? SourceCodeKind.Script
+                //    : SourceCodeKind.Regular;
+                return SourceCodeKind.Regular;
             }
 
             public override string GetDocumentExtension(SourceCodeKind sourceCodeKind)
             {
-                switch (sourceCodeKind)
-                {
-                    case SourceCodeKind.Script:
-                        return ".csx";
-                    default:
-                        return ".cs";
-                }
+                // TODO: uncomment when fixing https://github.com/dotnet/roslyn/issues/5325
+                //return (sourceCodeKind != SourceCodeKind.Script) ? ".cs" : ".csx";
+                return ".cs";
             }
 
             public override async Task<ProjectFileInfo> GetProjectFileInfoAsync(CancellationToken cancellationToken)
@@ -190,12 +188,8 @@ namespace Microsoft.CodeAnalysis.CSharp
             }
 
             private class CSharpCompilerInputs :
-#if !MSBUILD12
                 MSB.Tasks.Hosting.ICscHostObject4,
                 MSB.Tasks.Hosting.IAnalyzerHostObject
-#else
-                MSB.Tasks.Hosting.ICscHostObject4
-#endif
             {
                 private readonly CSharpProjectFile _projectFile;
 
@@ -253,6 +247,14 @@ namespace Microsoft.CodeAnalysis.CSharp
                         {
                             this.CommandLineArgs.Add("/debug:full");
                         }
+                        else if (string.Equals(_debugType, "portable", StringComparison.OrdinalIgnoreCase))
+                        {
+                            this.CommandLineArgs.Add("/debug:portable");
+                        }
+                        else if (string.Equals(_debugType, "embedded", StringComparison.OrdinalIgnoreCase))
+                        {
+                            this.CommandLineArgs.Add("/debug:embedded");
+                        }
                     }
 
                     if (!string.IsNullOrWhiteSpace(_platform))
@@ -303,7 +305,11 @@ namespace Microsoft.CodeAnalysis.CSharp
 
                 public bool SetApplicationConfiguration(string applicationConfiguration)
                 {
-                    this.CommandLineArgs.Add("/appconfig:" + applicationConfiguration);
+                    if (!string.IsNullOrWhiteSpace(applicationConfiguration))
+                    {
+                        this.CommandLineArgs.Add("/appconfig:" + applicationConfiguration);
+                    }
+
                     return true;
                 }
 

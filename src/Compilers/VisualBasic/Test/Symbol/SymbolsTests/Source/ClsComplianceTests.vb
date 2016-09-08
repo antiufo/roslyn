@@ -1,14 +1,7 @@
 ﻿' Copyright (c) Microsoft.  All Rights Reserved.  Licensed under the Apache License, Version 2.0.  See License.txt in the project root for license information.
 
-Imports System.Globalization
-Imports System.Text
-Imports System.Xml.Linq
 Imports Microsoft.CodeAnalysis.Test.Utilities
-Imports Microsoft.CodeAnalysis.Text
-Imports Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE
 Imports Microsoft.CodeAnalysis.VisualBasic.Symbols
-Imports Microsoft.CodeAnalysis.VisualBasic.Syntax
-Imports Microsoft.CodeAnalysis.VisualBasic.UnitTests.Symbols.Metadata
 Imports Roslyn.Test.Utilities
 
 Namespace Microsoft.CodeAnalysis.VisualBasic.UnitTests
@@ -2586,7 +2579,7 @@ End Class
             Next
         End Sub
 
-        <WorkItem(697178, "DevDiv")>
+        <WorkItem(697178, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/697178")>
         <Fact>
         Public Sub ConstructedSpecialTypes()
             Dim source =
@@ -2638,7 +2631,7 @@ BC30002: Type 'Missing' is not defined.
 ]]></errors>)
         End Sub
 
-        <WorkItem(709317, "DevDiv")>
+        <WorkItem(709317, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/709317")>
         <Fact>
         Public Sub Repro709317()
             Dim libSource =
@@ -2675,10 +2668,10 @@ End Class
             Dim libRef = CreateCompilationWithMscorlib(libSource).EmitToImageReference()
             Dim comp = CreateCompilationWithMscorlibAndReferences(source, {libRef})
             Dim tree = comp.SyntaxTrees.Single()
-            comp.GetDiagnosticsForTree(CompilationStage.Declare, tree, filterSpanWithinTree:=Nothing, includeEarlierStages:=True)
+            comp.GetDiagnosticsForSyntaxTree(CompilationStage.Declare, tree)
         End Sub
 
-        <WorkItem(709317, "DevDiv")>
+        <WorkItem(709317, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/709317")>
         <Fact>
         Public Sub FilterTree()
             Dim sourceTemplate = <![CDATA[
@@ -2749,7 +2742,7 @@ BC40027: Return type of function 'P' is not CLS-compliant.
                         ~
 ]]></errors>)
 
-            CompilationUtils.AssertTheseDiagnostics(comp.GetDiagnosticsForTree(CompilationStage.Declare, tree1, filterSpanWithinTree:=Nothing, includeEarlierStages:=False),
+            CompilationUtils.AssertTheseDiagnostics(comp.GetDiagnosticsForSyntaxTree(CompilationStage.Declare, tree1, filterSpanWithinTree:=Nothing, includeEarlierStages:=False),
                                                <errors><![CDATA[
 BC40026: 'Compliant' is not CLS-compliant because it derives from 'NonCompliant', which is not CLS-compliant.
     Public Class Compliant
@@ -2769,7 +2762,7 @@ BC40027: Return type of function 'P' is not CLS-compliant.
 ]]></errors>)
         End Sub
 
-        <WorkItem(718503, "DevDiv")>
+        <WorkItem(718503, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/718503")>
         <Fact>
         Public Sub ErrorTypeAccessibility()
             Dim source =
@@ -3586,7 +3579,7 @@ BC40027: Return type of function 'F' is not CLS-compliant.
             ]]></errors>)
         End Sub
 
-        <WorkItem(749432, "DevDiv")>
+        <WorkItem(749432, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/749432")>
         <Fact>
         Public Sub InvalidAttributeArgument()
             Dim source =
@@ -3618,7 +3611,7 @@ BC30059: Constant expression is required.
             ]]></errors>)
         End Sub
 
-        <WorkItem(749352, "DevDiv")>
+        <WorkItem(749352, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/749352")>
         <Fact>
         Public Sub Repro749352()
             Dim source =
@@ -3649,7 +3642,7 @@ BC40030: event 'Public Event Scen6(x As Integer)' cannot be marked CLS-compliant
             ]]></errors>)
         End Sub
 
-        <Fact, WorkItem(1026453, "DevDiv")>
+        <Fact, WorkItem(1026453, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/1026453")>
         Public Sub Bug1026453()
             Dim source1 =
                 <compilation>
@@ -3689,6 +3682,36 @@ End Namespace
             Dim comp3 = comp2.WithOptions(TestOptions.ReleaseModule.WithConcurrentBuild(False))
             comp3.AssertNoDiagnostics()
             comp3.WithOptions(TestOptions.ReleaseModule.WithConcurrentBuild(True)).AssertNoDiagnostics()
+        End Sub
+
+        <Fact, WorkItem(9719, "https://github.com/dotnet/roslyn/issues/9719")>
+        Public Sub Bug9719()
+            ' repro was simpler than what's on the github issue - before any fixes, the below snippit triggered the crash
+            Dim source =
+                <compilation>
+                    <file name="a.vb">
+                        <![CDATA[
+Imports System
+
+<Assembly: CLSCompliant(True)>
+
+Public Class C
+    Public Sub Problem(item As DummyModule)
+    End Sub
+End Class
+
+Public Module DummyModule
+
+End Module
+                        ]]>
+                    </file>
+                </compilation>
+
+            CreateCompilationWithMscorlib45AndVBRuntime(source).AssertTheseDiagnostics(<errors><![CDATA[
+BC30371: Module 'DummyModule' cannot be used as a type.
+    Public Sub Problem(item As DummyModule)
+                               ~~~~~~~~~~~
+]]></errors>)
         End Sub
 
     End Class

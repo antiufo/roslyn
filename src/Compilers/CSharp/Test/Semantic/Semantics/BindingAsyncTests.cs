@@ -842,12 +842,13 @@ class Test
 }";
 
             CreateCompilationWithMscorlib45(source).VerifyDiagnostics(
-                /// (10,32): error CS4032: The 'await' operator can only be used within an async method. Consider marking this method with the 'async' modifier and changing its return type to 'Task<int>'.
+                // (10,32): error CS4032: The 'await' operator can only be used within an async method. Consider marking this method with the 'async' modifier and changing its return type to 'Task<int>'.
                 //     static int Foo(int[] arr = await t)
-                Diagnostic(ErrorCode.ERR_BadAwaitWithoutAsyncMethod, "await t").WithArguments("int"),
-                // (10,26): error CS1750: A value of type '?' cannot be used as a default parameter because there are no standard conversions to type 'int[]'
+                Diagnostic(ErrorCode.ERR_BadAwaitWithoutAsyncMethod, "await t").WithArguments("int").WithLocation(10, 32),
+                // (10,26): error CS1750: A value of type 'void' cannot be used as a default parameter because there are no standard conversions to type 'int[]'
                 //     static int Foo(int[] arr = await t)
-                Diagnostic(ErrorCode.ERR_NoConversionForDefaultParam, "arr").WithArguments("?", "int[]"));
+                Diagnostic(ErrorCode.ERR_NoConversionForDefaultParam, "arr").WithArguments("void", "int[]").WithLocation(10, 26)
+                );
         }
 
         [Fact]
@@ -1075,7 +1076,7 @@ class Driver
             CreateCompilationWithMscorlib45(source).VerifyDiagnostics();
         }
 
-        [WorkItem(611150, "DevDiv")]
+        [WorkItem(611150, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/611150")]
         [Fact]
         public void AwaitInLambdaInLock()
         {
@@ -2389,7 +2390,7 @@ partial class Test
                 Diagnostic(ErrorCode.WRN_AsyncLacksAwaits, "Foo"));
         }
 
-        [WorkItem(611150, "DevDiv")]
+        [WorkItem(611150, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/611150")]
         [Fact]
         public void UnobservedAwaitableExpression_ForgetAwait12()
         {
@@ -2444,7 +2445,7 @@ class Test
                 Diagnostic(ErrorCode.WRN_UnobservedAwaitableExpression, "Meth((int?)null)"));
         }
 
-        [WorkItem(611150, "DevDiv")]
+        [WorkItem(611150, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/611150")]
         [Fact]
         public void UnobservedAwaitableExpression_ForgetAwait12_breaking()
         {
@@ -3121,6 +3122,43 @@ class Test : IDisposable
         }
 
         [Fact]
+        public void UnobservedAwaitableExpression_Script()
+        {
+            var source =
+@"using System.Threading.Tasks;
+Task.FromResult(1);
+Task.FromResult(2);";
+            var compilation = CreateCompilationWithMscorlib45(source, parseOptions: TestOptions.Script);
+            compilation.VerifyDiagnostics(
+                // (2,1): warning CS4014: Because this call is not awaited, execution of the current method continues before the call is completed. Consider applying the 'await' operator to the result of the call.
+                // Task.FromResult(1);
+                Diagnostic(ErrorCode.WRN_UnobservedAwaitableExpression, "Task.FromResult(1)").WithLocation(2, 1),
+                // (3,1): warning CS4014: Because this call is not awaited, execution of the current method continues before the call is completed. Consider applying the 'await' operator to the result of the call.
+                // Task.FromResult(2);
+                Diagnostic(ErrorCode.WRN_UnobservedAwaitableExpression, "Task.FromResult(2)").WithLocation(3, 1));
+        }
+
+        [Fact]
+        public void UnobservedAwaitableExpression_Submission()
+        {
+            var source0 =
+@"using System.Threading.Tasks;
+Task.FromResult(1);
+Task.FromResult(2)";
+            var submission = CSharpCompilation.CreateScriptCompilation(
+                "s0.dll",
+                syntaxTree: SyntaxFactory.ParseSyntaxTree(source0, options: TestOptions.Script),
+                references: new[] { MscorlibRef_v4_0_30316_17626 });
+            submission.VerifyDiagnostics(
+                // (2,1): warning CS4014: Because this call is not awaited, execution of the current method continues before the call is completed. Consider applying the 'await' operator to the result of the call.
+                // Task.FromResult(1);
+                Diagnostic(ErrorCode.WRN_UnobservedAwaitableExpression, "Task.FromResult(1)").WithLocation(2, 1),
+                // (3,1): warning CS4014: Because this call is not awaited, execution of the current method continues before the call is completed. Consider applying the 'await' operator to the result of the call.
+                // Task.FromResult(2);
+                Diagnostic(ErrorCode.WRN_UnobservedAwaitableExpression, "Task.FromResult(2)").WithLocation(3, 1));
+        }
+
+        [Fact]
         public void BadAsyncMethodWithNoStatementBody()
         {
             var source = @"
@@ -3131,7 +3169,7 @@ static class Test
     static async Task M1();
 }";
             CreateCompilationWithMscorlib45(source).VerifyDiagnostics(
-                // (6,23): error CS1994: The 'async' modifier can only be used in methods that have a statement body
+                // (6,23): error CS1994: The 'async' modifier can only be used in methods that have a body
                 //     static async Task M1();
                 Diagnostic(ErrorCode.ERR_BadAsyncLacksBody, "M1"));
         }
@@ -3147,7 +3185,7 @@ static class Test
     static async Task M1(__arglist);
 }";
             CreateCompilationWithMscorlib45(source).VerifyDiagnostics(
-                // (6,23): error CS1994: The 'async' modifier can only be used in methods that have a statement body
+                // (6,23): error CS1994: The 'async' modifier can only be used in methods that have a body
                 //     static async Task M1(__arglist);
                 Diagnostic(ErrorCode.ERR_BadAsyncLacksBody, "M1"));
         }
@@ -3406,7 +3444,7 @@ public class D
                 Diagnostic(ErrorCode.ERR_SecurityCriticalOrSecuritySafeCriticalOnAsync, "SecuritySafeCritical").WithArguments("SecuritySafeCritical"));
         }
 
-        [Fact, WorkItem(547077, "DevDiv")]
+        [Fact, WorkItem(547077, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/547077")]
         public void Repro_17880()
         {
             var source = @"
@@ -3422,7 +3460,7 @@ class Program
                 Diagnostic(ErrorCode.WRN_AsyncLacksAwaits, "Meth"));
         }
 
-        [Fact, WorkItem(547079, "DevDiv")]
+        [Fact, WorkItem(547079, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/547079")]
         public void Repro_17883()
         {
             var source = @"
@@ -3439,12 +3477,12 @@ class Test
     }
 }";
             CreateCompilationWithMscorlib45(source).VerifyDiagnostics(
-                // (4,32): error CS1994: The 'async' modifier can only be used in methods that have a statement body.
+                // (4,32): error CS1994: The 'async' modifier can only be used in methods that have a body.
                 //     public async abstract void M1();
                 Diagnostic(ErrorCode.ERR_BadAsyncLacksBody, "M1"));
         }
 
-        [Fact, WorkItem(547081, "DevDiv")]
+        [Fact, WorkItem(547081, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/547081")]
         public void Repro_17885()
         {
             var source = @"
@@ -3463,7 +3501,7 @@ class Test
                 Diagnostic(ErrorCode.ERR_MainCantBeAsync, "Main").WithArguments("Test.Main()"));
         }
 
-        [Fact, WorkItem(547088, "DevDiv")]
+        [Fact, WorkItem(547088, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/547088")]
         public void Repro_17914()
         {
             var source = @"
@@ -3538,7 +3576,7 @@ public class C
         }
 
         [Fact]
-        [WorkItem(552382, "DevDiv")]
+        [WorkItem(552382, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/552382")]
         public void GetAwaiterIsExtension()
         {
             var source =
@@ -3580,7 +3618,7 @@ namespace B
         }
 
         [Fact]
-        [WorkItem(576311, "DevDiv")]
+        [WorkItem(576311, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/576311")]
         public void BadDelegateTypeForAsync()
         {
             var source =
@@ -3602,7 +3640,7 @@ class C
            );
         }
 
-        [WorkItem(588706, "DevDiv")]
+        [WorkItem(588706, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/588706")]
         [Fact]
         public void AsyncAsLambdaParameter()
         {
@@ -3626,7 +3664,7 @@ class C
         }
 
         [Fact]
-        [WorkItem(629368, "DevDiv")]
+        [WorkItem(629368, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/629368")]
         public void GetAwaiterFieldUsedLikeMethod()
         {
             string source = @"
@@ -3650,7 +3688,7 @@ public class C
         }
 
         [Fact]
-        [WorkItem(629368, "DevDiv")]
+        [WorkItem(629368, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/629368")]
         public void GetAwaiterPropertyUsedLikeMethod()
         {
             string source = @"
@@ -3674,7 +3712,7 @@ public class C
         }
 
         [Fact]
-        [WorkItem(628619, "DevDiv")]
+        [WorkItem(628619, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/628619")]
         public void ReturnExpressionNotConvertible()
         {
             string source = @"
@@ -3696,7 +3734,7 @@ class Program
         }
 
         [Fact]
-        [WorkItem(632824, "DevDiv")]
+        [WorkItem(632824, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/632824")]
         public void RefParameterOnAsyncLambda()
         {
             string source = @"
@@ -3728,7 +3766,7 @@ class C
         }
 
         [Fact]
-        [WorkItem(858059, "DevDiv")]
+        [WorkItem(858059, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/858059")]
         public void UnawaitedVersusLambda()
         {
             string source =
@@ -3782,6 +3820,42 @@ public class Program
                 //         Action y2 = async () => YAsync(); // warn
                 Diagnostic(ErrorCode.WRN_AsyncLacksAwaits, "async () => YAsync()").WithLocation(15, 21)
                 );
+        }
+
+        [Fact()]
+        public void DelegateTypeWithNoInvokeMethod()
+        {
+            // Delegate type with no Invoke method.
+            var ilSource =
+@".class public auto ansi sealed D`1<T>
+       extends [mscorlib]System.MulticastDelegate
+{
+  .method public hidebysig specialname rtspecialname 
+          instance void  .ctor(object 'object',
+                               native int 'method') runtime managed
+  {
+  }
+}";
+            var source =
+@"using System;
+using System.Threading.Tasks;
+class C
+{
+    static void F(D<Task> d) { }
+    static void F<T>(D<Task<T>> d) { }
+    static void F(Func<Task> f) { }
+    static void F<T>(Func<Task<T>> f) { }
+    static void M()
+    {
+#pragma warning disable CS1998
+        F(async () => { });
+        F(async () => { return 3; });
+#pragma warning restore CS1998
+    }
+}";
+            var reference = CompileIL(ilSource);
+            var compilation = CreateCompilationWithMscorlib45(source, references: new[] { reference });
+            compilation.VerifyEmitDiagnostics();
         }
     }
 }

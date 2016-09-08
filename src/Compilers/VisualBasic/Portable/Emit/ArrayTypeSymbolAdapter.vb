@@ -21,27 +21,27 @@ Namespace Microsoft.CodeAnalysis.VisualBasic.Symbols
             End If
         End Function
 
-        Private ReadOnly Property IArrayTypeReferenceIsVector As Boolean Implements Cci.IArrayTypeReference.IsVector
+        Private ReadOnly Property IArrayTypeReferenceIsSZArray As Boolean Implements Cci.IArrayTypeReference.IsSZArray
             Get
-                Return Me.Rank = 1
+                Return Me.IsSZArray
             End Get
         End Property
 
-        Private ReadOnly Property IArrayTypeReferenceLowerBounds As IEnumerable(Of Integer) Implements Cci.IArrayTypeReference.LowerBounds
+        Private ReadOnly Property IArrayTypeReferenceLowerBounds As ImmutableArray(Of Integer) Implements Cci.IArrayTypeReference.LowerBounds
             Get
-                Return Linq.Enumerable.Repeat(0, Me.Rank)
+                Return LowerBounds
             End Get
         End Property
 
-        Private ReadOnly Property IArrayTypeReferenceRank As UInteger Implements Cci.IArrayTypeReference.Rank
+        Private ReadOnly Property IArrayTypeReferenceRank As Integer Implements Cci.IArrayTypeReference.Rank
             Get
-                Return CType(Me.Rank, UInteger)
+                Return Rank
             End Get
         End Property
 
-        Private ReadOnly Property IArrayTypeReferenceSizes As IEnumerable(Of ULong) Implements Cci.IArrayTypeReference.Sizes
+        Private ReadOnly Property IArrayTypeReferenceSizes As ImmutableArray(Of Integer) Implements Cci.IArrayTypeReference.Sizes
             Get
-                Return SpecializedCollections.EmptyEnumerable(Of ULong)()
+                Return Sizes
             End Get
         End Property
 

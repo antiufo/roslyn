@@ -93,17 +93,17 @@ class Maine
 extern alias Bar;
 Bar::NS.Foo d = new Bar::NS.Foo();
 ";
-            var comp = CreateCompilationWithMscorlib(src, options: new CSharpCompilationOptions(OutputKind.ConsoleApplication), parseOptions: TestOptions.Script);
+            var comp = CreateCompilationWithMscorlib45(src, options: new CSharpCompilationOptions(OutputKind.ConsoleApplication), parseOptions: TestOptions.Script);
             comp = comp.AddReferences(Foo1, Foo2);
             comp.VerifyDiagnostics();
         }
 
-        [ClrOnlyFact(ClrOnlyReason.Submission)]
+        [Fact]
         public void ExternAliasInInteractive_Error()
         {
             var src = "extern alias Bar;";
 
-            var comp = CSharpCompilation.CreateSubmission(
+            var comp = CSharpCompilation.CreateScriptCompilation(
                 GetUniqueName(),
                 syntaxTree: SyntaxFactory.ParseSyntaxTree(src, options: TestOptions.Script),
                 references: new MetadataReference[] { MscorlibRef, ExternAliasTests.Foo1, ExternAliasTests.Foo2 });
@@ -361,7 +361,7 @@ class A : Bar::NS.Foo {}
             Assert.Equal(SymbolKind.Alias, alias1.Kind);
         }
 
-        [WorkItem(546729, "DevDiv")]
+        [WorkItem(546729, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/546729")]
         [Fact]
         public void Crash16681()
         {
@@ -384,7 +384,7 @@ class A : Bar::NS.Foo {}
                 Diagnostic(ErrorCode.HDN_UnusedExternAlias, "extern alias Bar;"));
         }
 
-        [WorkItem(529751, "DevDiv")]
+        [WorkItem(529751, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529751")]
         [Fact]
         public void SameExternAliasInMultipleTreesValid()
         {
@@ -416,7 +416,7 @@ class A : Bar::NS.Foo {}
             Assert.True(targets.All(target => ReferenceEquals(firstTarget, target)));
         }
 
-        [WorkItem(529751, "DevDiv")]
+        [WorkItem(529751, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/529751")]
         [Fact]
         public void SameExternAliasInMultipleTreesInvalid()
         {
@@ -441,7 +441,7 @@ class A : Bar::NS.Foo {}
             Assert.True(targets.All(target => ReferenceEquals(firstTarget, target)));
         }
 
-        [WorkItem(875899, "DevDiv")]
+        [WorkItem(875899, "http://vstfdevdiv:8080/DevDiv2/DevDiv/_workitems/edit/875899")]
         [Fact]
         public void SymbolInfoForExternAliasInAliasTarget()
         {
